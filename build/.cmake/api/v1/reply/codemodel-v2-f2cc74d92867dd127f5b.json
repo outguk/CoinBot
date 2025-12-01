@@ -1,0 +1,89 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"childIndexes" : 
+					[
+						1,
+						2
+					],
+					"jsonFile" : "directory-.-Debug-d0094a50bb2071803777.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.8"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0
+					]
+				},
+				{
+					"build" : "src",
+					"jsonFile" : "directory-src-Debug-c94b7c2814d5a21df52c.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.8"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 0,
+					"source" : "src"
+				},
+				{
+					"build" : "tests",
+					"jsonFile" : "directory-tests-Debug-70e4927a02b591d5c1f8.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.8"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 0,
+					"source" : "tests"
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0,
+						1,
+						2
+					],
+					"name" : "CoinBot",
+					"targetIndexes" : 
+					[
+						0
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "CoinBot::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-CoinBot-Debug-663a8eb6518f9acff9bd.json",
+					"name" : "CoinBot",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "C:/cpp/CoinBot/build",
+		"source" : "C:/cpp/CoinBot"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 8
+	}
+}

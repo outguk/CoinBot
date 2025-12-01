@@ -37,11 +37,19 @@ if (POLICY CMP0141)
   set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<IF:$<AND:$<C_COMPILER_ID:MSVC>,$<CXX_COMPILER_ID:MSVC>>,$<$<CONFIG:Debug,RelWithDebInfo>:EditAndContinue>,$<$<CONFIG:Debug,RelWithDebInfo>:ProgramDatabase>>")
 endif()
 
+# VCPKG Toolchain 설정
+set(CMAKE_TOOLCHAIN_FILE "c:/git-repository/vcpkg/scripts/buildsystems/vcpkg.cmake")
+
 # Add source to this project's executable.
 add_executable (CoinBot 
     ${PROJECT_SOURCE_DIR}/src/app/CoinBot.cpp
     ${PROJECT_SOURCE_DIR}/CoinBot.h
   "src/core/domain/OrderEnums.h" "src/core/domain/Types.h" "src/core/domain/Instrument.h" "src/core/domain/Order.h" "src/core/domain/Trade.h" "src/core/domain/Position.h" "src/core/domain/Account.h" "src/core/domain/Ticker.h" "src/core/domain/Candle.h" "src/core/domain/OrderBook.h")
+
+  # fmt 패키지 찾기
+find_package(fmt CONFIG REQUIRED)
+target_link_libraries(CoinBot PRIVATE fmt::fmt)
+
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET CoinBot PROPERTY CXX_STANDARD 20)

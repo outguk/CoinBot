@@ -20,8 +20,8 @@ namespace core
 		std::vector<Position>	positions;			// 보유 포지션(코인) 목록
 
 		// 추후 정리
-		double					balance;			// 총 잔고
-		double					availableFunds;		// 사용 가능한 예수금
-		Amount					totalAssetValue;	// 총 자산 가치 (예: 잔고 + 미체결 주문 금액)
+		double					balance = 0;			// 총 잔고
+		double					availableFunds = 0;		// 사용 가능한 예수금
+		Amount					totalAssetValue = 0;	// 총 자산 가치 (예: 잔고 + 미체결 주문 금액)
 	};
 }
