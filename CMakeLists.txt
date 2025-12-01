@@ -41,7 +41,7 @@ endif()
 add_executable (CoinBot 
     ${PROJECT_SOURCE_DIR}/src/app/CoinBot.cpp
     ${PROJECT_SOURCE_DIR}/CoinBot.h
-)
+  "src/core/domain/OrderEnums.h" "src/core/domain/Types.h" "src/core/domain/Instrument.h" "src/core/domain/Order.h" "src/core/domain/Trade.h" "src/core/domain/Position.h" "src/core/domain/Account.h" "src/core/domain/Ticker.h" "src/core/domain/Candle.h" "src/core/domain/OrderBook.h")
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET CoinBot PROPERTY CXX_STANDARD 20)
