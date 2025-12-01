@@ -1,0 +1,7 @@
+C:/cpp/CoinBot/build/CMakeFiles/CoinBot.dir
+C:/cpp/CoinBot/build/CMakeFiles/edit_cache.dir
+C:/cpp/CoinBot/build/CMakeFiles/rebuild_cache.dir
+C:/cpp/CoinBot/build/src/CMakeFiles/edit_cache.dir
+C:/cpp/CoinBot/build/src/CMakeFiles/rebuild_cache.dir
+C:/cpp/CoinBot/build/tests/CMakeFiles/edit_cache.dir
+C:/cpp/CoinBot/build/tests/CMakeFiles/rebuild_cache.dir

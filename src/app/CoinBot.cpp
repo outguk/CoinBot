@@ -4,6 +4,8 @@
 #include "../core/domain/Order.h"
 #include "../core/domain/Ticker.h"
 
+#include <fmt/core.h>
+
 int main() {
     using namespace core;
 

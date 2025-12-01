@@ -56,6 +56,16 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release"
             }
+        },
+        {
+          "name": "vcpkg",
+          "generator": "Ninja",
+          "binaryDir": "${sourceDir}/build",
+          "cacheVariables": {
+            "CMAKE_TOOLCHAIN_FILE": "C:/git-repository/vcpkg/scripts/buildsystems/vcpkg.cmake",
+            "VCPKG_TARGET_TRIPLET": "x64-windows"
+          }
         }
+
     ]
 }
