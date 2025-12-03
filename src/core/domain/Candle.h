@@ -2,7 +2,7 @@
 #pragma once
 
 #include <chrono>
-#include "Instrument.h"
+#include "MarketInfo.h"
 #include "Types.h"
 
 namespace core {
@@ -12,7 +12,7 @@ namespace core {
     */
 
     struct Candle {
-		Instrument instrument; // 종목 정보
+		MarketInfo	market;		// 종목 정보
 
 		Price  open;			// 시가
 		Price  high;			// 고가

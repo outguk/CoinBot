@@ -1,3 +1,10 @@
+Package: vcpkg-cmake
+Version: 2024-04-23
+Architecture: x64-windows
+Multi-Arch: same
+Abi: d1bbfe794bf5f20d76941742337f2d926b2b37b2380f98506525ab844a4d059c
+Status: install ok installed
+
 Package: vcpkg-cmake-config
 Version: 2024-05-23
 Architecture: x64-windows
@@ -5,12 +12,21 @@ Multi-Arch: same
 Abi: c573653f5c0662cf8a26d06fdb8e3ad2f9075f146b5c22aa9510a37563b26cbb
 Status: install ok installed
 
-Package: vcpkg-cmake
-Version: 2024-04-23
+Package: vcpkg-boost
+Version: 2025-03-29
+Depends: vcpkg-cmake, vcpkg-cmake-config
 Architecture: x64-windows
 Multi-Arch: same
-Abi: d1bbfe794bf5f20d76941742337f2d926b2b37b2380f98506525ab844a4d059c
-Status: install ok installed
+Abi: 206959cdd1495db48ef7cd1ad8cdfb3b19fa71afddcb8bfc26d652b7e1f1a16e
+Status: purge ok not-installed
+
+Package: boost-uninstall
+Version: 1.88.0
+Architecture: x64-windows
+Multi-Arch: same
+Abi: a538ba382931b3ab0b1c14ffd06611f89525f44e6bb103db7f68d80e26d5467e
+Description: Internal vcpkg port used to uninstall Boost
+Status: purge ok not-installed
 
 Package: fmt
 Version: 11.2.0
@@ -19,5 +35,13 @@ Architecture: x64-windows
 Multi-Arch: same
 Abi: 74c34e02bebf580bb69885f7d62b5aae7f9172d7f4bae1445d335d249964ed39
 Description: {fmt} is an open-source formatting library providing a fast and safe alternative to C stdio and C++ iostreams.
+Status: install ok installed
+
+Package: vcpkg-cmake-get-vars
+Version: 2025-05-29
+Depends: vcpkg-cmake
+Architecture: x64-windows
+Multi-Arch: same
+Abi: 24a67e4148454f4c16be8c73e394b81b8e762f0db0e258c188c12c50c0ae2211
 Status: install ok installed
 
