@@ -19,7 +19,7 @@ namespace core
 	struct Order 
 	{
 		std::string			id;						// 내부 주문 ID (UUID 등)
-		Instrument			instrument;				// 거래 상품 정보
+		MarketInfo			market;					// 거래 상품 정보
 		OrderPosition		position;				// 매수/매도 구분
 		OrderType			type;					// 주문 타입 (시장가/지정가)
 		Price				price;					// 주문 가격

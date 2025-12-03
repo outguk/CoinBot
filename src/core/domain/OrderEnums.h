@@ -30,5 +30,10 @@ namespace core
 		Rejected	// ¡÷πÆ ∞≈∫Œµ 
 	};
 
+	enum class PriceChangeState {
+		Even,
+		Rise,
+		Fall
+	};
 
 }

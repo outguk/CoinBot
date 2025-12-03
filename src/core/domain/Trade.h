@@ -2,7 +2,7 @@
 #pragma once
 
 #include <string>
-#include "Instrument.h"
+#include "MarketInfo.h"
 #include "Types.h"
 #include "OrderEnums.h"
 

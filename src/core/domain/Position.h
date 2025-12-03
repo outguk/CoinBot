@@ -3,7 +3,7 @@
 
 #include <string>
 #include "Types.h"
-#include "Instrument.h"
+#include "MarketInfo.h"
 
 namespace core 
 {
@@ -16,7 +16,7 @@ namespace core
 
 	struct Position 
 	{
-		Instrument	instrument;		// 거래 상품 정보
+		MarketInfo	market;			// 거래 상품 정보
 		Volume		volume;			// 보유 수량 
 		Amount		averagePrice;	// 평단가 (원화 기준)
 	};

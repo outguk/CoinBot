@@ -4,7 +4,8 @@
 #include "../core/domain/Order.h"
 #include "../core/domain/Ticker.h"
 
-#include <fmt/core.h>
+#include <boost/version.hpp>
+#include <json.hpp>
 
 int main() {
     using namespace core;

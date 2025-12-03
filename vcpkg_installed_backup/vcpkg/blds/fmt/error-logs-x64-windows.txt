@@ -1,5 +1,0 @@
-C:\cpp\CoinBot\vcpkg_installed\vcpkg\blds\fmt\config-x64-windows-dbg-CMakeCache.txt.log
-C:\cpp\CoinBot\vcpkg_installed\vcpkg\blds\fmt\config-x64-windows-rel-CMakeCache.txt.log
-C:\cpp\CoinBot\vcpkg_installed\vcpkg\blds\fmt\config-x64-windows-dbg-CMakeConfigureLog.yaml.log
-C:\cpp\CoinBot\vcpkg_installed\vcpkg\blds\fmt\config-x64-windows-rel-CMakeConfigureLog.yaml.log
-C:\cpp\CoinBot\vcpkg_installed\vcpkg\blds\fmt\config-x64-windows-out.log
