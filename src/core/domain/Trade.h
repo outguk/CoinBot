@@ -4,25 +4,28 @@
 #include <string>
 #include "MarketInfo.h"
 #include "Types.h"
-#include "OrderEnums.h"
+#include "OrderTypes.h"
 
 namespace core 
 {
 
 	/*
-	* 주문 결과
-	* 주문이 실제로 어느 가격·수량으로 체결됐는지
-	* 트레이딩의 결과
+	* 지정한 페어의 최근 체결 목록을 조회
+	* 종목의 최근 정보	
+	* 
+	* - 실시간 매수/매도 흐름 감지
+	* - 체결 속도, 연속성 기반 타이밍 포착
+	* - 거래량 급증, 매도세 쏠림 등 비정형 조건 감지
 	*/
 
 	struct Trade 
 	{	
-		std::string		id;					// 거래 ID
-		std::string		orderId;			// 부분 체결될 때 어떤 주문에 속하는지 알기 위한 주문 ID
-		Instrument		instrument;			// 거래 상품 정보
-		OrderPosition	position;			// 매수/매도 구분
-		Price			price;				// 거래 가격
-		Volume			volume;				// 거래 수량
-		Amount			amount;				// 거래 금액 (price * quantity)
+		std::string		market;				// 마켓 코드 (ex: KRW-BTC)
+		int				timestamp;			// 체결 시각의 밀리초단위 타임스탬프
+
+		Price			trade_price;		// 거래 가격
+		Volume			trade_volume;		// 거래 수량
+
+		OrderPosition	position;			// 매수/매도 구분 (ASK, BID)
 	};
 }

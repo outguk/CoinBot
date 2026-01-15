@@ -16,9 +16,12 @@ namespace core
 
 	struct Position 
 	{
-		MarketInfo	market;			// 거래 상품 정보
-		Volume		volume;			// 보유 수량 
-		Amount		averagePrice;	// 평단가 (원화 기준)
+		std::string		currency;			// 거래 상품 정보
+		double			balance;			// 주문 가능 수량 또는 금액
+		
+		Price			avg_buy_price;		// 매수 평균가
+
+		std::string		unit_currency;		// 평균가 기준 통화 (매수 평균가의 단위 KRW)
 	};
 
 

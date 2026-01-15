@@ -16,12 +16,17 @@ set(CMAKE_CXX_EXTENSIONS OFF) # 컴파일러의 비표준 확장(-std=gnu++20 �
 set(BOOST_ROOT "C:/git-repository/boost_1_89_0")
 set(BOOST_LIBRARYDIR "${BOOST_ROOT}/stage/lib")   # 빌드된 .lib 위치
 set(Boost_NO_SYSTEM_PATHS ON)          # 시스템 경로 무시하고 위 경로 우선
-set(Boost_USE_STATIC_LIBS ON)         # 위에서 static으로 빌드 했다면 ON
+set(Boost_USE_STATIC_LIBS ON)          # 위에서 static으로 빌드 했다면 ON
 
 # OpenSSL 경로 직접 지정
 set(OPENSSL_ROOT_DIR "C:/git-repository/OpenSSL-Win64")
 set(OPENSSL_USE_STATIC_LIBS OFF)
 
+
+# (선택) VS IntelliSense에 도움이 되는 경우가 많음
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# ---- 찾기 ----
 find_package(Boost 1.80 REQUIRED COMPONENTS thread chrono)
 find_package(OpenSSL REQUIRED)
 
@@ -33,7 +38,7 @@ option(COINBOT_BUILD_TESTS "Build unit tests" ON) # 유닛 테스트를 빌드�
 include_directories(${CMAKE_SOURCE_DIR}/include) # 프로젝트 루트 / include 디렉토리
 
 # coinbot/src/ 폴더 안에 있는 CMakeLists.txt를 읽어서 처리해라
-add_subdirectory(src)
+ # add_subdirectory(src)
 
 # 위에서 만든 옵션 COINBOT_BUILD_TESTS가 ON 일 때만 tests 폴더를 CMake 빌드 트리 안으로 포함시켜라
 if (COINBOT_BUILD_TESTS)
@@ -53,7 +58,7 @@ endif()
 add_executable (CoinBot 
     ${PROJECT_SOURCE_DIR}/src/app/CoinBot.cpp
     ${PROJECT_SOURCE_DIR}/CoinBot.h
-  "src/core/domain/OrderEnums.h" "src/core/domain/Types.h" "src/core/domain/MarketInfo.h" "src/core/domain/Order.h" "src/core/domain/Trade.h" "src/core/domain/Position.h" "src/core/domain/Account.h" "src/core/domain/Ticker.h" "src/core/domain/Candle.h" "src/core/domain/OrderBook.h" "src/api/upbit/UpbitDtos.h" "src/api/upbit/UpbitConverters.h" "src/api/upbit/UpbitPublicRestClient.h" "src/api/upbit/UpbitPublicRestClient.cpp")
+  "src/core/domain/OrderTypes.h" "src/core/domain/Types.h" "src/core/domain/MarketInfo.h" "src/core/domain/Order.h" "src/core/domain/Trade.h" "src/core/domain/Position.h" "src/core/domain/Account.h" "src/core/domain/Ticker.h" "src/core/domain/Candle.h" "src/core/domain/Orderbook.h" "src/api/upbit/dto/UpbitQuotationDtos.h" "src/api/upbit/UpbitPublicRestClient.h" "src/api/upbit/UpbitPublicRestClient.cpp" "src/api/upbit/dto/UpbitAssetOrderDtos.h" "src/api/upbit/dto/UpbitWithdrawalDtos.h" "src/api/rest/RestClient.cpp" "src/api/rest/HttpTypes.h" "src/api/rest/RetryPolicy.h" "src/api/rest/RestClient.h" "src/api/rest/RestError.h"  "src/app/TestUpbitPublic.cpp" "src/api/upbit/mappers/MarketMapper.h"  "src/api/upbit/mappers/TickerMapper.h" "src/api/upbit/mappers/CandleMapper.h" "src/api/upbit/mappers/TimeFrameMapper.h" "src/api/upbit/mappers/OrderbookMapper.h" "src/core/domain/OrderRequest.h" "src/core/domain/MyTrade.h" "src/engine/IOrderEngine.h"  "src/engine/FeePolicy.h" "src/engine/EngineResult.h" "src/engine/OrderStore.h" "src/engine/OrderStore.cpp"  "src/app/OrderEngineDemo.cpp"   "src/trading/indicators/RingBuffer.h" "src/trading/indicators/Sma.h" "src/trading/indicators/Sma.cpp" "src/trading/indicators/ClosePriceWindow.h" "src/trading/indicators/ClosePriceWindow.cpp" "src/trading/indicators/ChangeVolatilityIndicator.h" "src/trading/indicators/ChangeVolatilityIndicator.cpp" "src/trading/indicators/RsiWilder.h" "src/trading/indicators/RsiWilder.cpp" "src/trading/strategies/RsiMeanReversionStrategy.cpp" "src/trading/strategies/RsiMeanReversionStrategy.h" "src/trading/strategies/StrategyTypes.h" "src/app/TestIndicators.cpp" "src/app/TestRsiMeanReversionStrategy.cpp" "src/app/TestCandleWebUpdate.cpp" "src/api/ws/UpbitWebSocketClient.h" "src/api/ws/UpbitWebSocketClient.cpp"  "src/util/ThreadSafeRingBuffer.h" "src/api/upbit/mappers/AccountMapper.h" "src/api/auth/UpbitJwtSigner.h" "src/api/auth/UpbitJwtSigner.cpp" "src/api/upbit/UpbitExchangeRestClient.h" "src/api/upbit/UpbitExchangeRestClient.cpp" "src/engine/RealOrderEngine.h" "src/engine/RealOrderEngine.cpp" "src/api/upbit/dto/UpbittWsDtos.h" "src/api/upbit/mappers/MyOrderMapper.h" "src/app/StartupRecovery.h" "src/api/upbit/mappers/OpenOrdersMapper.h" "src/app/StartupRecovery.cpp")
 
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
@@ -64,8 +69,8 @@ endif()
 # ===== CoinBot에 Boost / include 경로 연결 =====
 target_include_directories(CoinBot
     PRIVATE
-        ${Boost_INCLUDE_DIRS}
-        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/src
+        "C:/git-repository/boost_1_89_0"
         "C:/git-repository/nlohmann_json"
 )
 
@@ -79,3 +84,4 @@ target_link_libraries(CoinBot
 
 
 # TODO: Add tests and install targets if needed.
+# trading_indicators처럼 각 파일을 라이브러리로 만들어서 모듈화 작업 필요
