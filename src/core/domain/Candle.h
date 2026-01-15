@@ -2,7 +2,7 @@
 #pragma once
 
 #include <chrono>
-#include "MarketInfo.h"
+#include <string>
 #include "Types.h"
 
 namespace core {
@@ -11,16 +11,29 @@ namespace core {
 	* 들어오는 캔들(봉) 데이터 구조체
     */
 
-    struct Candle {
-		MarketInfo	market;		// 종목 정보
+	enum class TimeFrame
+	{
+		MIN_3,
+		MIN_5,
+		MIN_10,
+		MIN_15,
+		MIN_30,
+		MIN_60,
+		MIN_240
+	};
 
-		Price  open;			// 시가
-		Price  high;			// 고가
-		Price  low;				// 저가
-		Price  close;			// 종가
+    struct Candle 
+	{
+		std::string	market;		// 종목 정보
+
+		Price  open_price;		// 시가
+		Price  high_price;		// 고가
+		Price  low_price;		// 저가
+		Price  close_price;		// 종가
+
 		Volume volume;			// 거래량
 
-		std::chrono::system_clock::time_point timestamp; // 정보가 들어온 시각
+		std::string start_timestamp;			// 정보가 들어온 시각
     };
 
 } // namespace core

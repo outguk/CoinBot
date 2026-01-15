@@ -16,7 +16,7 @@ namespace core {
     */
 
     struct Ticker {
-        MarketInfo          market;                         // 종목 정보
+        std::string         market;                         // 종목 정보
 
         // 가격
         Price				ticker_opening_price;			// 해당 페어의 시가
@@ -24,13 +24,17 @@ namespace core {
         Price				ticker_low_price;				// 해당 페어의 저가
         Price				ticker_trade_price;			    // 해당 페어의 종가(최종 체결가)
 
-        // 거래량
-        Volume				trade_volume;			// 해당 페어의 최근 거래량
+        Price				prev_closing_price;		        // 전일 종가 (UTC0시 기준)
+        int					trade_timestamp;		        // 체결 시각의 밀리초단위 타임스탬프
 
-        Price				acc_trade_price;		// 해당 페어의 누적 거래대금 (UTC 0시부터 누적)
-        Price				acc_trade_price_24h;	// 해당 페어의 24시간 누적 거래대금
-        Volume				acc_trade_volume;		// 해당 페어의 누적 거래량 (UTC 0시부터 누적)
-        Volume				acc_trade_volume_24h;	// 해당 페어의 24시간 누적 거래량
+        double				change_price;	                // 부호 있는 가격 변화 (change_price와 동일하지만 부호 존재)
+        double				change_rate;		            // 부호 있는 가격 변화율 (change_rate와 동일하지만 부호 존재)
+
+        // 거래량
+        Volume				trade_volume;			        // 해당 페어의 최근 거래량
+        Volume				acc_trade_volume;		        // 해당 페어의 누적 거래량 (UTC 0시부터 누적)
+        Volume				acc_trade_volume_24h;	        // 해당 페어의 24시간 누적 거래량
+
 
         std::chrono::system_clock::time_point timestamp; // 정보가 들어온 시각
     };
