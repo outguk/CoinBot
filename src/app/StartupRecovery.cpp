@@ -156,7 +156,7 @@ namespace app {
         {
             if (p.currency == base && p.unit_currency == unit)
             {
-                pos.coin = p.balance;
+                pos.coin = p.free;
                 pos.avg_entry_price = p.avg_buy_price;
                 break;
             }

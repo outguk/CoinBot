@@ -17,7 +17,7 @@ namespace core
 	struct Position 
 	{
 		std::string		currency;			// 거래 상품 정보
-		double			balance;			// 주문 가능 수량 또는 금액
+		double			free;			// 주문 가능 수량 또는 금액
 		
 		Price			avg_buy_price;		// 매수 평균가
 

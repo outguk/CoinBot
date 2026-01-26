@@ -31,13 +31,13 @@ static void printAccount(const core::Account& a)
     {
         if (p.currency == "KRW") continue;
         std::cout << "  - " << p.currency
-            << " | balance=" << p.balance
+            << " | balance=" << p.free
             << " | avg_buy=" << p.avg_buy_price
             << " | unit=" << p.unit_currency << "\n";
     }
 }
 
-int main()
+int TestUpbitPublic()
 {
     // ÇÑ±Û ±úÁü ¹æÁö
     SetConsoleOutputCP(CP_UTF8);

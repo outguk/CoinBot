@@ -3,6 +3,7 @@
 #include <algorithm> // std::max, std::min
 #include <cmath>     // std::abs
 #include <utility>   // std::move
+#include <iostream>
 
 // 재시작/멀티프로세스 안전한 client_order_id를 위해 UUID 사용
 #include <boost/uuid/uuid.hpp>
@@ -10,6 +11,17 @@
 #include <boost/uuid/random_generator.hpp>
 
 namespace trading::strategies {
+
+    static constexpr double kMinNotionalKrw = 5000.0;   // KRW 마켓 대표 최소 주문 금액(간단 버전)
+    static constexpr double kVolumeSafetyEps = 1e-12;   // oversell 방지용 아주 작은 마진
+
+    template <typename T>
+    void printIndicator_(const char* name, const T& ind)
+    {
+        std::cout << ' ' << name << '=';
+        if (ind.ready) std::cout << std::fixed << std::setprecision(4) << ind.v;
+        else           std::cout << "N/A";
+    }
 
     // thread_local: 멀티스레드 환경에서도 경쟁을 줄이고 생성기 안전성을 높임
     std::string makeUuidV4()
@@ -55,6 +67,8 @@ namespace trading::strategies {
         vol_.clear();
 
         last_snapshot_ = Snapshot{};
+
+        last_candle_ts_.reset();
     }
 
     void RsiMeanReversionStrategy::syncOnStart(const trading::PositionSnapshot& pos)
@@ -102,8 +116,47 @@ namespace trading::strategies {
         if (c.market != market_)
             return Decision::noAction();
 
+        // 같은 ts(같은 1분 캔들 업데이트)가 반복되면 지표에 누적하지 않음
+        if (last_candle_ts_.has_value() && *last_candle_ts_ == c.start_timestamp)
+        {
+            // 필요하면 디버그 확인용 로그(원인 검증)
+            std::cout << "[Strategy][Dedup] same candle ts ignored. market=" << c.market
+                << " ts=" << c.start_timestamp
+                << " close=" << static_cast<double>(c.close_price);
+
+            return Decision::noAction();
+        }
+        last_candle_ts_ = c.start_timestamp;
+
         // 1) 지표/필터 스냅샷 생성(여기서 update가 모두 끝남)
         const Snapshot s = buildSnapshot(c);
+        
+        // 지표 확인 로그
+        printIndicator_("rsi", s.rsi);
+        printIndicator_("vol", s.volatility);
+
+        std::cout << " trendStrength=";
+        if (s.trendReady) std::cout << std::fixed << std::setprecision(6) << s.trendStrength;
+        else              std::cout << "N/A";
+
+        // --- self-heal: 전략 상태를 실제 보유 자산과 일관되게 유지 ---
+        const double posNotional = account.coin_available * s.close;
+        const bool hasMeaningfulPos = (posNotional >= kMinNotionalKrw);
+
+        if (state_ == State::Flat && hasMeaningfulPos)
+        {
+            // restart/partial-exit/dust 상황에서 "실제 보유"를 기준으로 InPosition 복구
+            state_ = State::InPosition;
+        }
+        else if (state_ == State::InPosition && !hasMeaningfulPos)
+        {
+            // 팔 수 없는 dust면 Flat 취급해서 고착 방지
+            state_ = State::Flat;
+            entry_price_.reset();
+            stop_price_.reset();
+            target_price_.reset();
+        }
+        // -----------------------------------------------------------
 
         // 2) 상태에 따라 “진입” 또는 “청산” 판단
         switch (state_) {
@@ -184,13 +237,16 @@ namespace trading::strategies {
         const double pct = std::clamp(params_.riskPercent, 0.0, 100.0);
         const double krw_to_use = account.krw_available * (pct / 100.0);
 
+        if (krw_to_use < kMinNotionalKrw) 
+            return Decision::noAction();
+
         // 너무 작은 주문 방지(데모/실거래 공통으로 “의미 없는 주문” 방지)
         if (krw_to_use <= 0.0)
             return Decision::noAction();
 
         // 주문 생성
         const std::string cid = makeIdentifier("entry");
-        core::OrderRequest req = makeMarketBuyByAmount(krw_to_use, "entry");
+        core::OrderRequest req = makeMarketBuyByAmount(krw_to_use, "entry"); // 우선 시장가로
         req.identifier = cid;
 
         // 이 주문에 대한 부분 체결 누적을 새로 시작
@@ -213,29 +269,36 @@ namespace trading::strategies {
         if (!account.canSell())
             return Decision::noAction();
 
-        // InPosition 상태라면 entry/stop/target은 존재하는 것이 정상
-        if (!entry_price_.has_value() || !stop_price_.has_value() || !target_price_.has_value())
-            return Decision::noAction();
-
-        const double close = s.close;
-        const double stop = *stop_price_;
-        const double target = *target_price_;
-
-        // 청산 조건
-        // 1) 손절
-        const bool hitStop = (close <= stop);
-
-        // 2) 익절
-        const bool hitTarget = (close >= target);
-
-        // 3) RSI가 과매수(overbought)면 되돌림으로 판단해서 청산(선택)
+        // ------------------------ 청산 조건 ------------------------
+        // 1. 과매수 신호
         const bool rsiExit = (s.rsi.ready && (s.rsi.v >= params_.overbought));
 
-        if (!(hitStop || hitTarget || rsiExit))
-            return Decision::noAction();
+        // RSI 기반 청산은 허용해서 InPosition 고착을 방지
+        if (!entry_price_.has_value() || !stop_price_.has_value() || !target_price_.has_value())
+        {
+            if (!rsiExit)
+                return Decision::noAction();
+        }
+        else
+        {
+            const double close = s.close;
+
+            // 2. 손절
+            const bool hitStop = (close <= *stop_price_);
+
+            // 3. 익절
+            const bool hitTarget = (close >= *target_price_);
+
+            if (!(hitStop || hitTarget || rsiExit))
+                return Decision::noAction();
+        }
 
         const std::string cid = makeIdentifier("exit");
-        core::OrderRequest req = makeMarketSellByVolume(account.coin_available, "exit");
+        const double sellVol = std::max(0.0, account.coin_available - kVolumeSafetyEps);
+        if (sellVol * s.close < kMinNotionalKrw)
+            return Decision::noAction();
+
+        core::OrderRequest req = makeMarketSellByVolume(sellVol, "exit");
         req.identifier = cid;
 
         // 이 주문에 대한 부분 체결 누적을 새로 시작
@@ -306,6 +369,7 @@ namespace trading::strategies {
             }
             else
             {
+                // cancel after trade: "실질적으로 체결 발생" -> 확정 처리
                 const double vwap = pending_cost_sum_ / pending_filled_volume_;
                 if (state_ == State::PendingEntry) {
                     entry_price_ = vwap;
@@ -316,6 +380,13 @@ namespace trading::strategies {
                     // 부분 청산: 수량 추적은 계좌 스냅샷에 맡기고 InPosition 유지
                     state_ = State::InPosition;
                 }
+
+                // pending을 끝냈으니 반드시 정리하고 종료
+                pending_client_id_.reset();
+                pending_filled_volume_ = 0.0;
+                pending_cost_sum_ = 0.0;
+                pending_last_price_ = 0.0;
+                return;
             }
         }
 
@@ -356,6 +427,36 @@ namespace trading::strategies {
         // Open/Pending/New 등의 상태는 그대로 유지한다.
         // - 상태 변화는 Filled/Canceled/Rejected에서만 확정
     };
+
+    void RsiMeanReversionStrategy::onSubmitFailed()
+    {
+        // 엔진 submit(=주문 POST)이 실패하면 WS 이벤트가 절대 오지 않는다.
+        // 따라서 Pending 상태가 영원히 풀리지 않도록, 여기서 즉시 롤백한다.
+        //
+        // 정책(최소 변경):
+        // - PendingEntry: Flat으로 복귀
+        // - PendingExit : InPosition으로 복귀
+        // - 부분 체결은 "submit 실패" 케이스에서는 발생하지 않는다고 가정(POST 자체가 실패)
+
+        if (!pending_client_id_.has_value())
+            return;
+
+        if (state_ == State::PendingEntry)
+        {
+            state_ = State::Flat;
+        }
+        else if (state_ == State::PendingExit)
+        {
+            state_ = State::InPosition;
+        }
+
+        // pending 누적값 정리(안전)
+        pending_client_id_.reset();
+        pending_filled_volume_ = 0.0;
+        pending_cost_sum_ = 0.0;
+        pending_last_price_ = 0.0;
+    }
+
 
     void RsiMeanReversionStrategy::setStopsFromEntry(double entry)
     {
