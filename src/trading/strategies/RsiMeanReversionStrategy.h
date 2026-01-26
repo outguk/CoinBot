@@ -30,23 +30,27 @@ namespace trading::strategies {
         // 전략 파라미터(“숫자 튜닝”은 이 구조체에서만)
         struct Params final {
             // RSI
-            std::size_t rsiLength{ 14 };
-            double oversold{ 30.0 };
-            double overbought{ 70.0 };
+            std::size_t rsiLength{ 3 };
+            double oversold{ 80 };
+            double overbought{ 70 };
+            
+            // SMA 추가
+            int smaLength{ 20 };
+            double smaBand{ 0.0 };
 
             // 추세 강도(trendStrength) 계산용: close[N]
             // trendStrength = abs(close - closeN) / closeN
-            std::size_t trendLookWindow{ 20 };
-            double maxTrendStrength{ 0.03 }; // 3% 이상 한 방향으로 벌어졌으면 “추세 강함 → 평균회귀 부적합” 같은 필터
+            std::size_t trendLookWindow{ 3 };
+            double maxTrendStrength{ 1 }; // 3% 이상 한 방향으로 벌어졌으면 “추세 강함 → 평균회귀 부적합” 같은 필터
 
             // 변동성(최근 수익률 표준편차)
-            std::size_t volatilityWindow{ 20 };
-            double minVolatility{ 0.01 };    // 1% 이상이면 거래하기 적당(너가 말한 기준)
+            std::size_t volatilityWindow{ 3 };
+            double minVolatility{ 0 };    // 1% 이상이면 거래하기 적당
 
             // 포지션/리스크
-            double riskPercent{ 20.0 };       // 매수에 사용할 KRW 비율(계좌의 krw_available 기준)
+            double riskPercent{ 10.0 };       // 매수에 사용할 KRW 비율(계좌의 krw_available 기준)
             double stopLossPct{ 1.0 };        // 진입가 대비 손절 %
-            double profitTargetPct{ 1.5 };    // 진입가 대비 익절 %
+            double profitTargetPct{ 1 };    // 진입가 대비 익절 %
         };
 
         enum class State : std::uint8_t {
@@ -71,6 +75,7 @@ namespace trading::strategies {
 
         // (2) last snapshot getter (public)
     public:
+        // 테스트용, 현재 사용x
         [[nodiscard]] const Snapshot& lastSnapshot() const noexcept { return last_snapshot_; }
 
         // 메인 진입점: “봉 1개” 들어오면, 주문 의도가 있으면 Decision::submit 반환
@@ -81,6 +86,9 @@ namespace trading::strategies {
 
         // 주문 상태 이벤트(최종 확정/롤백 기준)
         void onOrderUpdate(const trading::OrderStatusEvent& ev);
+
+        // [필수] 엔진 submit(=주문 POST) 실패 시, Pending 상태 즉시 롤백(WS 이벤트가 절대 오지 않음)
+        void onSubmitFailed();
 
         // - 미체결 주문은 상위(앱/엔진)에서 전부 취소 후 호출(프로그램 시작 시 작동)
         void syncOnStart(const trading::PositionSnapshot& pos);
@@ -129,6 +137,7 @@ namespace trading::strategies {
 
         // 지표들
         trading::indicators::RsiWilder rsi_{};
+        //trading::indicators::Sma sma_{};
         trading::indicators::ClosePriceWindow closeN_{};
         trading::indicators::ChangeVolatilityIndicator vol_{};
 
@@ -137,6 +146,9 @@ namespace trading::strategies {
 
         // 마지막 스냅샷 저장용 멤버 (private)
         Snapshot last_snapshot_{};
+
+        // 같은 1분 캔들이 여러 번(업데이트 형태로) 들어오는 경우 중복 누적 방지용
+        std::optional<std::string> last_candle_ts_{};
     };
 
 } // namespace trading::strategies

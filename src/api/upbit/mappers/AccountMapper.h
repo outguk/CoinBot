@@ -39,7 +39,7 @@ namespace api::upbit::mappers
 			core::Position p{};
 			p.currency = row.currency;
 			// 이 부분도 오류시 0으로 하는게 맞는지 검토 필요
-			p.balance = toDoubleOrZero(row.balance);
+			p.free = toDoubleOrZero(row.balance);
 			p.avg_buy_price = toDoubleOrZero(row.avg_buy_price);
 			p.unit_currency = row.unit_currency;
 

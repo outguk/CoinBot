@@ -9,6 +9,7 @@
 #include "core/domain/Ticker.h"
 
 #include "EngineResult.h"  // Result, RejectReason
+#include "EngineEvents.h"
 
 /*
 * 5단계(데모 주문 엔진) 기준 최소 엔진  인터페이스
@@ -49,6 +50,8 @@ namespace engine
 		// WS/REST가 준 “주문 스냅샷 전체”를 엔진이 받아 동기화할 때 사용
 		// - 기본 구현은 아무것도 하지 않음(다른 엔진 호환 유지)
 		virtual void onOrderSnapshot(const core::Order& snapshot) = 0;
+
+		virtual std::vector<EngineEvent> pollEvents() = 0;
 
 		// (디버그/스모크 테스트용) 주문 조회
 		// - 외부가 엔진 내부 저장소를 직접 만지지 않게 하기 위한 안전한 읽기 API

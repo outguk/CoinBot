@@ -8,7 +8,7 @@
 
 #include "core/domain/Order.h"
 #include "core/domain/MyTrade.h"
-#include "api/upbit/dto/UpbittWsDtos.h" // 네가 만든 DTO 경로에 맞춰 조정
+#include "api/upbit/dto/UpbitWsDtos.h" // 네가 만든 DTO 경로에 맞춰 조정
 
 namespace api::upbit::mappers
 {
@@ -46,6 +46,7 @@ namespace api::upbit::mappers
 
         if (state == "done")   return core::OrderStatus::Filled;
         if (state == "cancel") return core::OrderStatus::Canceled;
+        if (state == "prevented") return core::OrderStatus::Canceled; // SMP 등으로 취소된 케이스
 
         // prevented / unknown
         return core::OrderStatus::Rejected;

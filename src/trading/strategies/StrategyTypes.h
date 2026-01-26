@@ -122,6 +122,7 @@ namespace trading {
         Value<double> rsi{};
         Value<double> closeN{};
         Value<double> volatility{}; // ChangeVolatilityIndicator 결과(수익률 stdev)
+        //Value<double> sma{}; // 단순 이동 평균
 
         // 파생 필터 값
         bool trendReady{ false };

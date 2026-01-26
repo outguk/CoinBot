@@ -129,7 +129,12 @@ namespace api::upbit::dto
 	};
 	inline void from_json(const nlohmann::json& j, CandleDto_Minute& d)
 	{
-		j.at("market").get_to(d.market);
+		if (j.contains("market")) {
+			d.market = j.at("market").get<std::string>();
+		}
+		else if (j.contains("code")) {
+			d.market = j.at("code").get<std::string>();
+		}
 
 		j.at("opening_price").get_to(d.opening_price);
 		j.at("high_price").get_to(d.high_price);
