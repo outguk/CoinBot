@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include <string>
 #include <cstdint>
@@ -12,44 +12,44 @@ namespace core
     /*
      * MyTrade (Execution / Fill)
      *
-     * - Upbit WebSocket "myOrder" ¸Ş½ÃÁö Áß state == "trade" ÀÏ ¶§,
-     *   "Ã¼°á 1°Ç"À» µµ¸ŞÀÎ ÀÌº¥Æ®·Î ºĞ¸®ÇÑ ÇüÅÂ.
+     * - Upbit WebSocket "myOrder" ë©”ì‹œì§€ ì¤‘ state == "trade" ì¼ ë•Œ,
+     *   "ì²´ê²° 1ê±´"ì„ ë„ë©”ì¸ ì´ë²¤íŠ¸ë¡œ ë¶„ë¦¬í•œ í˜•íƒœ.
      *
-     * - ÁÖÀÇ: executed_volume/remaining_volume/paid_fee/locked °°Àº "ÁÖ¹® ´©Àû ½º³À¼¦"Àº
-     *   MyTrade°¡ ¾Æ´Ï¶ó core::Order(ÁÖ¹® »óÅÂ Ä³½Ã) ÂÊ¿¡¼­ °ü¸®ÇÏ´Â ÆíÀÌ ÀÇ¹Ì°¡ ¸íÈ®ÇÏ´Ù.
+     * - ì£¼ì˜: executed_volume/remaining_volume/paid_fee/locked ê°™ì€ "ì£¼ë¬¸ ëˆ„ì  ìŠ¤ëƒ…ìƒ·"ì€
+     *   MyTradeê°€ ì•„ë‹ˆë¼ core::Order(ì£¼ë¬¸ ìƒíƒœ ìºì‹œ) ìª½ì—ì„œ ê´€ë¦¬í•˜ëŠ” í¸ì´ ì˜ë¯¸ê°€ ëª…í™•í•˜ë‹¤.
      */
     struct MyTrade
     {
-        // --- Å°(Áßº¹ Á¦°Å/Á¤·ÄÀÇ ÇÙ½É) ---
-        std::string order_id;     // myOrder.uuid (ÁÖ¹® UUID)
-        std::string trade_id;     // myOrder.trade_uuid (Ã¼°á UUID)  ¡ç fillÀÇ °íÀ¯Å°
+        // --- í‚¤(ì¤‘ë³µ ì œê±°/ì •ë ¬ì˜ í•µì‹¬) ---
+        std::string order_id;     // myOrder.uuid (ì£¼ë¬¸ UUID)
+        std::string trade_id;     // myOrder.trade_uuid (ì²´ê²° UUID)  â† fillì˜ ê³ ìœ í‚¤
 
-        // --- ½ÃÀå/¹æÇâ ---
+        // --- ì‹œì¥/ë°©í–¥ ---
         std::string market;       // myOrder.code (ex: "KRW-BTC")
         OrderPosition side{ OrderPosition::BID }; // myOrder.ask_bid
 
-        // --- Ã¼°á °ª (state=trade¿¡¼­ price/volumeÀº Ã¼°á °ª ÀÇ¹Ì) ---
+        // --- ì²´ê²° ê°’ (state=tradeì—ì„œ price/volumeì€ ì²´ê²° ê°’ ì˜ë¯¸) ---
         Price  price{ 0.0 };
         Volume volume{ 0.0 };
 
-        // Ã¼°á ±İ¾×(ÆíÀÇ Ä³½Ã): funds = price * volume
-        // - ¸Å¼ö: KRW ÁöÃâ(¼ö¼ö·á º°µµ)
-        // - ¸Åµµ: KRW ¼öÀÔ(¼ö¼ö·á º°µµ)
+        // ì²´ê²° ê¸ˆì•¡(í¸ì˜ ìºì‹œ): funds = price * volume
+        // - ë§¤ìˆ˜: KRW ì§€ì¶œ(ìˆ˜ìˆ˜ë£Œ ë³„ë„)
+        // - ë§¤ë„: KRW ìˆ˜ì…(ìˆ˜ìˆ˜ë£Œ ë³„ë„)
         Amount executed_funds{ 0.0 };
 
-        // Ã¼°á 1°Ç ¼ö¼ö·á: myOrder.trade_fee (state=tradeÀÏ ¶§¸¸ À¯È¿)
+        // ì²´ê²° 1ê±´ ìˆ˜ìˆ˜ë£Œ: myOrder.trade_fee (state=tradeì¼ ë•Œë§Œ ìœ íš¨)
         Amount fee{ 0.0 };
 
-        // maker/taker(¼±ÅÃ): myOrder.is_maker (state=tradeÀÏ ¶§¸¸ À¯È¿)
+        // maker/taker(ì„ íƒ): myOrder.is_maker (state=tradeì¼ ë•Œë§Œ ìœ íš¨)
         std::optional<bool> is_maker;
 
-        // Ã¼°á ½Ã°¢(ms): myOrder.trade_timestamp
+        // ì²´ê²° ì‹œê°(ms): myOrder.trade_timestamp
         std::int64_t trade_timestamp_ms{ 0 };
 
-        // ÁÖ¹® ÃßÀû¿ë ½Äº°ÀÚ(¼±ÅÃ): myOrder.identifier
+        // ì£¼ë¬¸ ì¶”ì ìš© ì‹ë³„ì(ì„ íƒ): myOrder.identifier
         std::optional<std::string> identifier;
 
-        // ·ÎÄÃ ¸ŞÅ¸(¼±ÅÃ): OrderStoreÀÇ ÁÖ¹® ¸ŞÅ¸(Àü·«/ÅÂ±×)¸¦ joinÇØ¼­ ³Ö°í ½Í´Ù¸é optional·Î
+        // ë¡œì»¬ ë©”íƒ€(ì„ íƒ): OrderStoreì˜ ì£¼ë¬¸ ë©”íƒ€(ì „ëµ/íƒœê·¸)ë¥¼ joiní•´ì„œ ë„£ê³  ì‹¶ë‹¤ë©´ optionalë¡œ
         std::optional<std::string> strategy_id;
         std::optional<std::string> client_tag;
     };

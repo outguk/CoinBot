@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include <cstddef>
 
@@ -11,44 +11,44 @@ namespace trading::indicators {
 
      /*
      * SMA(Simple Moving Average)
-     * - ÃÖ±Ù length_°³ÀÇ °ª¿¡ ´ëÇÑ ´Ü¼ø ÀÌµ¿Æò±Õ
-     * - ¸Å update¸¶´Ù ÀüÃ¼ ÇÕÀ» ´Ù½Ã °è»êÇÏÁö ¾Ê°í(sum_ À¯Áö) O(1)·Î °»½Å
+     * - ìµœê·¼ length_ê°œì˜ ê°’ì— ëŒ€í•œ ë‹¨ìˆœ ì´ë™í‰ê· 
+     * - ë§¤ updateë§ˆë‹¤ ì „ì²´ í•©ì„ ë‹¤ì‹œ ê³„ì‚°í•˜ì§€ ì•Šê³ (sum_ ìœ ì§€) O(1)ë¡œ ê°±ì‹ 
      *
-     * ÇÙ½É ¾ÆÀÌµğ¾î:
-     * - RingBuffer¿¡ »õ °ª push
-     * - À©µµ¿ì°¡ °¡µæ Âù »óÅÂ¿¡¼­ push ½Ã, °¡Àå ¿À·¡µÈ °ªÀÌ overwrittenÀ¸·Î ³ª¿À¹Ç·Î
-     *   sum_¿¡¼­ »©°í »õ °ªÀ» ´õÇØ sum_À» Ç×»ó "ÃÖ±Ù N°³ ÇÕ"À¸·Î À¯Áö
+     * í•µì‹¬ ì•„ì´ë””ì–´:
+     * - RingBufferì— ìƒˆ ê°’ push
+     * - ìœˆë„ìš°ê°€ ê°€ë“ ì°¬ ìƒíƒœì—ì„œ push ì‹œ, ê°€ì¥ ì˜¤ë˜ëœ ê°’ì´ overwrittenìœ¼ë¡œ ë‚˜ì˜¤ë¯€ë¡œ
+     *   sum_ì—ì„œ ë¹¼ê³  ìƒˆ ê°’ì„ ë”í•´ sum_ì„ í•­ìƒ "ìµœê·¼ Nê°œ í•©"ìœ¼ë¡œ ìœ ì§€
      */
 
     class Sma final {
     public:
-        // ±âº» »ı¼ºÀÚ: ¾ÆÁ÷ length_°¡ 0ÀÌ¸é ºñÈ°¼º »óÅÂ·Î µ¿ÀÛ(ready=false)
+        // ê¸°ë³¸ ìƒì„±ì: ì•„ì§ length_ê°€ 0ì´ë©´ ë¹„í™œì„± ìƒíƒœë¡œ ë™ì‘(ready=false)
         Sma() = default;
 
-        // length¸¦ ¹Ş¾Æ ¹Ù·Î »ç¿ëÇÒ ¼ö ÀÖµµ·Ï reset±îÁö ¼öÇàÇÏ´Â »ı¼ºÀÚ
+        // lengthë¥¼ ë°›ì•„ ë°”ë¡œ ì‚¬ìš©í•  ìˆ˜ ìˆë„ë¡ resetê¹Œì§€ ìˆ˜í–‰í•˜ëŠ” ìƒì„±ì
         explicit Sma(std::size_t length) { reset(length); }
 
-        void reset(std::size_t length); // ³»ºÎ ¹öÆÛ¸¦ length Å©±â·Î ÃÊ±âÈ­ÇÏ°í(sum_ Æ÷ÇÔ) »óÅÂ¸¦ ±ú²ıÇÏ°Ô ¸®¼Â
-        void clear() noexcept;          // ³»ºÎ¿¡ ½×ÀÎ °ªµé¸¸ ºñ¿ì°í sum_µµ 0À¸·Î ÃÊ±âÈ­
+        void reset(std::size_t length); // ë‚´ë¶€ ë²„í¼ë¥¼ length í¬ê¸°ë¡œ ì´ˆê¸°í™”í•˜ê³ (sum_ í¬í•¨) ìƒíƒœë¥¼ ê¹¨ë—í•˜ê²Œ ë¦¬ì…‹
+        void clear() noexcept;          // ë‚´ë¶€ì— ìŒ“ì¸ ê°’ë“¤ë§Œ ë¹„ìš°ê³  sum_ë„ 0ìœ¼ë¡œ ì´ˆê¸°í™”
 
-        // ÇöÀç ¼³Á¤µÈ À©µµ¿ì ±æÀÌ(N)
+        // í˜„ì¬ ì„¤ì •ëœ ìœˆë„ìš° ê¸¸ì´(N)
         [[nodiscard]] std::size_t length() const noexcept { return length_; }
-        // ÇöÀç±îÁö ½×ÀÎ »ùÇÃ °³¼ö(0..N)
+        // í˜„ì¬ê¹Œì§€ ìŒ“ì¸ ìƒ˜í”Œ ê°œìˆ˜(0..N)
         [[nodiscard]] std::size_t count()  const noexcept { return window_.size(); }
 
-        // ¼ıÀÚ ½ºÆ®¸² ¾÷µ¥ÀÌÆ®(»õ »ùÇÃ x¸¦ SMA¿¡ ÀÔ·Â, °»½Å, À©µµ¿ì°¡ length_¸¸Å­ Â÷¾ß ready=true)
+        // ìˆ«ì ìŠ¤íŠ¸ë¦¼ ì—…ë°ì´íŠ¸(ìƒˆ ìƒ˜í”Œ xë¥¼ SMAì— ì…ë ¥, ê°±ì‹ , ìœˆë„ìš°ê°€ length_ë§Œí¼ ì°¨ì•¼ ready=true)
         trading::Value<double> update(double x);
 
-        // Candle ±â¹İ(Á¾°¡ »ç¿ë)À¸·Î update(double)·Î À§ÀÓ
+        // Candle ê¸°ë°˜(ì¢…ê°€ ì‚¬ìš©)ìœ¼ë¡œ update(double)ë¡œ ìœ„ì„
         trading::Value<double> update(const core::Candle& c);
 
-        // ÇöÀç SMA °ª(ÁØºñ ¾ÈµÇ¸é ready=false)
+        // í˜„ì¬ SMA ê°’(ì¤€ë¹„ ì•ˆë˜ë©´ ready=false)
         [[nodiscard]] trading::Value<double> value() const noexcept;
 
     private:
-        std::size_t length_{ 0 };       // À©µµ¿ì ±æÀÌ(N). 0ÀÌ¸é ºñÈ°¼º.
-        RingBuffer<double> window_{};   // ÃÖ±Ù N°³ °ªÀ» ÀúÀåÇÏ´Â °íÁ¤ Å©±â ¹öÆÛ
-        double sum_{ 0.0 };             // ÃÖ±Ù N°³ °ªÀÇ ÇÕ(readyÀÏ ¶§´Â Á¤È®È÷ N°³ÀÇ ÇÕ)
+        std::size_t length_{ 0 };       // ìœˆë„ìš° ê¸¸ì´(N). 0ì´ë©´ ë¹„í™œì„±.
+        RingBuffer<double> window_{};   // ìµœê·¼ Nê°œ ê°’ì„ ì €ì¥í•˜ëŠ” ê³ ì • í¬ê¸° ë²„í¼
+        double sum_{ 0.0 };             // ìµœê·¼ Nê°œ ê°’ì˜ í•©(readyì¼ ë•ŒëŠ” ì •í™•íˆ Nê°œì˜ í•©)
     };
 
 } // namespace trading::indicators

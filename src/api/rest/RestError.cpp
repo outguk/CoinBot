@@ -1,4 +1,4 @@
-#include <ostream>
+﻿#include <ostream>
 #include "RestError.h"
 
 namespace api::rest {
@@ -14,7 +14,7 @@ namespace api::rest {
 		case RestErrorCode::ReadFailed:        return os << "ReadFailed";
 		case RestErrorCode::Timeout:           return os << "Timeout";
 		case RestErrorCode::BadStatus:         return os << "BadStatus";
-		case RestErrorCode::InvaildArgiment:   return os << "InvalidArgument";
+		case RestErrorCode::InvalidArgument:   return os << "InvalidArgument";
 		case RestErrorCode::ParseError:        return os << "ParseError";
 		case RestErrorCode::Unknown:            return os << "Unknown";
 		default:                               return os << "Unknown";

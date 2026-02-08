@@ -1,7 +1,9 @@
-// app/EngineRunner.h
+ï»¿// app/EngineRunner.h
 #pragma once
 
 #include <atomic>
+#include <unordered_map>
+#include <string>
 
 #include "core/BlockingQueue.h"
 #include "engine/input/EngineInput.h"
@@ -10,15 +12,15 @@
 #include "trading/strategies/StrategyTypes.h"
 #include "trading/strategies/RsiMeanReversionStrategy.h"
 
-// ¿©±â¼­ºÎÅÍ´Â "¿£Áø ´ÜÀÏ ½º·¹µå"·Î¸¸ È£ÃâµÉ °Í.
-// WS´Â queue push¸¸ ´ã´ç.
-// ¡°¹«¾ùÀ», ¾î¶² ¼ø¼­·Î, ¾î¶² ½º·¹µå¿¡¼­ È£ÃâÇÒÁö¡±¸¦ °áÁ¤
+// ì—¬ê¸°ì„œë¶€í„°ëŠ” "ì—”ì§„ ë‹¨ì¼ ìŠ¤ë ˆë“œ"ë¡œë§Œ í˜¸ì¶œë  ê²ƒ.
+// WSëŠ” queue pushë§Œ ë‹´ë‹¹.
+// â€œë¬´ì—‡ì„, ì–´ë–¤ ìˆœì„œë¡œ, ì–´ë–¤ ìŠ¤ë ˆë“œì—ì„œ í˜¸ì¶œí• ì§€â€ë¥¼ ê²°ì •
 namespace app
 {
     struct EngineRunnerConfig
     {
-        // ÇÊ¿äÇÏ¸é tick sleep, batch size, Á¾·á Á¶°Ç µîÀ» È®Àå
-        int max_private_batch = 256; // myOrder´Â À¯½Ç ºÒ°¡¶ó ¹èÄ¡·Î ÃÖ´ëÇÑ »¡¸® ¼ÒÈ­
+        // í•„ìš”í•˜ë©´ tick sleep, batch size, ì¢…ë£Œ ì¡°ê±´ ë“±ì„ í™•ì¥
+        int max_private_batch = 256; // myOrderëŠ” ìœ ì‹¤ ë¶ˆê°€ë¼ ë°°ì¹˜ë¡œ ìµœëŒ€í•œ ë¹¨ë¦¬ ì†Œí™”
     };
 
     class EngineRunner
@@ -39,22 +41,24 @@ namespace app
             , market_(std::move(market))
             , cfg_(cfg)
         {
-            // ½ÃÀÛ ½ÃÁ¡¿¡ account Ä³½Ã 1È¸ »ı¼º
+            // ì‹œì‘ ì‹œì ì— account ìºì‹œ 1íšŒ ìƒì„±
             rebuildAccountSnapshot_();
         }
 
-        // ´ÜÀÏ ¿£Áø ½º·¹µå¿¡¼­ È£Ãâ
+        // ë‹¨ì¼ ì—”ì§„ ìŠ¤ë ˆë“œì—ì„œ í˜¸ì¶œ
         void run(std::atomic<bool>& stop_flag);
 
     private:
-        // Account/Position(core::Account)ÀÌ ¹Ù²î¾úÀ» ¶§¸¸ ½º³À¼¦À» Àç±¸¼º
+        // Account/Position(core::Account)ì´ ë°”ë€Œì—ˆì„ ë•Œë§Œ ìŠ¤ëƒ…ìƒ·ì„ ì¬êµ¬ì„±
         void rebuildAccountSnapshot_();
 
         static std::string extractCurrency_(std::string_view market);
 
         void handleOne_(const engine::input::EngineInput& in);
+        void handleMyOrder_(const engine::input::MyOrderRaw& raw);
+        void handleMarketData_(const engine::input::MarketDataRaw& raw);
 
-        // engine::EngineEvent -> trading ÀÌº¥Æ®·Î º¯È¯ ÈÄ RSI Àü·«¿¡ Á÷Á¢ Àü´Ş
+        // engine::EngineEvent -> trading ì´ë²¤íŠ¸ë¡œ ë³€í™˜ í›„ RSI ì „ëµì— ì§ì ‘ ì „ë‹¬
         void handleEngineEvents_(const std::vector<engine::EngineEvent>& evs);
 
     private:
@@ -65,5 +69,8 @@ namespace app
         std::string market_;
         trading::AccountSnapshot last_account_{};
         EngineRunnerConfig cfg_;
+
+        // ìº”ë“¤ ì¤‘ë³µ ì œê±°ë¥¼ ìœ„í•œ ë§ˆì¼“ë³„ íƒ€ì„ìŠ¤íƒ¬í”„ ì¶”ì 
+        std::unordered_map<std::string, std::string> last_candle_ts_;
     };
 }

@@ -1,4 +1,4 @@
-#include <atomic>
+ï»¿#include <atomic>
 #include <chrono>
 #include <iostream>
 #include <random>
@@ -12,10 +12,10 @@ namespace api::ws {
     namespace
     {
         /*
-         * ¿Ö decorator°¡ ÇÊ¿äÇÑ°¡?
-         * - Authorization Çì´õ´Â WebSocket "ÇÚµå¼ÎÀÌÅ©(HTTP Upgrade)" ¿äÃ»¿¡ Æ÷ÇÔµÇ¾î¾ß ÇÑ´Ù.
-         * - ws.handshake() ÀÌÈÄ¿¡´Â ÀÌ¹Ì Upgrade ¿äÃ»ÀÌ ³¡³µÀ¸¹Ç·Î Çì´õ »ğÀÔÀÌ ºÒ°¡´ÉÇÏ´Ù.
-         * - µû¶ó¼­ handshake È£Ãâ 'Á÷Àü'¿¡ decorator·Î request header¸¦ ²Ù¹Î´Ù.
+         * ì™œ decoratorê°€ í•„ìš”í•œê°€?
+         * - Authorization í—¤ë”ëŠ” WebSocket "í•¸ë“œì…°ì´í¬(HTTP Upgrade)" ìš”ì²­ì— í¬í•¨ë˜ì–´ì•¼ í•œë‹¤.
+         * - ws.handshake() ì´í›„ì—ëŠ” ì´ë¯¸ Upgrade ìš”ì²­ì´ ëë‚¬ìœ¼ë¯€ë¡œ í—¤ë” ì‚½ì…ì´ ë¶ˆê°€ëŠ¥í•˜ë‹¤.
+         * - ë”°ë¼ì„œ handshake í˜¸ì¶œ 'ì§ì „'ì— decoratorë¡œ request headerë¥¼ ê¾¸ë¯¼ë‹¤.
          */
         void applyAuthorizationDecorator(
             websocket::stream<beast::ssl_stream<beast::tcp_stream>>& ws,
@@ -23,7 +23,7 @@ namespace api::ws {
         {
             if (!bearer_jwt.has_value()) return;
 
-            // ¾÷ºñÆ® private WS ÀÎÁõ Çü½Ä: Authorization: Bearer <JWT>
+            // ì—…ë¹„íŠ¸ private WS ì¸ì¦ í˜•ì‹: Authorization: Bearer <JWT>
             const std::string auth = *bearer_jwt;
 
             ws.set_option(websocket::stream_base::decorator(
@@ -33,7 +33,7 @@ namespace api::ws {
                 }));
         }
 
-        // runReadLoop¿¡¼­ ¡°ÁÖ±âÀûÀ¸·Î ±ú¾î³ª Ä¿¸Çµå/ÇÎÀ» Ã³¸®¡±ÇÏ±â À§ÇÑ Å¸ÀÓ¾Æ¿ô(³Ê¹« ÂªÁö ¾Ê°Ô)
+        // runReadLoopì—ì„œ â€œì£¼ê¸°ì ìœ¼ë¡œ ê¹¨ì–´ë‚˜ ì»¤ë§¨ë“œ/í•‘ì„ ì²˜ë¦¬â€í•˜ê¸° ìœ„í•œ íƒ€ì„ì•„ì›ƒ(ë„ˆë¬´ ì§§ì§€ ì•Šê²Œ)
         constexpr std::chrono::seconds kIdleReadTimeout{ 1 };
     }
 
@@ -42,12 +42,12 @@ namespace api::ws {
         boost::asio::ssl::context& ssl_ctx)
         : ioc_(ioc)
         , ssl_ctx_(ssl_ctx)
-        , resolver_(boost::asio::make_strand(ioc))  // ¹®¹ı À¯ÀÇ
+        , resolver_(boost::asio::make_strand(ioc))  // ë¬¸ë²• ìœ ì˜
     {
-        // ws_´Â connectImpl¿¡¼­ resetStreamÀ¸·Î Ã³À½ »ı¼º
+        // ws_ëŠ” connectImplì—ì„œ resetStreamìœ¼ë¡œ ì²˜ìŒ ìƒì„±
     }
 
-    // ¿ÜºÎ¿¡¼­ ¸Ş½ÃÁö Ã³¸® ·ÎÁ÷
+    // ì™¸ë¶€ì—ì„œ ë©”ì‹œì§€ ì²˜ë¦¬ ë¡œì§
     void UpbitWebSocketClient::setMessageHandler(MessageHandler cb) {
         on_msg_ = std::move(cb);
     }
@@ -61,16 +61,16 @@ namespace api::ws {
         cmd_cv_.notify_one();
     }
 
-    // ¿¬°á/Àç¿¬°á¿¡ ÇÊ¿äÇÑ ³»ºÎ À¯Æ¿
+    // ì—°ê²°/ì¬ì—°ê²°ì— í•„ìš”í•œ ë‚´ë¶€ ìœ í‹¸
     void UpbitWebSocketClient::resetStream()
     {
         ws_ = std::make_unique<WsStream>(ioc_, ssl_ctx_);
 
-        // ¡°Ä¿¸Çµå Ã³¸®/ÇÎ Ã³¸®¡±¸¦ À§ÇØ read°¡ ¿µ¿øÈ÷ ºí·ÎÅ·µÇÁö ¾Ê°Ô idle timeoutÀ» Âª°Ô µĞ´Ù.
+        // â€œì»¤ë§¨ë“œ ì²˜ë¦¬/í•‘ ì²˜ë¦¬â€ë¥¼ ìœ„í•´ readê°€ ì˜ì›íˆ ë¸”ë¡œí‚¹ë˜ì§€ ì•Šê²Œ idle timeoutì„ ì§§ê²Œ ë‘”ë‹¤.
         websocket::stream_base::timeout opt{};
         opt.handshake_timeout = std::chrono::seconds(30);
         opt.idle_timeout = kIdleReadTimeout;
-        opt.keep_alive_pings = false; // pingÀº ¿ì¸®°¡ Á÷Á¢ º¸³¿
+        opt.keep_alive_pings = false; // pingì€ ìš°ë¦¬ê°€ ì§ì ‘ ë³´ëƒ„
         ws_->set_option(opt);
     }
 
@@ -92,14 +92,14 @@ namespace api::ws {
 
     std::chrono::milliseconds UpbitWebSocketClient::computeReconnectDelay_()
     {
-        // failures_´Â "ÀÌ¹ø Àç¿¬°á ½Ãµµ Á÷Àü" ÀÌ¹Ì Áõ°¡µÈ »óÅÂ¶ó°í °¡Á¤
+        // failures_ëŠ” "ì´ë²ˆ ì¬ì—°ê²° ì‹œë„ ì§ì „" ì´ë¯¸ ì¦ê°€ëœ ìƒíƒœë¼ê³  ê°€ì •
         // failures_=1 -> min_backoff
         // failures_=2 -> min_backoff*2
         // failures_=3 -> min_backoff*4 ...
         const std::uint32_t f = reconnect_failures_;
 
-        // Áö¼ö ¼ºÀåÀÇ ÆøÀ» Á¦ÇÑ(³Ê¹« Å« shift ¹æÁö)
-        const std::uint32_t exp = std::min<std::uint32_t>(f > 0 ? (f - 1) : 0, 10); // 2^10=1024¹è±îÁö¸¸
+        // ì§€ìˆ˜ ì„±ì¥ì˜ í­ì„ ì œí•œ(ë„ˆë¬´ í° shift ë°©ì§€)
+        const std::uint32_t exp = std::min<std::uint32_t>(f > 0 ? (f - 1) : 0, 10); // 2^10=1024ë°°ê¹Œì§€ë§Œ
         const long long base_ms =
             reconnect_min_backoff_.count() * (1LL << exp);
 
@@ -111,11 +111,11 @@ namespace api::ws {
         const long long lo = static_cast<long long>(capped_ms * (1.0 - j));
         const long long hi = static_cast<long long>(capped_ms * (1.0 + j));
 
-        // ÃÖ¼Ò 0ms ¹æÁö
+        // ìµœì†Œ 0ms ë°©ì§€
         const long long lo2 = std::max<long long>(0, lo);
-        const long long hi2 = std::max<long long>(lo2 + 1, hi); // range º¸Àå
+        const long long hi2 = std::max<long long>(lo2 + 1, hi); // range ë³´ì¥
 
-        // °£´ÜÇÑ per-call RNG (thread_local·Î ºñ¿ë/°æÇÕ ÁÙÀÓ)
+        // ê°„ë‹¨í•œ per-call RNG (thread_localë¡œ ë¹„ìš©/ê²½í•© ì¤„ì„)
         thread_local std::mt19937 rng{
             static_cast<unsigned>(
                 std::chrono::steady_clock::now().time_since_epoch().count())
@@ -127,19 +127,19 @@ namespace api::ws {
 
     bool UpbitWebSocketClient::reconnectOnce()
     {
-        // stop ¿äÃ»ÀÌ¸é Àç¿¬°á ½Ãµµ ÀÚÃ¼¸¦ ÇÏÁö ¾ÊÀ½
+        // stop ìš”ì²­ì´ë©´ ì¬ì—°ê²° ì‹œë„ ìì²´ë¥¼ í•˜ì§€ ì•ŠìŒ
         if (stop_.load(std::memory_order_relaxed))
             return false;
 
-        // ÀÌ¹ø ½Ãµµ´Â "¿¬¼Ó ½ÇÆĞ +1"·Î °è»ê
+        // ì´ë²ˆ ì‹œë„ëŠ” "ì—°ì† ì‹¤íŒ¨ +1"ë¡œ ê³„ì‚°
         ++reconnect_failures_;
 
         const auto delay = computeReconnectDelay_();
         std::cout << "[WS] reconnect attempt=" << reconnect_failures_
             << " sleep=" << delay.count() << "ms\n";
 
-        // sleep Áß¿¡µµ stopÀÌ µé¾î¿Ã ¼ö ÀÖÀ¸´Ï, Âª°Ô ÂÉ°³¼­ Ã¼Å©(°úÇÑ º¯°æ ¾øÀÌ ¾ÈÀü¼º¡è)
-        // (¿øÇÏ¸é ´Ü¼ø sleep_for(delay)·Îµµ ÃæºĞ)
+        // sleep ì¤‘ì—ë„ stopì´ ë“¤ì–´ì˜¬ ìˆ˜ ìˆìœ¼ë‹ˆ, ì§§ê²Œ ìª¼ê°œì„œ ì²´í¬(ê³¼í•œ ë³€ê²½ ì—†ì´ ì•ˆì „ì„±â†‘)
+        // (ì›í•˜ë©´ ë‹¨ìˆœ sleep_for(delay)ë¡œë„ ì¶©ë¶„)
         auto remaining = delay;
         while (remaining.count() > 0 && !stop_.load(std::memory_order_relaxed))
         {
@@ -151,7 +151,7 @@ namespace api::ws {
         if (stop_.load(std::memory_order_relaxed))
             return false;
 
-        // ±âÁ¸ ws_ Á¤¸®
+        // ê¸°ì¡´ ws_ ì •ë¦¬
         if (ws_ && ws_->is_open())
         {
             boost::system::error_code ignore;
@@ -159,13 +159,13 @@ namespace api::ws {
         }
         ws_.reset();
 
-        // ¸¶Áö¸· ¿¬°á Á¤º¸·Î ÀçÁ¢¼Ó
+        // ë§ˆì§€ë§‰ ì—°ê²° ì •ë³´ë¡œ ì¬ì ‘ì†
         connectImpl(host_, port_, target_, bearer_jwt_);
         const bool ok = (ws_ && ws_->is_open());
 
         if (ok)
         {
-            // ¼º°ø ½Ã ¿¬¼Ó ½ÇÆĞ Ä«¿îÅÍ reset
+            // ì„±ê³µ ì‹œ ì—°ì† ì‹¤íŒ¨ ì¹´ìš´í„° reset
             reconnect_failures_ = 0;
             std::cout << "[WS] reconnect success\n";
         }
@@ -180,8 +180,8 @@ namespace api::ws {
 
     void UpbitWebSocketClient::resubscribeAll()
     {
-        // ¸¶Áö¸·À¸·Î º¸³Â´ø subscribe frameµéÀ» ÀçÀü¼Û
-        // (Àç¿¬°á Á÷ÈÄ, ¼­¹ö¿¡´Â ±¸µ¶ »óÅÂ°¡ ¾øÀ¸¹Ç·Î ¹İµå½Ã ´Ù½Ã º¸³»¾ß ÇÑ´Ù.)
+        // ë§ˆì§€ë§‰ìœ¼ë¡œ ë³´ëƒˆë˜ subscribe frameë“¤ì„ ì¬ì „ì†¡
+        // (ì¬ì—°ê²° ì§í›„, ì„œë²„ì—ëŠ” êµ¬ë… ìƒíƒœê°€ ì—†ìœ¼ë¯€ë¡œ ë°˜ë“œì‹œ ë‹¤ì‹œ ë³´ë‚´ì•¼ í•œë‹¤.)
         for (const auto& [key, frame] : last_sub_frames_)
         {
             (void)sendTextFrame(frame);
@@ -190,13 +190,13 @@ namespace api::ws {
         std::cout << "[WS] resubscribe done. count=" << last_sub_frames_.size() << "\n";
     }
 
-    // WebSocket ¿¬°á
+    // WebSocket ì—°ê²°
     void UpbitWebSocketClient::connectPublic(
         const std::string& host,
         const std::string& port,
         const std::string& target) 
     {
-        // public Ã¤³ÎÀº ÀÎÁõÀÌ ÇÊ¿ä ¾ø´Ù.
+        // public ì±„ë„ì€ ì¸ì¦ì´ í•„ìš” ì—†ë‹¤.
         pushCommand(CmdConnect{ host, port, target, std::nullopt });
     }
 
@@ -206,9 +206,9 @@ namespace api::ws {
         const std::string& target,
         const std::string& bearer_jwt)
     {
-        // private Ã¤³ÎÀº handshake ¿äÃ»¿¡ Authorization Çì´õ°¡ ÇÊ¼ö´Ù.
-        // bearer_jwt°¡ ºñ¾îÀÖÀ¸¸é ½Ç¼öÀÌ¹Ç·Î ¿¬°áÀº µÇ´õ¶óµµ ±¸µ¶ÀÌ Á¦´ë·Î ¾È µÉ ¼ö ÀÖ´Ù.
-        // (¿©±â¼­´Â ¹æ¾îÀûÀ¸·Î ±×³É ¿¬°á ½Ãµµ ´ë½Å, caller°¡ ½Ç¼öÇÏÁö ¾Ê°Ô ±¸Á¶¸¦ ºĞ¸®ÇÏ´Â °ÍÀÌ ÇÙ½É)
+        // private ì±„ë„ì€ handshake ìš”ì²­ì— Authorization í—¤ë”ê°€ í•„ìˆ˜ë‹¤.
+        // bearer_jwtê°€ ë¹„ì–´ìˆìœ¼ë©´ ì‹¤ìˆ˜ì´ë¯€ë¡œ ì—°ê²°ì€ ë˜ë”ë¼ë„ êµ¬ë…ì´ ì œëŒ€ë¡œ ì•ˆ ë  ìˆ˜ ìˆë‹¤.
+        // (ì—¬ê¸°ì„œëŠ” ë°©ì–´ì ìœ¼ë¡œ ê·¸ëƒ¥ ì—°ê²° ì‹œë„ ëŒ€ì‹ , callerê°€ ì‹¤ìˆ˜í•˜ì§€ ì•Šê²Œ êµ¬ì¡°ë¥¼ ë¶„ë¦¬í•˜ëŠ” ê²ƒì´ í•µì‹¬)
         pushCommand(CmdConnect{ host, port, target, bearer_jwt });
     }
 
@@ -257,8 +257,8 @@ namespace api::ws {
             << "\n";
     }
 
-    // Äµµé ±¸µ¶ ¿äÃ» Àü¼Û
-    // - ÀÌ ÇÔ¼ö´Â ¡°¿äÃ» »ı¼º + Àü¼Û¡±¸¸ ´ã´ç
+    // ìº”ë“¤ êµ¬ë… ìš”ì²­ ì „ì†¡
+    // - ì´ í•¨ìˆ˜ëŠ” â€œìš”ì²­ ìƒì„± + ì „ì†¡â€ë§Œ ë‹´ë‹¹
     void UpbitWebSocketClient::subscribeCandles(
         const std::string& type,
         const std::vector<std::string>& markets,
@@ -276,9 +276,9 @@ namespace api::ws {
     {
         pushCommand(CmdSubMyOrder{ markets, is_only_realtime, format });
     }
-    // ¸Ş½ÃÁö ¼ö½Å ·çÇÁ
-    // - ¼­¹ö°¡ º¸³»´Â µ¥ÀÌÅÍ¸¦ °è¼Ó ÀĞ´Â´Ù
-    // - ÀÌ ·çÇÁ°¡ »ì¾Æ ÀÖ¾î¾ß ¿¬°áµµ À¯Áö
+    // ë©”ì‹œì§€ ìˆ˜ì‹  ë£¨í”„
+    // - ì„œë²„ê°€ ë³´ë‚´ëŠ” ë°ì´í„°ë¥¼ ê³„ì† ì½ëŠ”ë‹¤
+    // - ì´ ë£¨í”„ê°€ ì‚´ì•„ ìˆì–´ì•¼ ì—°ê²°ë„ ìœ ì§€
     void UpbitWebSocketClient::runReadLoop() 
     {
         stop_.store(false, std::memory_order_relaxed);
@@ -288,46 +288,48 @@ namespace api::ws {
 
         while (!stop_.load(std::memory_order_relaxed))
         {
-            // 1) Ä¿¸Çµå Ã³¸® (ÇÑ ¹ø¿¡ ¿©·¯ °³ Ã³¸®)
+            // 1) ì»¤ë§¨ë“œ ì²˜ë¦¬ (í•œ ë²ˆì— ì—¬ëŸ¬ ê°œ ì²˜ë¦¬)
             {
-                // Ä¿¸Çµå´Â ¿©±â¼­ "Áï½Ã ´ë±â"ÇÏÁö ¾Ê°í ÇÑ ¹ø¿¡ ºñ¿ì´Â ¹æ½ÄÀ¸·Î Ã³¸®ÇÑ´Ù.
-                // ½ÇÁúÀûÀÎ ¹İ¿µ Áö¿¬Àº read idle timeout(ÃÖ´ë 1ÃÊ) ÁÖ±â¿¡ ÀÇÇØ °áÁ¤µÈ´Ù.    
+                // ì»¤ë§¨ë“œëŠ” ì—¬ê¸°ì„œ "ì¦‰ì‹œ ëŒ€ê¸°"í•˜ì§€ ì•Šê³  í•œ ë²ˆì— ë¹„ìš°ëŠ” ë°©ì‹ìœ¼ë¡œ ì²˜ë¦¬í•œë‹¤.
+                // ë¡œì»¬ íë¥¼ ë§Œë“¤ê³  cmd_q ë‚´ìš©ì„ ë¹ ë¥´ê²Œ swapí•´ ë°”ë¡œ ì²˜ë¦¬í•  ìˆ˜ ìˆê²Œ ì„¤ì •
+                // ì‹¤ì§ˆì ì¸ ë°˜ì˜ ì§€ì—°ì€ read idle timeout(ìµœëŒ€ 1ì´ˆ) ì£¼ê¸°ì— ì˜í•´ ê²°ì •ëœë‹¤.    
                 std::deque<Command> local;
                 {
                     std::unique_lock lk(cmd_mu_);
                     local.swap(cmd_q_);
                 }
 
+                // í ì•ˆì˜ ë‚´ìš©ë“¤ì— ëŒ€í•´
                 for (auto& c : local)
                 {
-                    if (std::holds_alternative<CmdClose>(c))
+                    if (std::holds_alternative<CmdClose>(c)) // closeë©´
                     {
-                        stop_.store(true, std::memory_order_relaxed);
-                        break;
+                        stop_.store(true, std::memory_order_relaxed);  // trueë¡œ ë³€ê²½
+                        break; // run ì¢…ë£Œ
                     }
 
-                    if (auto* cc = std::get_if<CmdConnect>(&c))
+                    if (auto* cc = std::get_if<CmdConnect>(&c)) // ì—°ê²° ì‹ í˜¸ë¼ë©´
                     {
-                        connectImpl(cc->host, cc->port, cc->target, cc->bearer_jwt);
-                        if (ws_ && ws_->is_open())
-                            resubscribeAll();
+                        connectImpl(cc->host, cc->port, cc->target, cc->bearer_jwt); // ì—°ê²° ì‹œë„
+                        if (ws_ && ws_->is_open()) // ì—°ê²°ì— ì„±ê³µí•˜ë©´
+                            resubscribeAll();      // êµ¬ë…ì„ ë‹¤ì‹œí•œë‹¤
                         continue;
                     }
 
-                    if (auto* sc = std::get_if<CmdSubCandles>(&c))
+                    if (auto* sc = std::get_if<CmdSubCandles>(&c)) // ìº”ë“¤ êµ¬ë… ì‹ í˜¸ë¼ë©´
                     {
-                        const std::string ticket = makeTicket();
-                        const std::string frame = buildCandleSubJsonFrame(
+                        const std::string ticket = makeTicket();   // ìš”ì²­ êµ¬ë¶„ìë¥¼ ìƒì„±
+                        const std::string frame = buildCandleSubJsonFrame( // ìº”ë“¤ êµ¬ë… ìš”ì²­ í¬ë§·ì„ ìƒì„±
                             ticket, sc->type, sc->markets,
                             sc->is_only_snapshot, sc->is_only_realtime, sc->format);
 
-                        last_sub_frames_[sc->type] = frame;
-                        (void)sendTextFrame(frame);
+                        last_sub_frames_[sc->type] = frame; // ë§ˆì§€ë§‰ ì •ë³´ë¥¼ ì €ì¥í•  í”„ë ˆì„ ìƒì„±
+                        (void)sendTextFrame(frame); // êµ¬ë… ìš”ì²­ì„ ë³´ë‚¸ë‹¤
                         std::cout << "[WS] Candle Subscribe sent: " << sc->type << "\n";
                         continue;
                     }
 
-                    if (auto* sm = std::get_if<CmdSubMyOrder>(&c))
+                    if (auto* sm = std::get_if<CmdSubMyOrder>(&c))  // ë‚´ ì£¼ë¬¸ ì²´ê²° êµ¬ë… ì‹ í˜¸ë¼ë©´
                     {
                         const std::string ticket = makeTicket();
                         const std::string frame = buildMyOrderSubJsonFrame(
@@ -341,10 +343,11 @@ namespace api::ws {
                 }
             }
 
+            // ë£¨í”„ ì¤‘ê°„ì¤‘ê°„ í”Œë˜ê·¸ í™•ì¸
             if (stop_.load(std::memory_order_relaxed))
                 break;
 
-            // 2) ping Ã³¸®(´ÜÀÏ ·çÇÁ ³»Àå)
+            // 2) ping ì²˜ë¦¬(ë‹¨ì¼ ë£¨í”„ ë‚´ì¥)
             const auto now = std::chrono::steady_clock::now();
             if (now >= next_ping)
             {
@@ -358,20 +361,21 @@ namespace api::ws {
                     {
                         std::cout << "[WS] ping error: " << ec.message() << "\n";
 
-                        // ping/read ¿¡·¯ Ã³¸®: stopÀÌ¸é break (Àç¿¬°á·Î ¾È °¨)
+                        // ping/read ì—ëŸ¬ ì²˜ë¦¬: stopì´ë©´ break (ì¬ì—°ê²°ë¡œ ì•ˆ ê°)
                         if (stop_.load(std::memory_order_relaxed))
                             break;
 
+                        // ì—ëŸ¬ê°€ ëœ¨ë©´ ì¬ì—°ê²°
                         const bool ok = reconnectOnce();
                         if (ok) resubscribeAll();
                     }
                 }
             }
 
-            // 3) read (idle timeoutÀ¸·Î 1ÃÊ¸¶´Ù ±ú¾î³ª¼­ stop/command¸¦ Ã¼Å©ÇÒ ¼ö ÀÖÀ½)
+            // 3) read (idle timeoutìœ¼ë¡œ 1ì´ˆë§ˆë‹¤ ê¹¨ì–´ë‚˜ì„œ stop/commandë¥¼ ì²´í¬í•  ìˆ˜ ìˆìŒ)
             if (!ws_ || !ws_->is_open())
             {
-                // ¿¬°á ÀüÀÌ¸é ³Ê¹« ¹Ù»Ú°Ô µ¹Áö ¾Êµµ·Ï Àá±ñ ½°
+                // ì—°ê²° ì „ì´ë©´ ë„ˆë¬´ ë°”ì˜ê²Œ ëŒì§€ ì•Šë„ë¡ ì ê¹ ì‰¼
                 std::this_thread::sleep_for(std::chrono::milliseconds(50));
                 continue;
             }
@@ -382,13 +386,13 @@ namespace api::ws {
 
             if (ec)
             {
-                // idle timeout: Á¤»ó(¸Ş½ÃÁö ¾øÀ» »Ó)
+                // idle timeout: ì •ìƒ(ë©”ì‹œì§€ ì—†ì„ ë¿)
                 if (ec == beast::error::timeout || ec == boost::asio::error::timed_out)
                     continue;
 
                 std::cout << "[WS] read error: " << ec.message() << "\n";
 
-                // stopÀÌ¸é break (Àç¿¬°á·Î ¾È °¨)
+                // stopì´ë©´ break (ì¬ì—°ê²°ë¡œ ì•ˆ ê°)
                 if (stop_.load(std::memory_order_relaxed))
                     break;
 
@@ -399,9 +403,9 @@ namespace api::ws {
 
             const std::string msg = beast::buffers_to_string(buffer.data());
 
-            /// (¿É¼Ç) ÂªÀº ·Î±×
-            // Äµµé(candle.*) ¸Ş½ÃÁö´Â µ¿ÀÏ ts·Î ¹İº¹ ¾÷µ¥ÀÌÆ®°¡ ÀÚÁÖ ¿Í¼­ ·Î±×/IO º´¸ñÀÌ µÊ.
-            // Runner¿¡¼­ "»õ Äµµé¸¸" ·Î±×¸¦ Âïµµ·Ï ÇÏ°í, ¿©±â¼­´Â Äµµé ¿ø¹® ·Î±×¸¦ »ı·«ÇÑ´Ù.
+            /// (ì˜µì…˜) ì§§ì€ ë¡œê·¸
+            // ìº”ë“¤(candle.*) ë©”ì‹œì§€ëŠ” ë™ì¼ tsë¡œ ë°˜ë³µ ì—…ë°ì´íŠ¸ê°€ ìì£¼ ì™€ì„œ ë¡œê·¸/IO ë³‘ëª©ì´ ë¨.
+            // Runnerì—ì„œ "ìƒˆ ìº”ë“¤ë§Œ" ë¡œê·¸ë¥¼ ì°ë„ë¡ í•˜ê³ , ì—¬ê¸°ì„œëŠ” ìº”ë“¤ ì›ë¬¸ ë¡œê·¸ë¥¼ ìƒëµí•œë‹¤.
             const bool is_candle =
                 (msg.find("\"type\"") != std::string::npos) &&
                 (msg.find("\"candle.") != std::string::npos);
@@ -413,11 +417,12 @@ namespace api::ws {
                 else std::cout << "[WS] RX: " << msg.substr(0, kMaxLog) << "...\n";
             }
 
+            
             if (on_msg_)
-                on_msg_(std::string_view(msg));
+                on_msg_(std::string_view(msg)); // ì €ì¥ëœ ëŒë‹¤ í•¨ìˆ˜ í˜¸ì¶œ
         }
 
-        // 4) Á¾·á ½Ã close
+        // 4) ì¢…ë£Œ ì‹œ close
         if (ws_ && ws_->is_open())
         {
             boost::system::error_code ignore;
@@ -426,7 +431,7 @@ namespace api::ws {
         }
     }
 
-    // Á¤»ó Á¾·á
+    // ì •ìƒ ì¢…ë£Œ
     void UpbitWebSocketClient::close() {
 
         stop_.store(true, std::memory_order_relaxed);
@@ -436,9 +441,9 @@ namespace api::ws {
         cmd_cv_.notify_one();
     }
 
-    // ticket »ı¼º
+    // ticket ìƒì„±
     std::string UpbitWebSocketClient::makeTicket() {
-        // ¿äÃ»À» ±¸ºĞÇÏ±â À§ÇÑ ÀÓÀÇ ¹®ÀÚ¿­ »ı¼º
+        // ìš”ì²­ì„ êµ¬ë¶„í•˜ê¸° ìœ„í•œ ì„ì˜ ë¬¸ìì—´ ìƒì„±
         std::mt19937_64 rng(
             std::chrono::steady_clock::now()
             .time_since_epoch().count());
@@ -448,9 +453,9 @@ namespace api::ws {
         return oss.str();
     }
 
-    // Äµµé ±¸µ¶ JSON ÇÁ·¹ÀÓ »ı¼º
+    // ìº”ë“¤ êµ¬ë… JSON í”„ë ˆì„ ìƒì„±
     /*
-    * ¿äÃ» ±¸Á¶:
+    * ìš”ì²­ êµ¬ì¡°:
     [
         { "ticket": "..." },
         {
@@ -471,10 +476,10 @@ namespace api::ws {
 
         nlohmann::json root = nlohmann::json::array();
 
-        // ¿äÃ» ½Äº°ÀÚ
+        // ìš”ì²­ ì‹ë³„ì
         root.push_back({ {"ticket", ticket} });
 
-        // ½ÇÁ¦ ±¸µ¶ ´ë»ó
+        // ì‹¤ì œ êµ¬ë… ëŒ€ìƒ
         nlohmann::json body;
         body["type"] = type;
         body["codes"] = markets;
@@ -483,10 +488,10 @@ namespace api::ws {
 
         root.push_back(body);
 
-        // ÀÀ´ä Æ÷¸Ë ÁöÁ¤
+        // ì‘ë‹µ í¬ë§· ì§€ì •
         root.push_back({ {"format", format} });
 
-        return root.dump();
+        return root.dump(); // json í˜•ì‹ string ë°˜í™˜
     }
 
     std::string UpbitWebSocketClient::buildMyOrderSubJsonFrame(
@@ -495,7 +500,7 @@ namespace api::ws {
         bool is_only_realtime,
         const std::string& format)
     {
-        // myOrderµµ µ¿ÀÏÇÑ ¹è¿­ ±¸Á¶·Î ±¸µ¶ ÇÁ·¹ÀÓÀ» Àü¼ÛÇÑ´Ù.
+        // myOrderë„ ë™ì¼í•œ ë°°ì—´ êµ¬ì¡°ë¡œ êµ¬ë… í”„ë ˆì„ì„ ì „ì†¡í•œë‹¤.
         // [
         //   {"ticket":"..."},
         //   {"type":"myOrder","codes":["KRW-BTC"],"is_only_realtime":true},

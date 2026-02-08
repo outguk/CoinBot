@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include <cstddef>
 
@@ -12,17 +12,17 @@ namespace trading::indicators {
     /*
      * ClosePriceWindow
      *
-     * ¸ñÀû:
-     * - close[N] (N°³ ÀÌÀü Á¾°¡)¸¦ Á¦°øÇÑ´Ù. (½Ã°£ ±âÁØ Ç¥Çö)
-     * - trendStrength = abs(close - close[N]) / close[N] °è»ê¿¡ ÇÊ¿ä
+     * ëª©ì :
+     * - close[N] (Nê°œ ì´ì „ ì¢…ê°€)ë¥¼ ì œê³µí•œë‹¤. (ì‹œê°„ ê¸°ì¤€ í‘œí˜„)
+     * - trendStrength = abs(close - close[N]) / close[N] ê³„ì‚°ì— í•„ìš”
      *
-     * ÇÙ½É:
-     * - RingBuffer<double>¿¡ Á¾°¡¸¦ °è¼Ó push
-     * - close[N]´Â valueFromBack(N)·Î O(1)¿¡ Á¶È¸ °¡´É
+     * í•µì‹¬:
+     * - RingBuffer<double>ì— ì¢…ê°€ë¥¼ ê³„ì† push
+     * - close[N]ëŠ” valueFromBack(N)ë¡œ O(1)ì— ì¡°íšŒ ê°€ëŠ¥
      *
-     * ÁÖÀÇ:
-     * - close[N]¸¦ ¾òÀ¸·Á¸é ÃÖ¼Ò (N+1)°³ÀÇ °ªÀÌ ÇÊ¿ä (½Ã°£ ±âÁØÀÌ±â ¶§¹®¿¡)
-     *   µû¶ó¼­ ³»ºÎ ¹öÆÛ capacity´Â (delay_ + 1)·Î ¼³Á¤
+     * ì£¼ì˜:
+     * - close[N]ë¥¼ ì–»ìœ¼ë ¤ë©´ ìµœì†Œ (N+1)ê°œì˜ ê°’ì´ í•„ìš” (ì‹œê°„ ê¸°ì¤€ì´ê¸° ë•Œë¬¸ì—)
+     *   ë”°ë¼ì„œ ë‚´ë¶€ ë²„í¼ capacityëŠ” (delay_ + 1)ë¡œ ì„¤ì •
      */
     class ClosePriceWindow final {
     public:
@@ -31,46 +31,46 @@ namespace trading::indicators {
 
         /*
          * reset(delay)
-         * - delay=NÀ» ¼³Á¤
-         * - ³»ºÎ ¹öÆÛ¸¦ (N+1) Å©±â·Î Àç¼³Á¤ÇÏ°í »óÅÂ¸¦ ÃÊ±âÈ­
-         *   (close[N]¸¦ ¾ò±â À§ÇØ N+1°³¸¦ À¯ÁöÇØ¾ß ÇÔ)
+         * - delay=Nì„ ì„¤ì •
+         * - ë‚´ë¶€ ë²„í¼ë¥¼ (N+1) í¬ê¸°ë¡œ ì¬ì„¤ì •í•˜ê³  ìƒíƒœë¥¼ ì´ˆê¸°í™”
+         *   (close[N]ë¥¼ ì–»ê¸° ìœ„í•´ N+1ê°œë¥¼ ìœ ì§€í•´ì•¼ í•¨)
          */
         void reset(std::size_t delay);
 
         /*
          * clear()
-         * - delay ¼³Á¤Àº À¯Áö
-         * - ³»ºÎ¿¡ ½×ÀÎ µ¥ÀÌÅÍ¸¸ ºñ¿ò
+         * - delay ì„¤ì •ì€ ìœ ì§€
+         * - ë‚´ë¶€ì— ìŒ“ì¸ ë°ì´í„°ë§Œ ë¹„ì›€
          */
         void clear() noexcept;
 
-        // N °ª(¸î °³ ÀÌÀü Á¾°¡¸¦ º¼Áö)
+        // N ê°’(ëª‡ ê°œ ì´ì „ ì¢…ê°€ë¥¼ ë³¼ì§€)
         [[nodiscard]] std::size_t delay() const noexcept { return delay_; }
 
-        // ÇöÀç±îÁö ½×ÀÎ »ùÇÃ °³¼ö(0..delay_+1)
+        // í˜„ì¬ê¹Œì§€ ìŒ“ì¸ ìƒ˜í”Œ ê°œìˆ˜(0..delay_+1)
         [[nodiscard]] std::size_t count() const noexcept { return window_.size(); }
 
         /*
          * update(close)
-         * - »õ Á¾°¡¸¦ ÀÔ·Â
-         * - ÀÔ·Â ÈÄ "close[N]"¸¦ ¹İÈ¯ (ÁØºñµÇ¸é ready=true)
+         * - ìƒˆ ì¢…ê°€ë¥¼ ì…ë ¥
+         * - ì…ë ¥ í›„ "close[N]"ë¥¼ ë°˜í™˜ (ì¤€ë¹„ë˜ë©´ ready=true)
          *
-         * ready Á¶°Ç:
-         * - delay_=NÀÏ ¶§, ÃÖ¼Ò N+1°³ÀÇ °ªÀÌ ½×¿©¾ß close[N]°¡ Á¸Àç
+         * ready ì¡°ê±´:
+         * - delay_=Nì¼ ë•Œ, ìµœì†Œ N+1ê°œì˜ ê°’ì´ ìŒ“ì—¬ì•¼ close[N]ê°€ ì¡´ì¬
          */
         trading::Value<double> update(double close);
 
         /*
          * update(candle)
-         * - candle.close_price¸¦ ÀÔ·ÂÀ¸·Î »ç¿ë(ÆíÀÇ ÇÔ¼ö)
-         * - Candle include´Â cpp¿¡¼­¸¸ ÇÏµµ·Ï ºĞ¸®
+         * - candle.close_priceë¥¼ ì…ë ¥ìœ¼ë¡œ ì‚¬ìš©(í¸ì˜ í•¨ìˆ˜)
+         * - Candle includeëŠ” cppì—ì„œë§Œ í•˜ë„ë¡ ë¶„ë¦¬
          */
         trading::Value<double> update(const core::Candle& c);
 
         /*
          * closeN()
-         * - »óÅÂ º¯È­ ¾øÀÌ ÇöÀç close[N]¸¦ Á¶È¸
-         * - ÁØºñ ¾ÈµÆÀ¸¸é ready=false
+         * - ìƒíƒœ ë³€í™” ì—†ì´ í˜„ì¬ close[N]ë¥¼ ì¡°íšŒ
+         * - ì¤€ë¹„ ì•ˆëìœ¼ë©´ ready=false
          */
         [[nodiscard]] trading::Value<double> closeN() const noexcept;
 

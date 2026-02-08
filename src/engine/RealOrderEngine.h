@@ -1,4 +1,4 @@
-// engine/RealOrderEngine.h
+ï»¿// engine/RealOrderEngine.h
 #pragma once
 
 #include <mutex>
@@ -18,72 +18,70 @@
 #include "EngineEvents.h"
 #include "PrivateOrderApi.h"
 
-// ½Ç°Å·¡ ÁÖ¹® ¿£Áø
-// RealOrderEngineÀº ¡°»óÅÂ ¸Ó½Å + ¿µ¼Ó(½ºÅä¾î) + °èÁÂ/Æ÷Áö¼Ç ¾÷µ¥ÀÌÆ®¡±
+// ì‹¤ê±°ë˜ ì£¼ë¬¸ ì—”ì§„
+// RealOrderEngineì€ â€œìƒíƒœ ë¨¸ì‹  + ì˜ì†(ìŠ¤í† ì–´) + ê³„ì¢Œ/í¬ì§€ì…˜ ì—…ë°ì´íŠ¸â€
 namespace engine
 {
     class RealOrderEngine final : public IOrderEngine
     {
     public:
-        // account: ·ÎÄÃ Ä³½Ã (Áø½ÇÀº ¾÷ºñÆ® ¼­¹ö) - Step 3¿¡¼­ Ã¼°á ÀÌº¥Æ®·Î °»½ÅÇÑ´Ù.
+        // account: ë¡œì»¬ ìºì‹œ (ì§„ì‹¤ì€ ì—…ë¹„íŠ¸ ì„œë²„) - Step 3ì—ì„œ ì²´ê²° ì´ë²¤íŠ¸ë¡œ ê°±ì‹ í•œë‹¤.
         RealOrderEngine(PrivateOrderApi& api, OrderStore& store, core::Account& account);
 
-        // ¿£ÁøÀ» ÇöÀç ½º·¹µå(¿£Áø ·çÇÁ ½º·¹µå)·Î ¹ÙÀÎµùÇÑ´Ù.
-        // ¹İµå½Ã ¿£Áø ·çÇÁ ½ÃÀÛ ½ÃÁ¡¿¡ 1È¸ È£ÃâÇØ¾ß ÇÑ´Ù.
+        // ì—”ì§„ì„ í˜„ì¬ ìŠ¤ë ˆë“œ(ì—”ì§„ ë£¨í”„ ìŠ¤ë ˆë“œ)ë¡œ ë°”ì¸ë”©í•œë‹¤.
+        // ë°˜ë“œì‹œ ì—”ì§„ ë£¨í”„ ì‹œì‘ ì‹œì ì— 1íšŒ í˜¸ì¶œí•´ì•¼ í•œë‹¤.
         void bindToCurrentThread();
 
-        // Àü·«ÀÌ ¸¸µç ÁÖ¹® ÀÇµµ¸¦ "°Å·¡¼Ò·Î Àü¼Û"(POST) getOrderId´Â submit¾È¿¡¼­ ¾²ÀÎ´Ù
+        // ì „ëµì´ ë§Œë“  ì£¼ë¬¸ ì˜ë„ë¥¼ "ê±°ë˜ì†Œë¡œ ì „ì†¡"(POST) getOrderIdëŠ” submitì•ˆì—ì„œ ì“°ì¸ë‹¤
         EngineResult submit(const core::OrderRequest& req) override;
 
-        // WS(myTrade) ¿¬°á ÈÄ Ã¼°áÀÌ ¹ß»ıÇÏ¸é ¿©±â·Î µé¾î¿À°Ô µÈ´Ù.
-        // ÁÖ¹® ´©Àû/»óÅÂ ¾÷µ¥ÀÌÆ®, °èÁÂ/Æ÷Áö¼Ç ·ÎÄÃ Ä³½Ã(best-effort) °»½Å, EngineFillEvent ¹ßÇà
+        // WS(myTrade) ì—°ê²° í›„ ì²´ê²°ì´ ë°œìƒí•˜ë©´ ì—¬ê¸°ë¡œ ë“¤ì–´ì˜¤ê²Œ ëœë‹¤.
+        // ì£¼ë¬¸ ëˆ„ì /ìƒíƒœ ì—…ë°ì´íŠ¸, ê³„ì¢Œ/í¬ì§€ì…˜ ë¡œì»¬ ìºì‹œ(best-effort) ê°±ì‹ , EngineFillEvent ë°œí–‰
         void onMyTrade(const core::MyTrade& t) override;
 
-        // Ã¼°áÀÌ ´©ÀûµÇ´Ù°¡ ÁÖ¹® »óÅÂ º¯È­(´ë±â/Ãë¼Ò/¿Ï·á µî)¸¦ ¹İ¿µ
+        // ì²´ê²°ì´ ëˆ„ì ë˜ë‹¤ê°€ ì£¼ë¬¸ ìƒíƒœ ë³€í™”(ëŒ€ê¸°/ì·¨ì†Œ/ì™„ë£Œ ë“±)ë¥¼ ë°˜ì˜
         void onOrderStatus(std::string_view order_id, core::OrderStatus s) override;
 
-        // ¼öÁ¤µÈ Á¤º¸¸¦ µ¤¾î¾´´Ù
-        // ¡°¾÷ºñÆ®°¡ º¸³»ÁØ ¡®ÁÖ¹® ÀüÃ¼ »óÅÂ ½º³À¼¦¡¯À» ¿£Áø ³»ºÎ »óÅÂ¿Í µ¿±âÈ­ÇÏ´Â ÇÔ¼ö¡±
+        // ìˆ˜ì •ëœ ì •ë³´ë¥¼ ë®ì–´ì“´ë‹¤
+        // â€œì—…ë¹„íŠ¸ê°€ ë³´ë‚´ì¤€ â€˜ì£¼ë¬¸ ì „ì²´ ìƒíƒœ ìŠ¤ëƒ…ìƒ·â€™ì„ ì—”ì§„ ë‚´ë¶€ ìƒíƒœì™€ ë™ê¸°í™”í•˜ëŠ” í•¨ìˆ˜â€
         void onOrderSnapshot(const core::Order& snapshot);
 
-        // [ÇÙ½É] ¿£ÁøÀÌ ¼öÁıÇÑ Ã¼°á/»óÅÂ ÀÌº¥Æ®¸¦ »óÀ§(App)°¡ °¡Á®°¥ ¼ö ÀÖµµ·Ï ¹èÃâÇÑ´Ù.
-        // - WS ½º·¹µå/¸ŞÀÎ ·çÇÁ ½º·¹µå°¡ ºĞ¸®µÇ´õ¶óµµ ¾ÈÀüÇÏ°Ô µ¿ÀÛÇÏµµ·Ï ³»ºÎ Å¥¸¦ »ç¿ë.
-        // - ¹İÈ¯µÈ ÀÌº¥Æ®´Â App¿¡¼­ trading ÀÌº¥Æ®·Î ¸ÅÇÎÇÏ¿© strategy¿¡ Àü´Ş
+        // [í•µì‹¬] ì—”ì§„ì´ ìˆ˜ì§‘í•œ ì²´ê²°/ìƒíƒœ ì´ë²¤íŠ¸ë¥¼ ìƒìœ„(App)ê°€ ê°€ì ¸ê°ˆ ìˆ˜ ìˆë„ë¡ ë°°ì¶œí•œë‹¤.
+        // - WS ìŠ¤ë ˆë“œ/ë©”ì¸ ë£¨í”„ ìŠ¤ë ˆë“œê°€ ë¶„ë¦¬ë˜ë”ë¼ë„ ì•ˆì „í•˜ê²Œ ë™ì‘í•˜ë„ë¡ ë‚´ë¶€ íë¥¼ ì‚¬ìš©.
+        // - ë°˜í™˜ëœ ì´ë²¤íŠ¸ëŠ” Appì—ì„œ trading ì´ë²¤íŠ¸ë¡œ ë§¤í•‘í•˜ì—¬ strategyì— ì „ë‹¬
         std::vector<EngineEvent> pollEvents();
 
         std::optional<core::Order> get(std::string_view order_id) const override;
 
     private:
-        // ¿äÃ» ÃÖ¼Ò °ËÁõ(½Ç°Å·¡¿¡¼­ Àß¸øµÈ ÁÖ¹®Àº °ğ Àå¾Ö/¼Õ½Ç·Î ÀÌ¾îÁö´Ï °­ÇÏ°Ô ¹æ¾î)
+        // ìš”ì²­ ìµœì†Œ ê²€ì¦(ì‹¤ê±°ë˜ì—ì„œ ì˜ëª»ëœ ì£¼ë¬¸ì€ ê³§ ì¥ì• /ì†ì‹¤ë¡œ ì´ì–´ì§€ë‹ˆ ê°•í•˜ê²Œ ë°©ì–´)
         static bool validateRequest(const core::OrderRequest& req, std::string& reason) noexcept;
 
-        // ´ÜÀÏ ¼ÒÀ¯±Ç(¿£Áø ½º·¹µå 1°³ È£Ãâ) °ËÁõ¿ë °¡µå
+        // ë‹¨ì¼ ì†Œìœ ê¶Œ(ì—”ì§„ ìŠ¤ë ˆë“œ 1ê°œ í˜¸ì¶œ) ê²€ì¦ìš© ê°€ë“œ
         void assertOwner_() const;
 
-        // ¿£Áø ³»ºÎ ÀÌº¥Æ® Å¥¿¡ push (¶ô Æ÷ÇÔ)
+        // ì—”ì§„ ë‚´ë¶€ ì´ë²¤íŠ¸ íì— push (ë½ í¬í•¨)
         void pushEvent_(EngineEvent ev);
 
         // "KRW-BTC" -> "BTC"
         static std::string extractCurrency(std::string_view market);
         static std::string makeTradeDedupeKey_(const core::MyTrade& t);
 
-        // trade_uuid Áßº¹ ¼ö½Å ¹æÁö
+        // trade_uuid ì¤‘ë³µ ìˆ˜ì‹  ë°©ì§€
         bool markTradeOnce(std::string_view trade_id);
     private:
         PrivateOrderApi& api_;
         OrderStore& store_;
         core::Account& account_;
 
-        // ¿£Áø ´ÜÀÏ ¼ÒÀ¯±ÇÀ» À§ÇÑ "owner thread"
+        // ì—”ì§„ ë‹¨ì¼ ì†Œìœ ê¶Œì„ ìœ„í•œ "owner thread"
         std::thread::id owner_thread_{};
 
-        // ÀÌ¹Ì Ã³¸®ÇÑ trade_id ÁıÇÕ(ÃÖ¼Ò ¹æ¾î)
+        // ì´ë¯¸ ì²˜ë¦¬í•œ trade_id ì§‘í•©(ìµœì†Œ ë°©ì–´)
         std::unordered_set<std::string> seen_trades_;
         std::deque<std::string> seen_trade_fifo_;
-        // ÀÌ¹Ì Ã³¸®ÇÑ trade_id Áßº¹ ¹æ¾î¿ë(Àå½Ã°£ ¿î¿µ ½Ã ¸Ş¸ğ¸® ¹«ÇÑÁõ°¡ ¹æÁö)
-        static constexpr std::size_t kMaxSeenTrades = 20'000;
 
-        // ¿£ÁøÀÌ »ı¼ºÇÑ ÀÌº¥Æ® Å¥ (Ã¼°á ÀÌº¥Æ®)
+        // ì—”ì§„ì´ ìƒì„±í•œ ì´ë²¤íŠ¸ í (ì²´ê²° ì´ë²¤íŠ¸)
         std::deque<EngineEvent> events_;
     };
 }

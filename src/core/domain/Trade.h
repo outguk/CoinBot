@@ -1,4 +1,4 @@
-// core/domain/Order.h
+ï»¿// core/domain/Order.h
 #pragma once
 
 #include <string>
@@ -10,22 +10,22 @@ namespace core
 {
 
 	/*
-	* ÁöÁ¤ÇÑ Æä¾îÀÇ ÃÖ±Ù Ã¼°á ¸ñ·ÏÀ» Á¶È¸
-	* Á¾¸ñÀÇ ÃÖ±Ù Á¤º¸	
+	* ì§€ì •í•œ í˜ì–´ì˜ ìµœê·¼ ì²´ê²° ëª©ë¡ì„ ì¡°íšŒ
+	* ì¢…ëª©ì˜ ìµœê·¼ ì •ë³´	
 	* 
-	* - ½Ç½Ã°£ ¸Å¼ö/¸Åµµ Èå¸§ °¨Áö
-	* - Ã¼°á ¼Óµµ, ¿¬¼Ó¼º ±â¹İ Å¸ÀÌ¹Ö Æ÷Âø
-	* - °Å·¡·® ±ŞÁõ, ¸Åµµ¼¼ ½ò¸² µî ºñÁ¤Çü Á¶°Ç °¨Áö
+	* - ì‹¤ì‹œê°„ ë§¤ìˆ˜/ë§¤ë„ íë¦„ ê°ì§€
+	* - ì²´ê²° ì†ë„, ì—°ì†ì„± ê¸°ë°˜ íƒ€ì´ë° í¬ì°©
+	* - ê±°ë˜ëŸ‰ ê¸‰ì¦, ë§¤ë„ì„¸ ì ë¦¼ ë“± ë¹„ì •í˜• ì¡°ê±´ ê°ì§€
 	*/
 
 	struct Trade 
 	{	
-		std::string		market;				// ¸¶ÄÏ ÄÚµå (ex: KRW-BTC)
-		int				timestamp;			// Ã¼°á ½Ã°¢ÀÇ ¹Ğ¸®ÃÊ´ÜÀ§ Å¸ÀÓ½ºÅÆÇÁ
+		std::string		market;				// ë§ˆì¼“ ì½”ë“œ (ex: KRW-BTC)
+		int				timestamp;			// ì²´ê²° ì‹œê°ì˜ ë°€ë¦¬ì´ˆë‹¨ìœ„ íƒ€ì„ìŠ¤íƒ¬í”„
 
-		Price			trade_price;		// °Å·¡ °¡°İ
-		Volume			trade_volume;		// °Å·¡ ¼ö·®
+		Price			trade_price;		// ê±°ë˜ ê°€ê²©
+		Volume			trade_volume;		// ê±°ë˜ ìˆ˜ëŸ‰
 
-		OrderPosition	position;			// ¸Å¼ö/¸Åµµ ±¸ºĞ (ASK, BID)
+		OrderPosition	position;			// ë§¤ìˆ˜/ë§¤ë„ êµ¬ë¶„ (ASK, BID)
 	};
 }

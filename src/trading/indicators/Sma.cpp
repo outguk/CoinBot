@@ -1,6 +1,6 @@
-#include "Sma.h"
+ï»¿#include "Sma.h"
 
-#include "core/domain/Candle.h"   // close_price(Á¾°¡ »ç¿ë)
+#include "core/domain/Candle.h"   // close_price(ì¢…ê°€ ì‚¬ìš©)
 
 namespace trading::indicators {
 
@@ -19,31 +19,31 @@ namespace trading::indicators {
         trading::Value<double> out{};
 
         if (length_ == 0) {
-            // ºñÈ°¼º »óÅÂ: ¾î¶² °ªµµ ¸¸µéÁö ¾ÊÀ½
+            // ë¹„í™œì„± ìƒíƒœ: ì–´ë–¤ ê°’ë„ ë§Œë“¤ì§€ ì•ŠìŒ
             out.ready = false;
             out.v = 0.0;
             return out;
         }
 
-        // µ¤¾î¾´ °ªÀÌ ÀÖÀ¸¸é ÇÕ¿¡¼­ »©°í
+        // ë®ì–´ì“´ ê°’ì´ ìˆìœ¼ë©´ í•©ì—ì„œ ë¹¼ê³ 
         const auto overwritten = window_.push(x);
         if (overwritten.has_value()) {
             sum_ -= *overwritten;
         }
-        // »õ·Î µé¾î¿Â °ªÀº ÇÕ¿¡ Ãß°¡
+        // ìƒˆë¡œ ë“¤ì–´ì˜¨ ê°’ì€ í•©ì— ì¶”ê°€
         sum_ += x;
 
-        // À©µµ¿ì°¡ °¡µæ Ã¡À» ¶§¸¸ SMA°¡ "Á¤ÀÇ"µÈ´Ù°í º¸°í ready=true
+        // ìœˆë„ìš°ê°€ ê°€ë“ ì°¼ì„ ë•Œë§Œ SMAê°€ "ì •ì˜"ëœë‹¤ê³  ë³´ê³  ready=true
         out.ready = window_.full();
 
-        // readyÀÏ ¶§¸¸ Æò±ÕÀ» °è»êÇØ¼­ ¹İÈ¯
-        // (¹ÌÁØºñ »óÅÂ¿¡¼­´Â out.v¸¦ 0À¸·Î µÎ°í, ready ÇÃ·¡±×·Î ÆÇ´ÜÇÏµµ·Ï ¼³°è)
+        // readyì¼ ë•Œë§Œ í‰ê· ì„ ê³„ì‚°í•´ì„œ ë°˜í™˜
+        // (ë¯¸ì¤€ë¹„ ìƒíƒœì—ì„œëŠ” out.vë¥¼ 0ìœ¼ë¡œ ë‘ê³ , ready í”Œë˜ê·¸ë¡œ íŒë‹¨í•˜ë„ë¡ ì„¤ê³„)
         out.v = out.ready ? (sum_ / static_cast<double>(length_)) : 0.0;
         return out;
     }
 
     trading::Value<double> Sma::update(const core::Candle& c) {
-        // Candle ÀÔ·ÂÀº Á¾°¡(close_price)¸¦ SMA ÀÔ·ÂÀ¸·Î »ç¿ë
+        // Candle ì…ë ¥ì€ ì¢…ê°€(close_price)ë¥¼ SMA ì…ë ¥ìœ¼ë¡œ ì‚¬ìš©
         return update(static_cast<double>(c.close_price));
     }
 

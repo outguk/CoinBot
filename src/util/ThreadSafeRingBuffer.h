@@ -1,18 +1,18 @@
-#pragma once
+ï»¿#pragma once
 
 #include <mutex>
 #include <optional>
 #include <cstddef>
 
-#include "trading/indicators/RingBuffer.h" // °æ·Î´Â ³× ÇÁ·ÎÁ§Æ® include ±¸Á¶¿¡ ¸ÂÃç Á¶Á¤
+#include "trading/indicators/RingBuffer.h" // ê²½ë¡œëŠ” ë„¤ í”„ë¡œì íŠ¸ include êµ¬ì¡°ì— ë§ì¶° ì¡°ì •
 
 namespace util
 {
     /*
     * ThreadSafeRingBuffer<T>
-    * - RingBuffer<T>´Â thread-safe°¡ ¾Æ´Ï¹Ç·Î mutex·Î °¨½Ñ ·¡ÆÛ
+    * - RingBuffer<T>ëŠ” thread-safeê°€ ì•„ë‹ˆë¯€ë¡œ mutexë¡œ ê°ì‹¼ ë˜í¼
     * - WS producer thread: push()
-    * - main/strategy thread: (´ÙÀ½ ´Ü°è¿¡¼­) tryPopOldest() °°Àº ÇÔ¼ö·Î ¼Òºñ
+    * - main/strategy thread: (ë‹¤ìŒ ë‹¨ê³„ì—ì„œ) tryPopOldest() ê°™ì€ í•¨ìˆ˜ë¡œ ì†Œë¹„
     */
     template <typename T>
     class ThreadSafeRingBuffer final
@@ -23,8 +23,8 @@ namespace util
         {
         }
 
-        // push: °¡µæ Â÷¸é oldest drop (RingBuffer°¡ overwrittenÀ» ¹İÈ¯)
-        // ¹İÈ¯°ª: dropµÈ °ªÀÌ ÀÖÀ¸¸é optional·Î Á¦°ø(·Î±×/Åë°è¿ë)
+        // push: ê°€ë“ ì°¨ë©´ oldest drop (RingBufferê°€ overwrittenì„ ë°˜í™˜)
+        // ë°˜í™˜ê°’: dropëœ ê°’ì´ ìˆìœ¼ë©´ optionalë¡œ ì œê³µ(ë¡œê·¸/í†µê³„ìš©)
         std::optional<T> pushDropOldest(const T& v)
         {
             std::scoped_lock lk(mtx_);
@@ -37,7 +37,7 @@ namespace util
             return rb_.push(std::move(v));
         }
 
-        // size °üÂû(¼º°ø ±âÁØ È®ÀÎ¿ë)
+        // size ê´€ì°°(ì„±ê³µ ê¸°ì¤€ í™•ì¸ìš©)
         std::size_t size() const
         {
             std::scoped_lock lk(mtx_);
@@ -50,9 +50,9 @@ namespace util
             return rb_.capacity();
         }
 
-        // (Chat 5¿¡¼­ ¼ÒºñÀÚ°¡ ÇÊ¿äÇØÁú ÇÔ¼ö)
-        // oldest¸¦ ²¨³»°í Á¦°Å: RingBuffer´Â popÀÌ ¾ø¾î¼­ ¡°°¡º­¿î ¼Òºñ¿ë ¹öÆÛ¡±·Î ¾²·Á¸é È®Àå ÇÊ¿ä.
-        // Áö±İ ´Ü°è(Chat 4)´Â producer push + size ·Î±×±îÁö¸¸ ¿ä±¸ÇÏ´Ï ¿©±â¼­ ¸ØÃá´Ù.
+        // (Chat 5ì—ì„œ ì†Œë¹„ìê°€ í•„ìš”í•´ì§ˆ í•¨ìˆ˜)
+        // oldestë¥¼ êº¼ë‚´ê³  ì œê±°: RingBufferëŠ” popì´ ì—†ì–´ì„œ â€œê°€ë²¼ìš´ ì†Œë¹„ìš© ë²„í¼â€ë¡œ ì“°ë ¤ë©´ í™•ì¥ í•„ìš”.
+        // ì§€ê¸ˆ ë‹¨ê³„(Chat 4)ëŠ” producer push + size ë¡œê·¸ê¹Œì§€ë§Œ ìš”êµ¬í•˜ë‹ˆ ì—¬ê¸°ì„œ ë©ˆì¶˜ë‹¤.
 
     private:
         mutable std::mutex mtx_;

@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include <optional>
 #include <string>
@@ -8,51 +8,51 @@
 #include "core/domain/Account.h"
 
 /*
-* ÁÖ¹® ¿£Áø Ã³¸® °á°ú °´Ã¼
-* - ÁÖ¹®À» Ã³¸®ÇÑ °á°ú¸¸ Ã¥ÀÓ
-* - °èÁÂ¡¤Àü·«¡¤API »óÅÂ¸¦ Á÷Á¢ ³ëÃâÇÏÁö ¾Ê´Â´Ù
-* - Demo / Real ¿£Áø ¸ğµÎ °ø¿ëÀ¸·Î »ç¿ë °¡´É
+* ì£¼ë¬¸ ì—”ì§„ ì²˜ë¦¬ ê²°ê³¼ ê°ì²´
+* - ì£¼ë¬¸ì„ ì²˜ë¦¬í•œ ê²°ê³¼ë§Œ ì±…ì„
+* - ê³„ì¢ŒÂ·ì „ëµÂ·API ìƒíƒœë¥¼ ì§ì ‘ ë…¸ì¶œí•˜ì§€ ì•ŠëŠ”ë‹¤
+* - Demo / Real ì—”ì§„ ëª¨ë‘ ê³µìš©ìœ¼ë¡œ ì‚¬ìš© ê°€ëŠ¥
 */
 
 namespace engine
 {
-	// ÁÖ¹® ¿£Áø Ã³¸® °á°ú ÄÚµå
+	// ì£¼ë¬¸ ì—”ì§„ ì²˜ë¦¬ ê²°ê³¼ ì½”ë“œ
 	enum class EngineErrorCode
 	{
-		None = 0,               // ¼º°ø
+		None = 0,               // ì„±ê³µ
 
-		// ÀÔ·Â / »óÅÂ ¿À·ù
-		InvalidOrderId,			// Àß¸øµÈ ÁÖ¹® ¿äÃ» (ID)
-		InsufficientFunds,		// ÀÜ°í ºÎÁ·
-		MarketNotSupported,		// Áö¿øÇÏÁö ¾Ê´Â ¸¶ÄÏ
-		OrderRejected,			// ¿£Áø ³»ºÎ Á¤Ã¥¿¡ ÀÇÇÑ °ÅºÎ
+		// ì…ë ¥ / ìƒíƒœ ì˜¤ë¥˜
+		InvalidOrderId,			// ì˜ëª»ëœ ì£¼ë¬¸ ìš”ì²­ (ID)
+		InsufficientFunds,		// ì”ê³  ë¶€ì¡±
+		MarketNotSupported,		// ì§€ì›í•˜ì§€ ì•ŠëŠ” ë§ˆì¼“
+		OrderRejected,			// ì—”ì§„ ë‚´ë¶€ ì •ì±…ì— ì˜í•œ ê±°ë¶€
 
-		// ¿£Áø ¿À·ù
-		InternalError,			// ³»ºÎ ¿À·ù
+		// ì—”ì§„ ì˜¤ë¥˜
+		InternalError,			// ë‚´ë¶€ ì˜¤ë¥˜
 	};
 
-	// ÁÖ¹® ¿£ÁøÀÇ ½ÇÇà °á°ú
+	// ì£¼ë¬¸ ì—”ì§„ì˜ ì‹¤í–‰ ê²°ê³¼
 	struct EngineResult
 	{
-		// -- ±âº» »óÅÂ --
-		bool success{ false };							// ¼º°ø ¿©ºÎ
-		EngineErrorCode code{ EngineErrorCode::None };	// ½ÇÆĞ »çÀ¯
+		// -- ê¸°ë³¸ ìƒíƒœ --
+		bool success{ false };							// ì„±ê³µ ì—¬ë¶€
+		EngineErrorCode code{ EngineErrorCode::None };	// ì‹¤íŒ¨ ì‚¬ìœ 
 
-		// -- ÁÖ¹® °á°ú --
-		std::optional<core::Order>		order;			// ÁÖ¹® Ã³¸® ÈÄ ÁÖ¹® »óÅÂ (ÀÖÀ» °æ¿ì)
-		std::optional<core::MyTrade>	myTrade;		// ÁÖ¹® Ã³¸® ÈÄ ³» °Å·¡ »óÅÂ (ÀÖÀ» °æ¿ì)
+		// -- ì£¼ë¬¸ ê²°ê³¼ --
+		std::optional<core::Order>		order;			// ì£¼ë¬¸ ì²˜ë¦¬ í›„ ì£¼ë¬¸ ìƒíƒœ (ìˆì„ ê²½ìš°)
+		std::optional<core::MyTrade>	myTrade;		// ì£¼ë¬¸ ì²´ê²° í›„ ë‚´ ê±°ë˜ ìƒíƒœ (ìˆì„ ê²½ìš°)
 
-		// -- °èÁÂ ½º³À¼¦ --
-		std::optional<core::Account>	account;		// Ã³¸® ÈÄ °èÁÂ »óÅÂ (ÀÖÀ» °æ¿ì)
+		// -- ê³„ì¢Œ ìŠ¤ëƒ…ìƒ· --
+		std::optional<core::Account>	account;		// ì²˜ë¦¬ í›„ ê³„ì¢Œ ìƒíƒœ (ìˆì„ ê²½ìš°)
 
-		// -- ¸Ş½ÃÁö (µğ¹ö±×/·Î±×) --
+		// -- ë©”ì‹œì§€ (ë””ë²„ê·¸/ë¡œê·¸) --
 		std::string message;
 
-		// ¼º°ø°ú ½ÇÆĞ¸¦ ½±°Ô »ı¼ºÇÏ´Â ÇïÆÛ
-		// - ÀÇ¹ÌÀûÀ¸·Î ¿Ã¹Ù¸¥ »óÅÂ¸¦ °­Á¦
-		// - ¿£Áø ±¸Çö ÄÚµå°¡ ¾ĞµµÀûÀ¸·Î ÀĞ±â ½¬¿öÁü
+		// ì„±ê³µê³¼ ì‹¤íŒ¨ë¥¼ ì‰½ê²Œ ìƒì„±í•˜ëŠ” í—¬í¼
+		// - ì˜ë¯¸ì ìœ¼ë¡œ ì˜¬ë°”ë¥¸ ìƒíƒœë¥¼ ê°•ì œ
+		// - ì—”ì§„ êµ¬í˜„ ì½”ë“œê°€ ì••ë„ì ìœ¼ë¡œ ì½ê¸° ì‰¬ì›Œì§
 
-		// -- ¼º°ø °á°ú ÇïÆÛ --
+		// -- ì„±ê³µ ê²°ê³¼ í—¬í¼ --
 		static EngineResult Success(
 			core::Order order,
 			std::optional<core::MyTrade> trade = std::nullopt,
@@ -70,7 +70,7 @@ namespace engine
 			};
 		}
 
-		// -- ½ÇÆĞ °á°ú ÇïÆÛ --
+		// -- ì‹¤íŒ¨ ê²°ê³¼ í—¬í¼ --
 		static EngineResult Fail(
 			EngineErrorCode error_code,
 			std::string msg = {}

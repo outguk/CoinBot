@@ -1,39 +1,39 @@
-#pragma once
+ï»¿#pragma once
 
 #include <string>
 #include <vector>
 #include <optional>
 #include <json.hpp>
 
-// Upbit ½Ã¼¼, ÄÚÀÎ Á¤º¸ µîÀÇ JSON µ¥ÀÌÅÍ¸¦ ±×´ë·Î ¹Ş´Â ±¸Á¶Ã¼(Dto) Á¤ÀÇ
+// Upbit ì‹œì„¸, ì½”ì¸ ì •ë³´ ë“±ì˜ JSON ë°ì´í„°ë¥¼ ê·¸ëŒ€ë¡œ ë°›ëŠ” êµ¬ì¡°ì²´(Dto) ì •ì˜
 
 namespace api::upbit::dto
 {	
-	// ¾÷ºñÆ® ¸¶ÄÏ(Á¾¸ñ) Á¤º¸ DTO
+	// ì—…ë¹„íŠ¸ ë§ˆì¼“(ì¢…ëª©) ì •ë³´ DTO
 	struct MarketEventDto 
 	{
 		struct MarketCautionDto
 		{
-			bool	PRICE_FLUCTUATIONS;					// °¡°İ ±Şµî¶ô °æº¸
-			bool	RADING_VOLUME_SOARING;				// °Å·¡·® ±ŞÁõ °æº¸
-			bool	DEPOSIT_AMOUNT_SOARING;				// ÀÔ±İ·® ±ŞÁõ °æº¸
-			bool	GLOBAL_PRICE_DIFFERENCES;			// ±¹³»¿Ü ½Ã¼¼ Â÷ÀÌ °æº¸
-			bool	CONCENTRATION_OF_SMALL_ACCOUNTS;	// ¼Ò¼ö °èÁ¤ ÁıÁß °Å·¡ °æº¸
+			bool	PRICE_FLUCTUATIONS;					// ê°€ê²© ê¸‰ë“±ë½ ê²½ë³´
+			bool	RADING_VOLUME_SOARING;				// ê±°ë˜ëŸ‰ ê¸‰ì¦ ê²½ë³´
+			bool	DEPOSIT_AMOUNT_SOARING;				// ì…ê¸ˆëŸ‰ ê¸‰ì¦ ê²½ë³´
+			bool	GLOBAL_PRICE_DIFFERENCES;			// êµ­ë‚´ì™¸ ì‹œì„¸ ì°¨ì´ ê²½ë³´
+			bool	CONCENTRATION_OF_SMALL_ACCOUNTS;	// ì†Œìˆ˜ ê³„ì • ì§‘ì¤‘ ê±°ë˜ ê²½ë³´
 		};
 
-		bool warning = false;                         // À¯ÀÇ Á¾¸ñ ¿©ºÎ
-		std::optional<MarketCautionDto> caution; // ÁÖÀÇ Á¾¸ñ Á¤º¸ (¾øÀ» ¼öµµ ÀÖÀ¸´Ï optional ±ÇÀå)
+		bool warning = false;                         // ìœ ì˜ ì¢…ëª© ì—¬ë¶€
+		std::optional<MarketCautionDto> caution; // ì£¼ì˜ ì¢…ëª© ì •ë³´ (ì—†ì„ ìˆ˜ë„ ìˆìœ¼ë‹ˆ optional ê¶Œì¥)
 	};
 	struct MarketDto
 	{
-		std::string			market;			// ¸¶ÄÏ ÄÚµå (ex: KRW-BTC)
-		std::string			korean_name;	// ÇÑ±Û¸í
-		std::string			english_name;	// ¿µ¹®¸í
+		std::string			market;			// ë§ˆì¼“ ì½”ë“œ (ex: KRW-BTC)
+		std::string			korean_name;	// í•œê¸€ëª…
+		std::string			english_name;	// ì˜ë¬¸ëª…
 
-		std::optional<MarketEventDto> market_event; // ¸¶ÄÏ °æ°í Á¤º¸ (¾øÀ» ¼öµµ ÀÖÀ¸´Ï optional ±ÇÀå)
+		std::optional<MarketEventDto> market_event; // ë§ˆì¼“ ê²½ê³  ì •ë³´ (ì—†ì„ ìˆ˜ë„ ìˆìœ¼ë‹ˆ optional ê¶Œì¥)
 	};
 
-	// nlohmann::json ¸ÅÇÎ (ADL)
+	// nlohmann::json ë§¤í•‘ (ADL)
 	inline void from_json(const nlohmann::json& j, MarketDto& d)
 	{
 		j.at("market").get_to(d.market);
@@ -42,48 +42,48 @@ namespace api::upbit::dto
 	}
 	
 	/*
-	* ÇöÀç´Â Á÷Á¢ Á¾¸ñÀ» °ñ¶ó¼­ ½Ã¼¼ Á¤º¸¸¦ ¹Ş´Â Æä¾î ´ÜÀ§ÀÇ Ticker DTO¸¸ Á¤ÀÇ
-	* ÃßÈÄ ½Ç½Ã°£À» °Å·¡ Á¾¸ñÀ» °í¸£´Â °æ¿ì ¸¶ÄÏ Æä¾î ´ÜÀ§ÀÇ Á¶È¸ DTOµµ Á¤ÀÇ ÇÊ¿ä
+	* í˜„ì¬ëŠ” ì§ì ‘ ì¢…ëª©ì„ ê³¨ë¼ì„œ ì‹œì„¸ ì •ë³´ë¥¼ ë°›ëŠ” í˜ì–´ ë‹¨ìœ„ì˜ Ticker DTOë§Œ ì •ì˜
+	* ì¶”í›„ ì‹¤ì‹œê°„ì„ ê±°ë˜ ì¢…ëª©ì„ ê³ ë¥´ëŠ” ê²½ìš° ë§ˆì¼“ í˜ì–´ ë‹¨ìœ„ì˜ ì¡°íšŒ DTOë„ ì •ì˜ í•„ìš”
 	*/
 
-	// ¾÷ºñÆ® Æä¾î ´ÜÀ§ ½Ã¼¼ Á¤º¸ DTO (Á¾¸ñÀº ³»°¡ °í¸§)
+	// ì—…ë¹„íŠ¸ í˜ì–´ ë‹¨ìœ„ ì‹œì„¸ ì •ë³´ DTO (ì¢…ëª©ì€ ë‚´ê°€ ê³ ë¦„)
 	struct TickerDto
 	{
-		// ±âº» Á¤º¸
-		std::string			market;					// ¸¶ÄÏ ÄÚµå (ex: KRW-BTC)
-		std::string			trade_date;				// ÃÖ±Ù Ã¼°á ÀÏÀÚ UTC ±âÁØ (yyyyMMdd)
-		std::string			trade_time;				// ÃÖ±Ù Ã¼°á ÀÏÀÚ UTC ±âÁØ	 (HHmmss)
-		std::string			trade_date_kst;			// ÃÖ±Ù Ã¼°á ÀÏÀÚ KST ±âÁØ	 (yyyyMMdd)
-		std::string			trade_time_kst;			// ÃÖ±Ù Ã¼°á ÀÏÀÚ KST ±âÁØ	 (HHmmss)
-		std::int64_t		trade_timestamp;		// Ã¼°á ½Ã°¢ÀÇ ¹Ğ¸®ÃÊ´ÜÀ§ Å¸ÀÓ½ºÅÆÇÁ
+		// ê¸°ë³¸ ì •ë³´
+		std::string			market;					// ë§ˆì¼“ ì½”ë“œ (ex: KRW-BTC)
+		std::string			trade_date;				// ìµœê·¼ ì²´ê²° ì¼ì UTC ê¸°ì¤€ (yyyyMMdd)
+		std::string			trade_time;				// ìµœê·¼ ì²´ê²° ì¼ì UTC ê¸°ì¤€	 (HHmmss)
+		std::string			trade_date_kst;			// ìµœê·¼ ì²´ê²° ì¼ì KST ê¸°ì¤€	 (yyyyMMdd)
+		std::string			trade_time_kst;			// ìµœê·¼ ì²´ê²° ì¼ì KST ê¸°ì¤€	 (HHmmss)
+		std::int64_t		trade_timestamp;		// ì²´ê²° ì‹œê°ì˜ ë°€ë¦¬ì´ˆë‹¨ìœ„ íƒ€ì„ìŠ¤íƒ¬í”„
 
-		// °¡°İ
-		double				opening_price;			// ÇØ´ç Æä¾îÀÇ ½Ã°¡
-		double				high_price;				// ÇØ´ç Æä¾îÀÇ °í°¡
-		double				low_price;				// ÇØ´ç Æä¾îÀÇ Àú°¡
-		double				trade_price;			// ÇØ´ç Æä¾îÀÇ Á¾°¡(ÃÖÁ¾ Ã¼°á°¡)
-		double				prev_closing_price;		// ÀüÀÏ Á¾°¡ (UTC0½Ã ±âÁØ)
-		std::string			change;					// °¡°İ º¯µ¿ »óÅÂ(RISE, FALL, EVEN)
-		double				change_price;			// ÀüÀÏ Á¾°¡ ´ëºñ °¡°İ º¯È­(trade_price - prev_closing_price)
-		double				change_rate;			// ÀüÀÏ Á¾°¡ ´ëºñ °¡°İ º¯È­À² ((trade_price - prev_closing_price) / prev_closing_price)
-		double				signed_change_price;	// ºÎÈ£ ÀÖ´Â °¡°İ º¯È­ (change_price¿Í µ¿ÀÏÇÏÁö¸¸ ºÎÈ£ Á¸Àç)
-		double				signed_change_rate;		// ºÎÈ£ ÀÖ´Â °¡°İ º¯È­À² (change_rate¿Í µ¿ÀÏÇÏÁö¸¸ ºÎÈ£ Á¸Àç)
+		// ê°€ê²©
+		double				opening_price;			// í•´ë‹¹ í˜ì–´ì˜ ì‹œê°€
+		double				high_price;				// í•´ë‹¹ í˜ì–´ì˜ ê³ ê°€
+		double				low_price;				// í•´ë‹¹ í˜ì–´ì˜ ì €ê°€
+		double				trade_price;			// í•´ë‹¹ í˜ì–´ì˜ ì¢…ê°€(ìµœì¢… ì²´ê²°ê°€)
+		double				prev_closing_price;		// ì „ì¼ ì¢…ê°€ (UTC0ì‹œ ê¸°ì¤€)
+		std::string			change;					// ê°€ê²© ë³€ë™ ìƒíƒœ(RISE, FALL, EVEN)
+		double				change_price;			// ì „ì¼ ì¢…ê°€ ëŒ€ë¹„ ê°€ê²© ë³€í™”(trade_price - prev_closing_price)
+		double				change_rate;			// ì „ì¼ ì¢…ê°€ ëŒ€ë¹„ ê°€ê²© ë³€í™”ìœ¨ ((trade_price - prev_closing_price) / prev_closing_price)
+		double				signed_change_price;	// ë¶€í˜¸ ìˆëŠ” ê°€ê²© ë³€í™” (change_priceì™€ ë™ì¼í•˜ì§€ë§Œ ë¶€í˜¸ ì¡´ì¬)
+		double				signed_change_rate;		// ë¶€í˜¸ ìˆëŠ” ê°€ê²© ë³€í™”ìœ¨ (change_rateì™€ ë™ì¼í•˜ì§€ë§Œ ë¶€í˜¸ ì¡´ì¬)
 
-		// °Å·¡·®
-		double				trade_volume;			// ÇØ´ç Æä¾îÀÇ ÃÖ±Ù °Å·¡·®
-		double				acc_trade_price;		// ÇØ´ç Æä¾îÀÇ ´©Àû °Å·¡´ë±İ (UTC 0½ÃºÎÅÍ ´©Àû)
-		double				acc_trade_price_24h;	// ÇØ´ç Æä¾îÀÇ 24½Ã°£ ´©Àû °Å·¡´ë±İ
-		double				acc_trade_volume;		// ÇØ´ç Æä¾îÀÇ ´©Àû °Å·¡·® (UTC 0½ÃºÎÅÍ ´©Àû)
-		double				acc_trade_volume_24h;	// ÇØ´ç Æä¾îÀÇ 24½Ã°£ ´©Àû °Å·¡·®
+		// ê±°ë˜ëŸ‰
+		double				trade_volume;			// í•´ë‹¹ í˜ì–´ì˜ ìµœê·¼ ê±°ë˜ëŸ‰
+		double				acc_trade_price;		// í•´ë‹¹ í˜ì–´ì˜ ëˆ„ì  ê±°ë˜ëŒ€ê¸ˆ (UTC 0ì‹œë¶€í„° ëˆ„ì )
+		double				acc_trade_price_24h;	// í•´ë‹¹ í˜ì–´ì˜ 24ì‹œê°„ ëˆ„ì  ê±°ë˜ëŒ€ê¸ˆ
+		double				acc_trade_volume;		// í•´ë‹¹ í˜ì–´ì˜ ëˆ„ì  ê±°ë˜ëŸ‰ (UTC 0ì‹œë¶€í„° ëˆ„ì )
+		double				acc_trade_volume_24h;	// í•´ë‹¹ í˜ì–´ì˜ 24ì‹œê°„ ëˆ„ì  ê±°ë˜ëŸ‰
 
-		// ÃÖ°í°¡ / ÃÖÀú°¡
-		double				highest_52_week_price;	// ÃÖ±Ù 52ÁÖ ÃÖ°í°¡
-		std::string			highest_52_week_date;	// ÃÖ±Ù 52ÁÖ ÃÖ°í°¡ ´Ş¼ºÀÏÀÚ (yyyy-MM-dd)
-		double				lowest_52_week_price;	// ÃÖ±Ù 52ÁÖ ÃÖÀú°¡
-		std::string			lowest_52_week_date;	// ÃÖ±Ù 52ÁÖ ÃÖÀú°¡ ´Ş¼ºÀÏÀÚ (yyyy-MM-dd)
-		int					timestamp;				// Å¸ÀÓ½ºÅÆÇÁ
+		// ìµœê³ ê°€ / ìµœì €ê°€
+		double				highest_52_week_price;	// ìµœê·¼ 52ì£¼ ìµœê³ ê°€
+		std::string			highest_52_week_date;	// ìµœê·¼ 52ì£¼ ìµœê³ ê°€ ë‹¬ì„±ì¼ì (yyyy-MM-dd)
+		double				lowest_52_week_price;	// ìµœê·¼ 52ì£¼ ìµœì €ê°€
+		std::string			lowest_52_week_date;	// ìµœê·¼ 52ì£¼ ìµœì €ê°€ ë‹¬ì„±ì¼ì (yyyy-MM-dd)
+		int					timestamp;				// íƒ€ì„ìŠ¤íƒ¬í”„
 	};
-	// nlohmann::json ¸ÅÇÎ (ADL)
+	// nlohmann::json ë§¤í•‘ (ADL)
 	inline void from_json(const nlohmann::json& j, TickerDto& d)
 	{
 		j.at("market").get_to(d.market);
@@ -105,27 +105,27 @@ namespace api::upbit::dto
 	}
 
 
-	// ÁöÁ¤ÇÑ Æä¾îÀÇ Äµµé(ºÀ) µ¥ÀÌÅÍ DTO
+	// ì§€ì •í•œ í˜ì–´ì˜ ìº”ë“¤(ë´‰) ë°ì´í„° DTO
 	struct CandleDto_Minute
 	{
-		// ±âº» Á¤º¸
-		std::string		market;						// ¸¶ÄÏ ÄÚµå (ex: KRW-BTC)
-		std::string		candle_date_time_utc;		// Äµµé ±âÁØ ½ÃÀÛ ½Ã°¢(UTC)
-		std::string		candle_date_time_kst;		// Äµµé ±âÁØ ½ÃÀÛ ½Ã°¢(KST)
+		// ê¸°ë³¸ ì •ë³´
+		std::string		market;						// ë§ˆì¼“ ì½”ë“œ (ex: KRW-BTC)
+		std::string		candle_date_time_utc;		// ìº”ë“¤ ê¸°ì¤€ ì‹œì‘ ì‹œê°(UTC)
+		std::string		candle_date_time_kst;		// ìº”ë“¤ ê¸°ì¤€ ì‹œì‘ ì‹œê°(KST)
 		
-		// °¡°İ
-		double			opening_price;				// ÇØ´ç ÄµµéÀÇ ½Ã°¡
-		double			high_price;					// ÇØ´ç ÄµµéÀÇ °í°¡
-		double			low_price;					// ÇØ´ç ÄµµéÀÇ Àú°¡
-		double			trade_price;				// ÇØ´ç ÄµµéÀÇ Á¾°¡
-		std::int64_t	timestamp;					// ÄµµéÀÇ ¸¶Áö¸· Æ½ÀÇ Å¸ÀÓ½ºÅÆÇÁ
+		// ê°€ê²©
+		double			opening_price;				// í•´ë‹¹ ìº”ë“¤ì˜ ì‹œê°€
+		double			high_price;					// í•´ë‹¹ ìº”ë“¤ì˜ ê³ ê°€
+		double			low_price;					// í•´ë‹¹ ìº”ë“¤ì˜ ì €ê°€
+		double			trade_price;				// í•´ë‹¹ ìº”ë“¤ì˜ ì¢…ê°€
+		std::int64_t	timestamp;					// ìº”ë“¤ì˜ ë§ˆì§€ë§‰ í‹±ì˜ íƒ€ì„ìŠ¤íƒ¬í”„
 
-		// °Å·¡·®
-		double			candle_acc_trade_price;		// ÇØ´ç ÄµµéÀÇ ´©Àû °Å·¡´ë±İ
-		double			candle_acc_trade_volume;	// ÇØ´ç ÄµµéÀÇ ´©Àû °Å·¡·®
+		// ê±°ë˜ëŸ‰
+		double			candle_acc_trade_price;		// í•´ë‹¹ ìº”ë“¤ì˜ ëˆ„ì  ê±°ë˜ëŒ€ê¸ˆ
+		double			candle_acc_trade_volume;	// í•´ë‹¹ ìº”ë“¤ì˜ ëˆ„ì  ê±°ë˜ëŸ‰
 
-		// ºĞ ´ÜÀ§ - 1, 3, 5, 10, 15, 30, 60, 240 (¿ì¸®´Â 3ºĞºÎÅÍ »ç¿ë)
-		int				unit;						// Äµµé ´ÜÀ§ (ºĞ)
+		// ë¶„ ë‹¨ìœ„ - 1, 3, 5, 10, 15, 30, 60, 240 (ìš°ë¦¬ëŠ” 3ë¶„ë¶€í„° ì‚¬ìš©)
+		int				unit;						// ìº”ë“¤ ë‹¨ìœ„ (ë¶„)
 	};
 	inline void from_json(const nlohmann::json& j, CandleDto_Minute& d)
 	{
@@ -147,118 +147,118 @@ namespace api::upbit::dto
 	}
 	struct CandleDto_Day
 	{
-		// ±âº» Á¤º¸
-		std::string		market;						// ¸¶ÄÏ ÄÚµå (ex: KRW-BTC)
-		std::string		candle_date_time_utc;		// Äµµé ±âÁØ ½ÃÀÛ ½Ã°¢(UTC)
-		std::string		candle_date_time_kst;		// Äµµé ±âÁØ ½ÃÀÛ ½Ã°¢(KST)
+		// ê¸°ë³¸ ì •ë³´
+		std::string		market;						// ë§ˆì¼“ ì½”ë“œ (ex: KRW-BTC)
+		std::string		candle_date_time_utc;		// ìº”ë“¤ ê¸°ì¤€ ì‹œì‘ ì‹œê°(UTC)
+		std::string		candle_date_time_kst;		// ìº”ë“¤ ê¸°ì¤€ ì‹œì‘ ì‹œê°(KST)
 
-		// °¡°İ
-		double			opening_price;				// ÇØ´ç ÄµµéÀÇ ½Ã°¡
-		double			high_price;					// ÇØ´ç ÄµµéÀÇ °í°¡
-		double			low_price;					// ÇØ´ç ÄµµéÀÇ Àú°¡
-		double			trade_price;				// ÇØ´ç ÄµµéÀÇ Á¾°¡
-		std::int64_t	timestamp;					// ÄµµéÀÇ ¸¶Áö¸· Æ½ÀÇ Å¸ÀÓ½ºÅÆÇÁ
+		// ê°€ê²©
+		double			opening_price;				// í•´ë‹¹ ìº”ë“¤ì˜ ì‹œê°€
+		double			high_price;					// í•´ë‹¹ ìº”ë“¤ì˜ ê³ ê°€
+		double			low_price;					// í•´ë‹¹ ìº”ë“¤ì˜ ì €ê°€
+		double			trade_price;				// í•´ë‹¹ ìº”ë“¤ì˜ ì¢…ê°€
+		std::int64_t	timestamp;					// ìº”ë“¤ì˜ ë§ˆì§€ë§‰ í‹±ì˜ íƒ€ì„ìŠ¤íƒ¬í”„
 
-		// °Å·¡·®
-		double			candle_acc_trade_price;		// ÇØ´ç ÄµµéÀÇ ´©Àû °Å·¡´ë±İ
-		double			candle_acc_trade_volume;	// ÇØ´ç ÄµµéÀÇ ´©Àû °Å·¡·®
+		// ê±°ë˜ëŸ‰
+		double			candle_acc_trade_price;		// í•´ë‹¹ ìº”ë“¤ì˜ ëˆ„ì  ê±°ë˜ëŒ€ê¸ˆ
+		double			candle_acc_trade_volume;	// í•´ë‹¹ ìº”ë“¤ì˜ ëˆ„ì  ê±°ë˜ëŸ‰
 		
-		// ÀüÀÏ	Á¾°¡ °ü·Ã Á¤º¸
-		double			prev_closing_price;			// ÀüÀÏ Á¾°¡
-		double			change_price;				// ÀüÀÏ Á¾°¡ ´ëºñ °¡°İ º¯È­(trade_price - prev_closing_price)
-		double			change_rate;				// ÀüÀÏ Á¾°¡ ´ëºñ °¡°İ º¯È­À² ((trade_price - prev_closing_price) / prev_closing_price)
-		double			coverted_trade_price;		// Á¾°¡ È¯»ê °¡°İ(converted_trade_price¿¡ ¿äÃ»µÈ ÅëÈ­·Î È¯»êµÈ °¡°İ)
+		// ì „ì¼	ì¢…ê°€ ê´€ë ¨ ì •ë³´
+		double			prev_closing_price;			// ì „ì¼ ì¢…ê°€
+		double			change_price;				// ì „ì¼ ì¢…ê°€ ëŒ€ë¹„ ê°€ê²© ë³€í™”(trade_price - prev_closing_price)
+		double			change_rate;				// ì „ì¼ ì¢…ê°€ ëŒ€ë¹„ ê°€ê²© ë³€í™”ìœ¨ ((trade_price - prev_closing_price) / prev_closing_price)
+		double			coverted_trade_price;		// ì¢…ê°€ í™˜ì‚° ê°€ê²©(converted_trade_priceì— ìš”ì²­ëœ í†µí™”ë¡œ í™˜ì‚°ëœ ê°€ê²©)
 	};
 	struct CandleDto_Week
 	{
-		// ±âº» Á¤º¸
-		std::string		market;						// ¸¶ÄÏ ÄÚµå (ex: KRW-BTC)
-		std::string		candle_date_time_utc;		// Äµµé ±âÁØ ½ÃÀÛ ½Ã°¢(UTC)
-		std::string		candle_date_time_kst;		// Äµµé ±âÁØ ½ÃÀÛ ½Ã°¢(KST)
+		// ê¸°ë³¸ ì •ë³´
+		std::string		market;						// ë§ˆì¼“ ì½”ë“œ (ex: KRW-BTC)
+		std::string		candle_date_time_utc;		// ìº”ë“¤ ê¸°ì¤€ ì‹œì‘ ì‹œê°(UTC)
+		std::string		candle_date_time_kst;		// ìº”ë“¤ ê¸°ì¤€ ì‹œì‘ ì‹œê°(KST)
 
-		// °¡°İ
-		double			opening_price;				// ÇØ´ç ÄµµéÀÇ ½Ã°¡
-		double			high_price;					// ÇØ´ç ÄµµéÀÇ °í°¡
-		double			low_price;					// ÇØ´ç ÄµµéÀÇ Àú°¡
-		double			trade_price;				// ÇØ´ç ÄµµéÀÇ Á¾°¡
-		std::int64_t	timestamp;					// ÄµµéÀÇ ¸¶Áö¸· Æ½ÀÇ Å¸ÀÓ½ºÅÆÇÁ
+		// ê°€ê²©
+		double			opening_price;				// í•´ë‹¹ ìº”ë“¤ì˜ ì‹œê°€
+		double			high_price;					// í•´ë‹¹ ìº”ë“¤ì˜ ê³ ê°€
+		double			low_price;					// í•´ë‹¹ ìº”ë“¤ì˜ ì €ê°€
+		double			trade_price;				// í•´ë‹¹ ìº”ë“¤ì˜ ì¢…ê°€
+		std::int64_t	timestamp;					// ìº”ë“¤ì˜ ë§ˆì§€ë§‰ í‹±ì˜ íƒ€ì„ìŠ¤íƒ¬í”„
 
-		// °Å·¡·®
-		double			candle_acc_trade_price;		// ÇØ´ç ÄµµéÀÇ ´©Àû °Å·¡´ë±İ
-		double			candle_acc_trade_volume;	// ÇØ´ç ÄµµéÀÇ ´©Àû °Å·¡·®
+		// ê±°ë˜ëŸ‰
+		double			candle_acc_trade_price;		// í•´ë‹¹ ìº”ë“¤ì˜ ëˆ„ì  ê±°ë˜ëŒ€ê¸ˆ
+		double			candle_acc_trade_volume;	// í•´ë‹¹ ìº”ë“¤ì˜ ëˆ„ì  ê±°ë˜ëŸ‰
 
-		// ºÎ°¡ Á¤º¸
-		std::string		first_day_of_period;		// ÇØ´ç ÁÖ Äµµé Áı°è ½ÃÀÛÀÏÀÚ (yyyy-MM-dd)
+		// ë¶€ê°€ ì •ë³´
+		std::string		first_day_of_period;		// í•´ë‹¹ ì£¼ ìº”ë“¤ ì§‘ê³„ ì‹œì‘ì¼ì (yyyy-MM-dd)
 	};
 	struct CandleDto_Month
 	{
-		// ±âº» Á¤º¸
-		std::string		market;						// ¸¶ÄÏ ÄÚµå (ex: KRW-BTC)
-		std::string		candle_date_time_utc;		// Äµµé ±âÁØ ½ÃÀÛ ½Ã°¢(UTC)
-		std::string		candle_date_time_kst;		// Äµµé ±âÁØ ½ÃÀÛ ½Ã°¢(KST)
+		// ê¸°ë³¸ ì •ë³´
+		std::string		market;						// ë§ˆì¼“ ì½”ë“œ (ex: KRW-BTC)
+		std::string		candle_date_time_utc;		// ìº”ë“¤ ê¸°ì¤€ ì‹œì‘ ì‹œê°(UTC)
+		std::string		candle_date_time_kst;		// ìº”ë“¤ ê¸°ì¤€ ì‹œì‘ ì‹œê°(KST)
 
-		// °¡°İ
-		double			opening_price;				// ÇØ´ç ÄµµéÀÇ ½Ã°¡
-		double			high_price;					// ÇØ´ç ÄµµéÀÇ °í°¡
-		double			low_price;					// ÇØ´ç ÄµµéÀÇ Àú°¡
-		double			trade_price;				// ÇØ´ç ÄµµéÀÇ Á¾°¡
-		int				timestamp;					// ÄµµéÀÇ ¸¶Áö¸· Æ½ÀÇ Å¸ÀÓ½ºÅÆÇÁ
+		// ê°€ê²©
+		double			opening_price;				// í•´ë‹¹ ìº”ë“¤ì˜ ì‹œê°€
+		double			high_price;					// í•´ë‹¹ ìº”ë“¤ì˜ ê³ ê°€
+		double			low_price;					// í•´ë‹¹ ìº”ë“¤ì˜ ì €ê°€
+		double			trade_price;				// í•´ë‹¹ ìº”ë“¤ì˜ ì¢…ê°€
+		int				timestamp;					// ìº”ë“¤ì˜ ë§ˆì§€ë§‰ í‹±ì˜ íƒ€ì„ìŠ¤íƒ¬í”„
 
-		// °Å·¡·®
-		double			candle_acc_trade_price;		// ÇØ´ç ÄµµéÀÇ ´©Àû °Å·¡´ë±İ
-		double			candle_acc_trade_volume;	// ÇØ´ç ÄµµéÀÇ ´©Àû °Å·¡·®
+		// ê±°ë˜ëŸ‰
+		double			candle_acc_trade_price;		// í•´ë‹¹ ìº”ë“¤ì˜ ëˆ„ì  ê±°ë˜ëŒ€ê¸ˆ
+		double			candle_acc_trade_volume;	// í•´ë‹¹ ìº”ë“¤ì˜ ëˆ„ì  ê±°ë˜ëŸ‰
 
-		// ºÎ°¡ Á¤º¸
-		std::string		first_day_of_period;		// ÇØ´ç ¿ù Äµµé Áı°è ½ÃÀÛÀÏÀÚ (yyyy-MM-dd)
+		// ë¶€ê°€ ì •ë³´
+		std::string		first_day_of_period;		// í•´ë‹¹ ì›” ìº”ë“¤ ì§‘ê³„ ì‹œì‘ì¼ì (yyyy-MM-dd)
 	};
 
-	// ÁöÁ¤ÇÑ Æä¾îÀÇ ÃÖ±Ù Ã¼°á ¸ñ·Ï
+	// ì§€ì •í•œ í˜ì–´ì˜ ìµœê·¼ ì²´ê²° ëª©ë¡
 	struct TradeDto
 	{
-		// ±âº» Á¤º¸
-		std::string		market;			// ¸¶ÄÏ ÄÚµå (ex: KRW-BTC)
-		std::string		trade_date_utc;	// Ã¼°á ÀÏÀÚ UTC ±âÁØ (yyyyMMdd)
-		std::string		trade_time_utc;	// Ã¼°á ½Ã°¢ UTC ±âÁØ (HHmmss)
-		std::int64_t	timestamp;		// Ã¼°á ½Ã°¢ÀÇ ¹Ğ¸®ÃÊ´ÜÀ§ Å¸ÀÓ½ºÅÆÇÁ
+		// ê¸°ë³¸ ì •ë³´
+		std::string		market;			// ë§ˆì¼“ ì½”ë“œ (ex: KRW-BTC)
+		std::string		trade_date_utc;	// ì²´ê²° ì¼ì UTC ê¸°ì¤€ (yyyyMMdd)
+		std::string		trade_time_utc;	// ì²´ê²° ì‹œê° UTC ê¸°ì¤€ (HHmmss)
+		std::int64_t	timestamp;		// ì²´ê²° ì‹œê°ì˜ ë°€ë¦¬ì´ˆë‹¨ìœ„ íƒ€ì„ìŠ¤íƒ¬í”„
 
-		// Ã¼°á Á¤º¸
-		double			trade_price;	// Ã¼°á °¡°İ
-		double			trade_volume;	// Ã¼°á ¼ö·®
+		// ì²´ê²° ì •ë³´
+		double			trade_price;	// ì²´ê²° ê°€ê²©
+		double			trade_volume;	// ì²´ê²° ìˆ˜ëŸ‰
 
-		// ºÎ°¡ Á¤º¸
-		double			prev_closing_price;	// ÀüÀÏ Á¾°¡ (UTC0½Ã ±âÁØ)
-		double 			change_price;		// ÀüÀÏ Á¾°¡ ´ëºñ °¡°İ º¯È­(trade_price - prev_closing_price)
-		std::string		ask_bid;			// ¸Åµµ/¸Å¼ö ±¸ºĞ (ASK, BID)
+		// ë¶€ê°€ ì •ë³´
+		double			prev_closing_price;	// ì „ì¼ ì¢…ê°€ (UTC0ì‹œ ê¸°ì¤€)
+		double 			change_price;		// ì „ì¼ ì¢…ê°€ ëŒ€ë¹„ ê°€ê²© ë³€í™”(trade_price - prev_closing_price)
+		std::string		ask_bid;			// ë§¤ë„/ë§¤ìˆ˜ êµ¬ë¶„ (ASK, BID)
 		
-		// Ã¼°á ¹øÈ£
-		int 			sequential_id;		// Ã¼°á ¹øÈ£
+		// ì²´ê²° ë²ˆí˜¸
+		int 			sequential_id;		// ì²´ê²° ë²ˆí˜¸
 	};
 
-	// ÁöÁ¤ÇÑ Á¾¸ñµéÀÇ ½Ç½Ã°£ È£°¡ Á¤º¸ (¿øÈ­ ¸¶ÄÏ¿¡¼­¸¸ Á¦°ø)
+	// ì§€ì •í•œ ì¢…ëª©ë“¤ì˜ ì‹¤ì‹œê°„ í˜¸ê°€ ì •ë³´ (ì›í™” ë§ˆì¼“ì—ì„œë§Œ ì œê³µ)
 	struct OrderbookDto
 	{
-		// ±âº» Á¤º¸
-		std::string		market;			// ¸¶ÄÏ ÄÚµå (ex: KRW-BTC)
-		std::int64_t	timestamp;		// Á¶È¸ ¿äÃ» ½Ã°¢ÀÇ Å¸ÀÓ½ºÅÆÇÁ(ms)
+		// ê¸°ë³¸ ì •ë³´
+		std::string		market;			// ë§ˆì¼“ ì½”ë“œ (ex: KRW-BTC)
+		std::int64_t	timestamp;		// ì¡°íšŒ ìš”ì²­ ì‹œê°ì˜ íƒ€ì„ìŠ¤íƒ¬í”„(ms)
 		
-		// ¸Å¼ö / ¸Åµµ ÀÜ·®
-		double			total_ask_size;	// ÀüÃ¼ ¸Åµµ ÀÜ·®
-		double			total_bid_size;	// ÀüÃ¼ ¸Å¼ö ÀÜ·®
+		// ë§¤ìˆ˜ / ë§¤ë„ ì”ëŸ‰
+		double			total_ask_size;	// ì „ì²´ ë§¤ë„ ì”ëŸ‰
+		double			total_bid_size;	// ì „ì²´ ë§¤ìˆ˜ ì”ëŸ‰
 
-		// È£°¡ ¸ñ·Ï
+		// í˜¸ê°€ ëª©ë¡
 		struct UpbitOrderbookUnitDto
 		{
-			// ¸Åµµ
-			double	ask_price;		// ¸Åµµ È£°¡
-			double	ask_size;		// ¸Åµµ ÀÜ·®
+			// ë§¤ë„
+			double	ask_price;		// ë§¤ë„ í˜¸ê°€
+			double	ask_size;		// ë§¤ë„ ì”ëŸ‰
 
-			// ¸Å¼ö
-			double	bid_price;		// ¸Å¼ö È£°¡
-			double	bid_size;		// ¸Å¼ö ÀÜ·®
+			// ë§¤ìˆ˜
+			double	bid_price;		// ë§¤ìˆ˜ í˜¸ê°€
+			double	bid_size;		// ë§¤ìˆ˜ ì”ëŸ‰
 		};
 
-		std::vector<UpbitOrderbookUnitDto> orderbook_units; // È£°¡ ´ÜÀ§ ¸ñ·Ï (ÃÖ´ë 15°³)
-		double 		level;			// ÇØ´ç È£°¡¿¡ Àû¿ëµÈ °¡°İ ´ÜÀ§ Default : 0
+		std::vector<UpbitOrderbookUnitDto> orderbook_units; // í˜¸ê°€ ë‹¨ìœ„ ëª©ë¡ (ìµœëŒ€ 15ê°œ)
+		double 		level;			// í•´ë‹¹ í˜¸ê°€ì— ì ìš©ëœ ê°€ê²© ë‹¨ìœ„ Default : 0
 	};
 	inline void from_json(const nlohmann::json& j, OrderbookDto::UpbitOrderbookUnitDto& u)
 	{
@@ -277,7 +277,7 @@ namespace api::upbit::dto
 
 		j.at("orderbook_units").get_to(d.orderbook_units);
 
-		// ÀÀ´ä¿¡ levelÀÌ ¾ø´Â °æ¿ìµµ ´ëºñÇÏ°í ½ÍÀ¸¸é contains·Î ¹æ¾î
+		// ì‘ë‹µì— levelì´ ì—†ëŠ” ê²½ìš°ë„ ëŒ€ë¹„í•˜ê³  ì‹¶ìœ¼ë©´ containsë¡œ ë°©ì–´
 		if (j.contains("level"))
 			j.at("level").get_to(d.level);
 		else
@@ -285,9 +285,9 @@ namespace api::upbit::dto
 	}
 	struct OrderbookPolicyDto
 	{
-		std::string		market;				// ¸¶ÄÏ ÄÚµå (ex: KRW-BTC)
-		std::string		quote_currency;		// ÇØ´ç Æä¾îÀÇ ¸¶ÄÏ ÅëÈ­ ÄÚµå (ex: KRW)
-		std::string		orderbook_units;	// ÇØ´ç Æä¾î¿¡ Àû¿ëµÇ´Â È£°¡ ´ÜÀ§ 
+		std::string		market;				// ë§ˆì¼“ ì½”ë“œ (ex: KRW-BTC)
+		std::string		quote_currency;		// í•´ë‹¹ í˜ì–´ì˜ ë§ˆì¼“ í†µí™” ì½”ë“œ (ex: KRW)
+		std::string		orderbook_units;	// í•´ë‹¹ í˜ì–´ì— ì ìš©ë˜ëŠ” í˜¸ê°€ ë‹¨ìœ„ 
 	};
 
 }

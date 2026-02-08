@@ -1,15 +1,15 @@
 // tests/TestRealTradingWithEngineRunner.cpp
-// ¸ñÀû: EngineRunner¸¦ »ç¿ëÇØ ½Ç°Å·¡ E2E(WS¡æÀü·«¡æPOST¡æWS¡æ¿£Áø/Àü·« °»½Å) °ËÁõ
+// ëª©ì : EngineRunnerë¥¼ í¬í•¨í•œ ì‹¤ê±°ë˜ E2E í…ŒìŠ¤íŠ¸(WS ìˆ˜ì‹  â†’ POST ì£¼ë¬¸ â†’ WS ì´ë²¤íŠ¸ ì²˜ë¦¬ â†’ ì „ëµ ì½œë°±)
 //
-// Èå¸§(°íÁ¤):
-//   WS(raw) ¡æ Bridge(queue push) ¡æ EngineRunner(pop)
-//   Candle ¡æ Strategy(onCandle) ¡æ OrderRequest »ı¼º ¡æ RealOrderEngine.submit(POST)
-//   MyOrder ¡æ Mapper ¡æ RealOrderEngine.onOrderSnapshot/onMyTrade/onOrderStatus
-//   EngineRunner°¡ pollEvents() ¡æ Strategy.onFill/onOrderUpdate
+// íë¦„(ìš”ì•½):
+//   WS(raw) â†’ Bridge(queue push) â†’ EngineRunner(pop)
+//   Candle â†’ Strategy(onCandle) â†’ OrderRequest ìƒì„± â†’ RealOrderEngine.submit(POST)
+//   MyOrder â†’ Mapper â†’ RealOrderEngine.onOrderSnapshot / onMyTrade / onOrderStatus
+//   EngineRunnerê°€ pollEvents() â†’ Strategy.onFill / onOrderUpdate í˜¸ì¶œ
 //
-// ÀüÁ¦:
-// - EngineRunner´Â "A ±¸Á¶(Àü·« ¼ÒÀ¯)"·Î ¼öÁ¤ ¿Ï·áµÇ¾î ÀÖ¾î¾ß ÇÔ
-//   (Áï, ¸â¹ö°¡ reference°¡ ¾Æ´Ï¶ó value·Î ¼ÒÀ¯ÇÏ°Å³ª, ÃÖ¼ÒÇÑ dangling reference ¹®Á¦°¡ ¾ø¾î¾ß ÇÔ)
+// ì „ì œ:
+// - EngineRunnerê°€ "Aì•ˆ(ì „ëµì„ valueë¡œ ì†Œìœ )" êµ¬ì¡°ë¡œ ì ìš©ë˜ì–´ ìˆì–´ì•¼ í•œë‹¤.
+//   (ì¦‰, ì™¸ë¶€ ì „ëµì„ referenceë¡œ ë“¤ê³  ìˆì§€ ì•Šê³ , valueë¡œ ì†Œìœ í•˜ì—¬ dangling reference ìœ„í—˜ì´ ì—†ì–´ì•¼ í•¨)
 
 #include <atomic>
 #include <chrono>
@@ -24,7 +24,7 @@
 #include <boost/asio.hpp>
 #include <boost/asio/ssl.hpp>
 
-// ===== ÇÁ·ÎÁ§Æ® Çì´õ =====
+// ===== í”„ë¡œì íŠ¸ í—¤ë” =====
 #include "app/EngineRunner.h"
 #include "app/MarketDataEventBridge.h"
 #include "app/MyOrderEventBridge.h"
@@ -42,8 +42,10 @@
 
 #include "trading/strategies/RsiMeanReversionStrategy.h"
 
+#include "util/Logger.h"
+
 // ------------------------------
-// Ctrl+C Á¾·á ÇÃ·¡±×
+// Ctrl+C ì¢…ë£Œ í”Œë˜ê·¸
 // ------------------------------
 static std::atomic<bool> g_stop{ false };
 static void onSignal(int) { g_stop.store(true, std::memory_order_relaxed); }
@@ -53,13 +55,19 @@ int main()
     std::signal(SIGINT, onSignal);
     std::signal(SIGTERM, onSignal);
 
-    // ---- ·±Å¸ÀÓ ÆÄ¶ó¹ÌÅÍ ----
-    // »ç¿ë ¿¹)
+    // ---- Logger ì´ˆê¸°í™” ----
+    auto& logger = util::Logger::instance();
+    logger.setLevel(util::LogLevel::INFO);
+    logger.enableFileOutput("logs/coinbot.log");
+    logger.info("CoinBot starting...");
+
+    // ---- í…ŒìŠ¤íŠ¸ íŒŒë¼ë¯¸í„° ----
+    // ì‹¤í–‰ ì˜ˆ)
     //   TestRealTradingWithEngineRunner KRW-BTC candle.1m
     const std::string market = "KRW-BTC";
     const std::string candle_type = "candle.1m";
 
-    // ---- ¾÷ºñÆ® Å° ----
+    // ---- í™˜ê²½ ë³€ìˆ˜ í‚¤ ----
     const char* access = std::getenv("UPBIT_ACCESS_KEY");
     const char* secret = std::getenv("UPBIT_SECRET_KEY");
     if (!access || !secret)
@@ -68,12 +76,12 @@ int main()
         return 2;
     }
 
-    // ---- ³×Æ®¿öÅ© °ø¿ë ¸®¼Ò½º ----
+    // ---- ë„¤íŠ¸ì›Œí¬ ê³µìš© ë¦¬ì†ŒìŠ¤ ----
     boost::asio::io_context ioc;
     boost::asio::ssl::context ssl_ctx(boost::asio::ssl::context::tls_client);
 
-    // ¿î¿µ ±ÇÀå: verify_peer + CA
-    // (³ÊÀÇ È¯°æ¿¡¼­ verify ¹®Á¦·Î ¸·È÷¸é, ÀÌÀü¿¡ Çß´ø ¹æ½Ä´ë·Î verify_noneÀ¸·Î ¹Ù²Ù´Â ¼±ÅÃÁöµµ ÀÖÀ½)
+    // ìš´ì˜ ê¶Œì¥: verify_peer + CA ê²€ì¦
+    // (í…ŒìŠ¤íŠ¸ í™˜ê²½ì—ì„œëŠ” verify ì„¤ì • ë•Œë¬¸ì— ë§‰íˆë©´ verify_noneìœ¼ë¡œ ë‚®ì¶°ì„œ ì›ì¸ ë¶„ë¦¬ ê°€ëŠ¥)
     ssl_ctx.set_default_verify_paths();
     ssl_ctx.set_verify_mode(boost::asio::ssl::verify_none);
 
@@ -82,7 +90,7 @@ int main()
     api::rest::RestClient rest(ioc, ssl_ctx);
     api::rest::UpbitExchangeRestClient exchange(rest, signer);
 
-    // ---- ½ÃÀÛ ½Ã account ·Îµù(·ÎÄÃ Ä³½Ã) ----
+    // ---- ì‹œì‘ ì‹œ account ë¡œë“œ(ë¡œì»¬ ìºì‹œ) ----
     core::Account account{};
     {
         auto r = exchange.getMyAccount();
@@ -98,15 +106,15 @@ int main()
             << " positions=" << account.positions.size() << "\n";
     }
 
-    // ---- Àü·« »ı¼º(´ÜÀÏ Àü·«/´ÜÀÏ ¸¶ÄÏ) ----
+    // ---- ì „ëµ ìƒì„±(ì˜ˆ: RSI Mean Reversion) ----
     trading::strategies::RsiMeanReversionStrategy::Params sp{};
-    // ¸®½ºÅ© ³·Ãß°í ½ÍÀ¸¸é ¿©±â¼­ sp Á¶Àı (¿¹: riskPercent ³·Ãß±â µî)
+    // í•„ìš”í•˜ë‹¤ë©´ ì—¬ê¸°ì„œ sp ê°’ ì¡°ì •(ì˜ˆ: riskPercent, rsiPeriod ë“±)
     trading::strategies::RsiMeanReversionStrategy strategy(market, sp);
 
-    // ---- StartupRecovery(¹ÌÃ¼°á Á¤¸® + Æ÷Áö¼Ç º¹±¸) ----
+    // ---- StartupRecovery(ë¯¸ì²´ê²° ì •ë¦¬ + ì „ëµ ìƒíƒœ ë™ê¸°í™”) ----
     {
         app::StartupRecovery::Options opt{};
-        opt.bot_identifier_prefix = std::string(strategy.id()) + ":" + market + ":"; // ³× Á¤Ã¥ À¯Áö
+        opt.bot_identifier_prefix = std::string(strategy.id()) + ":" + market + ":"; // ï¿½ï¿½ ï¿½ï¿½Ã¥ ï¿½ï¿½ï¿½ï¿½
         opt.cancel_retry = 3;
         opt.verify_retry = 3;
 
@@ -114,27 +122,28 @@ int main()
         std::cout << "[StartupRecovery] done\n";
     }
 
-    // ---- ¿£Áø ±¸¼º(POST ¾î´ğÅÍ + store + RealOrderEngine) ----
-    engine::OrderStore store;                 // ³× ÇÁ·ÎÁ§Æ® ±¸ÇöÃ¼
+    // ---- ì£¼ë¬¸ ì—”ì§„(POST ì£¼ë¬¸ + store + RealOrderEngine) ----
+    engine::OrderStore store;                 // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½Ã¼
     engine::upbit::UpbitPrivateOrderApi orderApi(exchange);  // POST /v1/orders
     engine::RealOrderEngine engine(orderApi, store, account);
 
-    // ¿£Áø owner-thread °íÁ¤: EngineRunner.run()À» È£ÃâÇÏ±â Á÷Àü¿¡ °°Àº ½º·¹µå¿¡¼­ ¹ÙÀÎµù
+    // ì—”ì§„ owner-thread ì§€ì •: EngineRunner.run() í˜¸ì¶œ ì „ì— í˜„ì¬ ìŠ¤ë ˆë“œë¥¼ ì†Œìœ  ìŠ¤ë ˆë“œë¡œ ë“±ë¡
     engine.bindToCurrentThread();
 
-    // ---- EngineRunner ÀÔ·Â Å¥ + Bridge ----
-    app::EngineRunner::PrivateQueue q;
-    // [PATCH] MyOrder overflow -> RESYNC mode flag
-    std::atomic<bool> needs_resync{ false };
+    // ---- EngineRunner ì…ë ¥ í + Bridge ----
+    // í í¬ê¸° ì„¤ì •: ê¸°ë³¸ 0(ë¬´ì œí•œ) / WS í­ì£¼ ë°©ì§€ë¥¼ ì›í•˜ë©´ ì ì ˆíˆ ì œí•œ
+    app::EngineRunner::PrivateQueue q(10000);
 
     app::MarketDataEventBridge mdBridge(q);
-    app::MyOrderEventBridge myBridge(q, needs_resync);
+    app::MyOrderEventBridge myBridge(q);
 
-    // ---- WS Å¬¶óÀÌ¾ğÆ® 2°³(°ø¿ë: candle / private: myOrder) ----
+    // ---- WS í´ë¼ì´ì–¸íŠ¸ 2ê°œ(ê³µê°œ: candle / ê°œì¸: myOrder) ----
     api::ws::UpbitWebSocketClient ws_pub(ioc, ssl_ctx);
     api::ws::UpbitWebSocketClient ws_priv(ioc, ssl_ctx);
 
-    // WS´Â raw¸¦ Bridge·Î Àü´Ş¸¸(ÆÄ½Ì/Àü·«/¿£ÁøÀº EngineRunner¿¡¼­ ´ÜÀÏ ½º·¹µå Ã³¸®)
+    // WS ë‚´ë¶€ ë©”ì‹œì§€í•¸ë“¤ì–´ì— ëŒë‹¤ í•¨ìˆ˜ë¥¼ ì €ì¥í•œë‹¤.
+    // WS raw ë©”ì‹œì§€ë¥¼ Bridgeë¡œ ì „ë‹¬ (ëŒë‹¤ í•¨ìˆ˜ë¥¼ íŒŒë¼ë¯¸í„°ë¡œ ë„˜ê¸´ ê²ƒ)
+    // (íŒŒì‹±/ê²€ì¦/ì—”ì§„ ì „ë‹¬ì€ EngineRunnerì—ì„œ ì²˜ë¦¬)
     ws_pub.setMessageHandler([&](std::string_view msg) {
         mdBridge.onWsMessage(msg);
         });
@@ -142,23 +151,22 @@ int main()
         myBridge.onWsMessage(msg);
         });
 
-    // ---- WS read loop ½º·¹µå ½ÃÀÛ ----
+    // ---- WS read loop ìŠ¤ë ˆë“œ ì‹œì‘ ----
     std::thread th_pub([&] { ws_pub.runReadLoop(); });
     std::thread th_priv([&] { ws_priv.runReadLoop(); });
 
-    // ---- connect + subscribe Ä¿¸Çµå Çª½Ã ----
-    // ³× ÇÁ·ÎÁ§Æ®¿¡¼­ ÀÌ¹Ì ¼º°ø½ÃÅ² endpoint/target °ªÀ» ±×´ë·Î ¾²´Â °Ô °¡Àå ¾ÈÀü
+    // ---- connect + subscribe ì»¤ë§¨ë“œ ë“±ë¡ ----
     const std::string host = "api.upbit.com";
     const std::string port = "443";
 
-    // public / private targetÀº ³× ±¸Çö(UpbitWebSocketClient.cpp)¿¡¼­ ±â´ëÇÏ´Â °ªÀ¸·Î ¸ÂÃç¾ß ÇÔ
+    // public / private targetì€ UpbitWebSocketClient êµ¬í˜„ ì •ì±…ì— ë§ì¶° ì„¤ì •
     const std::string pub_target = "/websocket/v1";
     const std::string priv_target = "/websocket/v1/private";
 
     ws_pub.connectPublic(host, port, pub_target);
     ws_pub.subscribeCandles(candle_type, { market }, false, true, "DEFAULT");
 
-    // private WS´Â JWT bearer ÇÊ¿ä
+    // private WSëŠ” JWT bearer í•„ìš”
     const std::string bearer = signer.makeBearerToken(std::nullopt);
     ws_priv.connectPrivate(host, port, priv_target, bearer);
     ws_priv.subscribeMyOrder({ market }, true, "DEFAULT");
@@ -167,29 +175,19 @@ int main()
     std::cout << "[RUN] market=" << market << " candle=" << candle_type << "\n";
     std::cout << "      Ctrl+C to stop\n";
 
-    // ---- EngineRunner ½ÇÇà(¸ŞÀÎ ½º·¹µå¿¡¼­ ¿£Áø ·çÇÁ) ----
-    // A ±¸Á¶(Àü·« ¼ÒÀ¯)ÀÌ¹Ç·Î Àü·«À» move·Î ³Ñ±â´Â ÇüÅÂ°¡ ÀÚ¿¬½º·´´Ù.
-    // (³ÊÀÇ EngineRunner ½Ã±×´ÏÃ³¿¡ ¸ÂÃç std::move(strategy) ¶Ç´Â strategy ±×´ë·Î »ç¿ë)
-
-    app::StartupRecovery::Options resync_opt{};
-    resync_opt.bot_identifier_prefix = std::string(strategy.id()) + ":" + market + ":";
-    resync_opt.cancel_retry = 3;
-    resync_opt.verify_retry = 3;
-
+    // ---- EngineRunner ì‹¤í–‰(í˜„ì¬ ìŠ¤ë ˆë“œì—ì„œ ì—”ì§„ ë£¨í”„ ì‹¤í–‰) ----
+    // Aì•ˆ(ì „ëµì„ valueë¡œ Runnerê°€ ì†Œìœ )ì´ë¯€ë¡œ, strategyë¥¼ moveë¡œ ë„˜ê¸°ëŠ” ê²ƒì´ ìì—°ìŠ¤ëŸ½ë‹¤
     app::EngineRunner runner(
         engine,
-        std::move(strategy), // A ±¸Á¶: Runner°¡ Àü·«À» ¼ÒÀ¯
+        std::move(strategy), // Aì•ˆ: Runnerê°€ ì „ëµì„ ì†Œìœ 
         q,
         account,
-        market,
-        exchange,   // RESYNC¿ë REST client
-        needs_resync, // overflow flag
-        resync_opt  // recovery policy
+        market
     );
 
     runner.run(g_stop);
 
-    // ---- Á¾·á Ã³¸® ----
+    // ---- ì¢…ë£Œ ì²˜ë¦¬ ----
     std::cout << "[STOP] closing ws...\n";
     ws_pub.close();
     ws_priv.close();

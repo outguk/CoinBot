@@ -1,4 +1,4 @@
-#include "RealOrderEngine.h"
+ï»¿#include "RealOrderEngine.h"
 
 #include <variant>
 #include <algorithm>
@@ -6,6 +6,9 @@
 #include <iostream>
 #include <sstream>
 #include <iomanip>
+
+#include "util/Config.h"
+#include "util/Logger.h"
 
 namespace engine
 {
@@ -16,8 +19,8 @@ namespace engine
 
     void RealOrderEngine::bindToCurrentThread()
     {
-        // ¿£Áø ·çÇÁ ½º·¹µå¿¡¼­ 1È¸ È£ÃâÇØ¼­ "¼ÒÀ¯ ½º·¹µå"¸¦ °íÁ¤ÇÑ´Ù.
-        // ÀÌÈÄ public APIµéÀÌ ´Ù¸¥ ½º·¹µå¿¡¼­ È£ÃâµÇ¸é assertOwner_()¿¡¼­ Áï½Ã Å½ÁöÇÑ´Ù.
+        // ì—”ì§„ ì‹œì‘ ìŠ¤ë ˆë“œì—ì„œ 1íšŒ í˜¸ì¶œí•´ì„œ "ì†Œìœ  ìŠ¤ë ˆë“œ"ë¥¼ ê¸°ë¡í•œë‹¤.
+        // ì´í›„ public APIë“¤ì´ ë‹¤ë¥¸ ìŠ¤ë ˆë“œì—ì„œ í˜¸ì¶œë˜ë©´ assertOwner_()ì—ì„œ ì¦‰ì‹œ íƒì§€í•œë‹¤.
         owner_thread_ = std::this_thread::get_id();
     }
 
@@ -29,7 +32,7 @@ namespace engine
 #else
         if (owner_thread_ == std::thread::id{} || std::this_thread::get_id() != owner_thread_)
         {
-            std::cerr << "[Fatal] RealOrderEngine called from non-owner thread\n";
+            util::Logger::instance().error("[Fatal] RealOrderEngine called from non-owner thread");
             std::terminate();
         }
 #endif
@@ -39,22 +42,22 @@ namespace engine
     {
         assertOwner_();
 
-        // 1) ÁÖ¹® ¿äÃ» °ËÁõ(½Ç°Å·¡ ¾ÈÀü¼º)
+        // 1) ì£¼ë¬¸ ìš”ì²­ ê²€ì¦(ë©±ë“±ì„± ë³´ì¥ë¨)
         std::string reason;
         if (!validateRequest(req, reason))
             return EngineResult::Fail(EngineErrorCode::OrderRejected, reason);
 
-        // 2) ½ÇÁ¦ ÁÖ¹® »ı¼º POST(/v1/orders) ¼öÇà ¡æ uuid È¹µæ
+        // 2) ê±°ë˜ì†Œ ì£¼ë¬¸ ë°œì†¡ POST(/v1/orders) í˜¸ì¶œ í›„ uuid íšë“
         const auto uuid = api_.getOrderId(req);
         if (!uuid.has_value() || uuid->empty())
             return EngineResult::Fail(EngineErrorCode::InternalError, "placeOrder failed");
 
-        // 3) ·ÎÄÃ ½ºÅä¾î¿¡ ÃÖ¼Ò ½º³À¼¦ ÀúÀå(Pending)
-        // - executed/fee/locked µî Á¤È®ÇÑ °ªÀº WS/REST ½º³À¼¦ÀÌ ±ÇÀ§°¡ ´õ ³ôÀ½
+        // 3) ë¡œì»¬ ì£¼ë¬¸ ì €ì¥ì†Œì— ì£¼ë¬¸ ì •ë³´ë¥¼ ë¨¼ì € ì €ì¥(Pending)
+        // - executed/fee/locked ë“± ì •í™•í•œ ê°’ì€ WS/REST ìŠ¤ëƒ…ìƒ·ì—ì„œ ë‚˜ì¤‘ì— ë™ê¸°í™”í•œë‹¤.
         core::Order o{};
         o.id = *uuid;
 
-        // ÃßÀû/µğ¹ö±ëÀ» À§ÇØ client_order_id(ÇÁ·Î±×·¥ ³»ºÎ ½Äº°ÀÚ)¸¦ identifier·Î º¸°ü
+        // ì „ëµ/ì•Œê³ ë¦¬ì¦˜ êµ¬ë¶„ìš© client_order_id(í”„ë¡œê·¸ë¨ ë ˆë²¨ ì‹ë³„ì)ë¥¼ identifierë¡œ ì‚¬ìš©
         o.identifier = req.identifier.empty()
             ? std::nullopt
             : std::optional<std::string>(req.identifier);
@@ -64,8 +67,8 @@ namespace engine
         o.type = req.type;
         o.price = req.price;
 
-        // volumeÀº "¼ö·® ±â¹İ" ÁÖ¹®ÀÏ ¶§¸¸ ¾Ë ¼ö ÀÖÀ½.
-        // ½ÃÀå°¡ ¸Å¼ö(AmountSize)´Â Ã¼°á Àü ¼ö·®ÀÌ È®Á¤µÇÁö ¾ÊÀ¸¹Ç·Î nullopt°¡ ÀÚ¿¬½º·´´Ù.
+        // volumeì€ "ì§€ì •ê°€ ë§¤ë„" ì£¼ë¬¸ë§Œ ë¯¸ë¦¬ ì•Œ ìˆ˜ ìˆìŒ.
+        // ì‹œì¥ê°€ ë§¤ìˆ˜(AmountSize)ëŠ” ì²´ê²° í›„ ê±°ë˜ì†Œ í™•ì •ì¹˜ê°€ ë‚´ë ¤ì˜¤ë¯€ë¡œ nulloptë¡œ ì´ˆê¸°í™”í•¨.
         if (std::holds_alternative<core::VolumeSize>(req.size))
             o.volume = std::get<core::VolumeSize>(req.size).value;
         else
@@ -74,7 +77,7 @@ namespace engine
         o.status = core::OrderStatus::Pending;
         o.created_at = "";
 
-        // ½Ç°Å·¡¿¡¼­ uuid Áßº¹Àº °ÅÀÇ ¾øÁö¸¸, ¹æ¾îÀûÀ¸·Î upsertÇØµµ ¹«¹æ
+        // ë©±ë“±ì„±ë³´ì¥ - uuid ì¤‘ë³µì´ ìƒê¸°ë©´ ë®ì–´ì“°ê³ , ì—†ìœ¼ë©´ì²˜ëŸ¼ upsertí•´ë„ ì•ˆì „
         store_.upsert(o);
 
         return EngineResult::Success(std::move(o));
@@ -82,16 +85,16 @@ namespace engine
 
     std::string RealOrderEngine::makeTradeDedupeKey_(const core::MyTrade& t)
     {
-        // 24½Ã°£ ¿î¿µ¿¡¼­ WS ÀçÀü¼Û/¸®ÇÃ·¹ÀÌ/Àç¿¬°á·Î µ¿ÀÏ Ã¼°áÀÌ Áßº¹ À¯ÀÔµÉ ¼ö ÀÖ´Ù.
-        // ÀÌ»óÀûÀÎ dedupe Å°´Â trade_uuid(trade_id) ÀÌÁö¸¸,
-        // ÀÏºÎ ÄÉÀÌ½º(Æ¯È÷ ½ÃÀå°¡/Ãë¼Ò °æ°è)¿¡¼­ trade_id°¡ ºñ¾î µé¾î¿Ã ¼ö ÀÖÀ¸¹Ç·Î
-        // "ÃæºĞÈ÷ À¯´ÏÅ©ÇÑ ´ëÃ¼ Å°"¸¦ ¸¸µé¾î Áßº¹ ¹İ¿µÀ» ¹æÁö
+        // 24ì‹œê°„ ìš´ìš© ì‹œ WS ì¬ì—°ê²°/ì¤‘ë³µ íŒ¨í‚·/ìˆœì„œ ê¼¬ì„ ë•Œë¬¸ì— ì²´ê²° ì´ë²¤íŠ¸ê°€ ì¤‘ë³µ ìœ ì…ë  ìˆ˜ ìˆë‹¤.
+        // ì´ìƒì ìœ¼ë¡œëŠ” dedupe í‚¤ë¡œ trade_uuid(trade_id)ë¥¼ ì‚¬ìš©í•˜ì§€ë§Œ,
+        // ì¼ë¶€ ì¼€ì´ìŠ¤(íŠ¹íˆ ì‹œì¥ê°€/ì·¨ì†Œ ì²˜ë¦¬ ë“±)ì—ì„œëŠ” trade_idê°€ ë¹„ì–´ ì˜¬ ìˆ˜ ìˆìœ¼ë¯€ë¡œ
+        // "ì²´ê²°ì„ ëŒ€í‘œí•  ìˆ˜ ìˆëŠ” ë³µí•© í‚¤"ë¥¼ ë§Œë“¤ì–´ ì¤‘ë³µ ë°˜ì˜ì„ ë°©ì§€í•œë‹¤.
 
         if (!t.trade_id.empty())
             return t.trade_id;
 
         std::ostringstream oss;
-        oss.imbue(std::locale::classic()); // locale ¿µÇâ Á¦°Å(¼Ò¼öÁ¡ ÄŞ¸¶ ¹æÁö)
+        oss.imbue(std::locale::classic()); // locale ì˜í–¥ ì œê±°(ì†Œìˆ˜ì  í‘œê¸° ê³ ì •)
         oss << "FALLBACK|"
             << t.order_id << '|'
             << static_cast<int>(t.side) << '|'
@@ -102,7 +105,7 @@ namespace engine
             << t.executed_funds << '|'
             << t.fee;
 
-        // identifier°¡ ÀÖÀ¸¸é Ãæµ¹ °¡´É¼ºÀ» ´õ ³·Ãá´Ù
+        // identifierëŠ” ì¶©ëŒì„ í”¼í•˜ê¸° ìœ„í•´ ì˜µì…˜ìœ¼ë¡œ ë¶™ì„ ì¶”ê°€
         if (t.identifier.has_value() && !t.identifier->empty())
             oss << '|' << *t.identifier;
 
@@ -111,21 +114,21 @@ namespace engine
 
     bool RealOrderEngine::markTradeOnce(std::string_view trade_id)
     {
-        // WS´Â µ¿ÀÏ trade_id¸¦ Áßº¹À¸·Î Àü´ŞÇÒ ¼ö ÀÖ´Ù(ÀçÀü¼Û/¸®ÇÃ·¹ÀÌ/¿¬°á ÀÌ½´ µî).
-        // Áßº¹ ¹İ¿µµÇ¸é °èÁÂ/Æ÷Áö¼ÇÀÌ 2¹ø ¾÷µ¥ÀÌÆ®µÇ´Â ´ëÇü »ç°í°¡ ¹ß»ıÇÒ ¼ö ÀÖÀ¸¹Ç·Î 1È¸ Ã³¸®¸¸ Çã¿ë.
+        // WSë¥¼ í†µí•´ trade_idê°€ ì¤‘ë³µì „ì†¡ë  ê°€ëŠ¥ì„± ìˆìŒ(ì¬ì—°ê²°/ì¤‘ë³µíŒ¨í‚·/ìˆœì„œ ê¼¬ì„ ë“±).
+        // ì¤‘ë³µ ë°˜ì˜ë˜ë©´ ì”ê³ /ì²´ê²°ëŸ‰ì´ 2ë°° ì—…ë°ì´íŠ¸ë˜ëŠ” ì‹¬ê°í•œ ì˜¤ë¥˜ê°€ ë°œìƒí•  ìˆ˜ ìˆìœ¼ë¯€ë¡œ 1íšŒ ì²˜ë¦¬ë§Œ í—ˆìš©.
         if (trade_id.empty())
-            return false; // trade_id°¡ ºñ¾î ÀÖÀ¸¸é dedupe ºÒ°¡ ¡æ Á¤Ã¥»ó ÀÏ´Ü Åë°ú(¾Æ·¡ ¹®Á¦Á¡ ¼½¼Ç¿¡¼­ °³¼± Á¦¾È)
+            return false; // trade_idê°€ ë¹„ì–´ìˆëŠ” ê²½ìš°ëŠ” dedupe ë¶ˆê°€ ì‹œ ì •ì±…ì ìœ¼ë¡œ í•˜ë˜ í—ˆìš©(ì•„ë˜ ìƒí™©ì€ ì•ìª½ì—ì„œ ëŒ€ì‘ ì™„ë£Œ)
 
         auto [it, inserted] = seen_trades_.emplace(trade_id);
         if (!inserted)
-            return false; // ÀÌ¹Ì Ã³¸®ÇÑ trade_id -> ¹«½Ã
+            return false; // ì´ë¯¸ ì²˜ë¦¬í•œ trade_id -> ë¬´ì‹œ
 
-        // 2) »õ trade_id¸é FIFO¿¡µµ ±â·Ï
-        // (setÀÇ ¹®ÀÚ¿­À» º¹»çÇÏ±âº¸´Ù, emplace°¡ ÀúÀåÇÑ °ªÀ» »ç¿ëÇÏ¸é ºÒÇÊ¿äÇÑ ÀçÇÒ´çÀ» ÁÙÀÏ ¼ö ÀÖÀ½)
+        // 2) ìƒˆ trade_idë¥¼ FIFOíì— ì €ì¥
+        // (setì˜ ë¬¸ìì—´ì„ ë³µì‚¬í•˜ê¸°ë³´ë‹¤ëŠ”, emplaceëœ ë°˜ë³µì ìì²´ ì €ì¥í•˜ë©´ ë¶ˆí•„ìš”í•œ ë©”ëª¨ë¦¬ ë³µì‚¬ ì¤„ì¼ ìˆ˜ ìˆìŒ)
         seen_trade_fifo_.push_back(*it);
 
-        // 3) »óÇÑ ÃÊ°ú ½Ã °¡Àå ¿À·¡µÈ idºÎÅÍ Á¦°Å
-        while (seen_trade_fifo_.size() > kMaxSeenTrades)
+        // 3) ê°œìˆ˜ ì´ˆê³¼ ì‹œ ê°€ì¥ ì˜¤ë˜ëœ idë¶€í„° ì‚­ì œ
+        while (seen_trade_fifo_.size() > util::AppConfig::instance().engine.max_seen_trades)
         {
             const std::string& oldest = seen_trade_fifo_.front();
             seen_trades_.erase(oldest);
@@ -138,14 +141,14 @@ namespace engine
     {
         assertOwner_();
 
-        // 0) trade_id Áßº¹ ¹æÁö
+        // 0) trade_id ì¤‘ë³µ ë°©ì§€
         const std::string dedupeKey = makeTradeDedupeKey_(t);
         if (!markTradeOnce(dedupeKey))
             return;
 
-        // 1) ÁÖ¹® ´©Àû°ª ¾÷µ¥ÀÌÆ® + fill ÀÌº¥Æ® ¹ßÇàÀ» À§ÇÑ identifier È®º¸
-        // - WS ¸Ş½ÃÁö¿¡ identifier°¡ ÀÖÀ¸¸é ¿ì¼± »ç¿ë
-        // - ¾øÀ¸¸é OrderStore¿¡ ÀúÀåµÈ ÁÖ¹®(identifier)·Î fallback
+        // 1) ì£¼ë¬¸ ì •ë³´ë¥¼ ì—…ë°ì´íŠ¸ + fill ì´ë²¤íŠ¸ ë°œí–‰ì„ ìœ„í•´ identifier í™•ì¸
+        // - WS ë©”ì‹œì§€ì— identifierê°€ ìˆìœ¼ë©´ ìš°ì„  ì‚¬ìš©
+        // - ì—†ìœ¼ë©´ OrderStoreì— ì €ì¥ëœ ì£¼ë¬¸(identifier)ë¥¼ fallback
         std::optional<std::string> id = t.identifier;
 
         if (auto ordOpt = store_.get(t.order_id); ordOpt.has_value())
@@ -154,23 +157,24 @@ namespace engine
 
             o.market = t.market;
 
-            // Ã¼°áÀÌ ¹ß»ıÇß´Ù¸é Pending/New »óÅÂ¿¡¼­ OpenÀ¸·Î ³Ñ¾î°¡´Â °ÍÀÌ ÀÚ¿¬½º·¯¿ò(Á¤Ã¥)
+            // ì²´ê²°ì´ ë°œìƒí–ˆë‹¤ë©´ Pending/New ìƒíƒœì—ì„œ Openìœ¼ë¡œ ì „í™˜í•˜ëŠ” ì •ì±…(ì„ ì œ ë°˜ì˜)
             if (o.status == core::OrderStatus::Pending || o.status == core::OrderStatus::New)
                 o.status = core::OrderStatus::Open;
 
-            // ´©Àû Ã¼°á ¹İ¿µ
             o.executed_volume += t.volume;
             o.trades_count += 1;
 
-            // ¿ø ÁÖ¹® ¼ö·®(o.volume)ÀÌ ÀÖ´Â °æ¿ì¿¡¸¸ remaining °è»ê °¡´É
+            // ì´ ì£¼ë¬¸ ìˆ˜ëŸ‰(o.volume)ì´ ìˆëŠ” ê²½ìš°ì—ëŠ” remaining_volume ê³„ì‚°
             if (o.volume.has_value())
             {
                 const double rem = std::max(0.0, o.volume.value() - o.executed_volume);
                 o.remaining_volume = rem;
             }
 
-            // ¼ö¼ö·á ´©Àû(Á¤È®ÇÑ fee/locked´Â ½º³À¼¦ÀÌ ´õ ±ÇÀ§ ÀÖÀ½ ¡æ best-effort)
+            // ìˆ˜ìˆ˜ë£Œ ë°˜ì˜(ì •í™•í•œ fee/lockedëŠ” ìŠ¤ëƒ…ìƒ·ì—ì„œ ê°±ì‹ , ì—¬ê¸°ì„œëŠ” best-effort)
             o.paid_fee += t.fee;
+
+            o.executed_funds += t.executed_funds;
 
             store_.update(o);
 
@@ -178,8 +182,8 @@ namespace engine
                 id = o.identifier;
         }
 
-        // 2) EngineFillEvent ¹ßÇà(ºÎºĞ/º¹¼ö Ã¼°áµµ ¸Å¹ø ¹ßÇà °¡´É)
-        // - OrderStore¿¡ ÁÖ¹®ÀÌ ¾ø´õ¶óµµ(identifier¸¸ ÀÖ´Ù¸é) Àü·« ¸ÅÄªÀÌ °¡´ÉÇÏ¹Ç·Î ¹ßÇàÇÑ´Ù.
+        // 2) EngineFillEvent ë°œí–‰(ë¶€ë¶„/ì „ì²´ ì²´ê²°ë„ ëª¨ë‘ ë°œí–‰ í•„ìš”)
+        // - OrderStoreì— ì£¼ë¬¸ì´ ì €ì¥ë¨(identifierê°€ ìˆë‹¤ë©´) í•´ë‹¹ ë§¤ì¹­ì„ ë³´ì¥í•˜ë¯€ë¡œ ì‚¬ìš©í•œë‹¤.
         if (id.has_value() && !id->empty())
         {
             EngineFillEvent ev;
@@ -192,13 +196,13 @@ namespace engine
             pushEvent_(EngineEvent{ std::move(ev) });
         }
 
-        // 3) °èÁÂ/Æ÷Áö¼Ç ·ÎÄÃ Ä³½Ã(best-effort) °»½Å
-        // - ÃÖÁ¾ Áø½ÇÀº WS ½º³À¼¦(/accounts µî)·Î ¸ÂÃç¾ß ÇÔ
+        // 3) ì”ê³ /í¬ì§€ì…˜ ë¡œì»¬ ìºì‹œ(best-effort) ì—…ë°ì´íŠ¸
+        // - ìµœì¢… ì •í™•ê°’ì€ WS ì´ë²¤íŠ¸(/accounts ë“±)ë¥¼ ì‚¬ìš©í•  ê²ƒ
         const std::string currency = extractCurrency(t.market);
 
         if (t.side == core::OrderPosition::BID)
         {
-            // ¸Å¼ö Ã¼°á: KRW °¨¼Ò(Ã¼°á´ë±İ + ¼ö¼ö·á), ÄÚÀÎ Áõ°¡
+            // ë§¤ìˆ˜ ì²´ê²°: KRW ì°¨ê°(ì²´ê²°ì•¡ + ìˆ˜ìˆ˜ë£Œ), ì½”ì¸ ì¦ê°€
             const core::Amount krw_out = t.executed_funds + t.fee;
             account_.krw_free = std::max<core::Amount>(0.0, account_.krw_free - krw_out);
 
@@ -216,7 +220,7 @@ namespace engine
             }
             else
             {
-                // °£´Ü °¡ÁßÆò±Õ ¸Å¼ö°¡ °»½Å(ÃÊ±â ±¸Çö)
+                // ê¸°ì¡´ í¬ì§€ì…˜ì— ì¶”ê°€ë§¤ìˆ˜ ë°œìƒ(í‰ë‹¨ ì¬ê³„ì‚°)
                 const double old_qty = it->free;
                 const double new_qty = old_qty + t.volume;
                 if (new_qty > 0.0)
@@ -230,7 +234,7 @@ namespace engine
         }
         else
         {
-            // ¸Åµµ Ã¼°á: KRW Áõ°¡(Ã¼°á´ë±İ - ¼ö¼ö·á), ÄÚÀÎ °¨¼Ò
+            // ë§¤ë„ ì²´ê²°: KRW ì¦ê°€(ì²´ê²°ì•¡ - ìˆ˜ìˆ˜ë£Œ), ì½”ì¸ ì°¨ê°
             const core::Amount krw_in = std::max<core::Amount>(0.0, t.executed_funds - t.fee);
             account_.krw_free += krw_in;
 
@@ -246,30 +250,52 @@ namespace engine
         }
     }
 
-    // ³ªÁß¿¡ REST º¸Á¤ °æ·Î°¡ »ı±æ ¶§ »óÅÂ¸¸ °»½ÅÇÏ´Â Åë·Î
+    // ë‚˜ì¤‘ì— REST í´ë§ ë“±ìœ¼ë¡œ ë‹¨ìˆœ ìƒíƒœë§Œ ì—…ë°ì´íŠ¸í•˜ëŠ” ê²½ìš°
     void RealOrderEngine::onOrderStatus(std::string_view order_id, core::OrderStatus s)
     {
         assertOwner_();
 
-        // »óÅÂ ÀüÀÌ´Â Upbit ÀÌº¥Æ®¸¦ ±âÁØÀ¸·Î È®Á¤ Ã³¸®ÇÏ´Â °ÍÀÌ ¾ÈÀü
+        // ì§€ê¸ˆ êµ¬í˜„ì€ Upbit ì´ë²¤íŠ¸ë¥¼ ì „ë‹¬ë°›ì€ í›„ ìƒíƒœ ì²˜ë¦¬í•˜ëŠ” ì˜ˆì œ ìˆ˜ì¤€
         auto ordOpt = store_.get(order_id);
         if (!ordOpt.has_value()) return;
 
         auto o = *ordOpt;
+        const core::OrderStatus old_status = o.status;
         o.status = s;
 
         if (s == core::OrderStatus::Filled)
             o.remaining_volume = 0.0;
 
         store_.update(o);
+
+        // ì™„ë£Œ ì£¼ë¬¸ì´ ì „í™˜ë  ë•Œë§ˆë‹¤ ì£¼ê¸°ì ìœ¼ë¡œ cleanup ì‹¤í–‰
+        if (old_status != s && (s == core::OrderStatus::Filled
+            || s == core::OrderStatus::Canceled
+            || s == core::OrderStatus::Rejected))
+        {
+            // ì¹´ìš´í„° ê¸°ë°˜ ì‹¤í–‰(ìŠ¤ë ˆë“œ ì•ˆì „)
+            static std::size_t completed_count = 0;
+            ++completed_count;
+
+            // 100ê°œ ì™„ë£Œ ì£¼ë¬¸ë§ˆë‹¤ 1íšŒ cleanup
+            if (completed_count >= 100)
+            {
+                completed_count = 0;
+                const std::size_t removed = store_.cleanup();
+                if (removed > 0)
+                {
+                    util::Logger::instance().info("[OrderStore] Cleanup: removed ", removed, " old orders");
+                }
+            }
+        }
     }
 
     void RealOrderEngine::onOrderSnapshot(const core::Order& snapshot)
     {
         assertOwner_();
 
-        // WS/REST ½º³À¼¦Àº "±ÇÀ§ ÀÖ´Â °ª"À¸·Î º¸°í µ¿±âÈ­ÇÑ´Ù.
-        // - À¯½Ç/ÀçÁ¤·Ä/ºÎºĞ Á¤º¸¿¡µµ ºñ±³Àû ¾ÈÁ¤ÀûÀ¸·Î º¹±¸ °¡´É
+        // WS/REST ì´ë²¤íŠ¸ë¡œ "ìµœì‹  ìˆëŠ” ì „ì²´"ì—ì„œ ìƒíƒœ ë™ê¸°í™”í•œë‹¤.
+        // - ì¬ì—°ê²°/ì¤‘ë³µì „ì†¡/ë¶€ë¶„ ì´ë²¤íŠ¸ì—ì„œ ì•ˆì „ ë³´ì¡´í•˜ë„ë¡ ì„¤ê³„ ì˜ë„
         auto ordOpt = store_.get(snapshot.id);
         if (!ordOpt.has_value())
         {
@@ -280,7 +306,7 @@ namespace engine
         auto o = *ordOpt;
         const core::OrderStatus old_status = o.status;
 
-        // º¯°æÀÌ ÀÇ¹Ì ÀÖ´Â ÇÊµå¸¸ ¾÷µ¥ÀÌÆ®(ºñ¾îÀÖ´Â °ªÀº ±âÁ¸ À¯Áö)
+        // ìŠ¤ëƒ…ìƒ·ì— ì˜ë¯¸ ìˆëŠ” í•„ë“œë§Œ ì—…ë°ì´íŠ¸(ê°’ì—†ê±°ë‚˜ ë¹ˆê°’ ë¬´ì‹œ ë¡œì§)
         if (!snapshot.market.empty()) o.market = snapshot.market;
         o.position = snapshot.position;
         o.type = snapshot.type;
@@ -288,7 +314,6 @@ namespace engine
         if (snapshot.price.has_value())  o.price = snapshot.price;
         if (snapshot.volume.has_value()) o.volume = snapshot.volume;
 
-        // ´©Àû/ÀÚ±İ/»óÅÂ´Â ½º³À¼¦ÀÌ ´õ Á¤È®ÇÏ¹Ç·Î ±×´ë·Î µ¤¾î¾´´Ù.
         o.executed_volume = snapshot.executed_volume;
         o.remaining_volume = snapshot.remaining_volume;
         o.trades_count = snapshot.trades_count;
@@ -299,8 +324,9 @@ namespace engine
         o.locked = snapshot.locked;
 
         o.status = snapshot.status;
+        o.executed_funds = snapshot.executed_funds;
 
-        // identifier´Â ÀÌ¹Ì ÀÖÀ¸¸é À¯Áö, ¾øÀ¸¸é ½º³À¼¦ °ªÀ¸·Î Ã¤¿ò(ÃßÀû ¾ÈÁ¤¼º)
+        // identifierëŠ” ì´ë¯¸ ìˆìœ¼ë©´ ìœ ì§€, ì—†ìœ¼ë©´ ìŠ¤ëƒ…ìƒ· ì •ë³´ë¡œ ì±„ì›€(ì–‘ë°©í–¥ ê°€ëŠ¥ì„±)
         if (!o.identifier.has_value() && snapshot.identifier.has_value())
             o.identifier = snapshot.identifier;
 
@@ -309,8 +335,8 @@ namespace engine
 
         store_.update(o);
 
-        // ½º³À¼¦¿¡ ÁÖ¹®ÀÌ ÅÍ¹Ì³Î »óÅÂ¿¡ µµ´ŞÇß´Ù°í Ç¥½ÃµÇ¸é EngineOrderStatusEvent¸¦ ÇÑ ¹ø ¹æÃâ
-        // Reject/Cancel/Filled µîÀÇ »óÅÂ ÀÌº¥Æ® ¹ßÇà
+        // ì™¸ë¶€ì—ì„œ ì£¼ë¬¸ì´ í„°ë¯¸ë„ ìƒíƒœì— ë„ë‹¬í–ˆë‹¤ê³  í‘œì‹œë˜ë©´ EngineOrderStatusEventë¥¼ ì  ìˆ˜ ìˆìŒ
+        // Reject/Cancel/Filled ê°™ì€ ìµœì¢… ì´ë²¤íŠ¸ ë°œí–‰
         const bool isTerminal = (o.status == core::OrderStatus::Filled
             || o.status == core::OrderStatus::Canceled
             || o.status == core::OrderStatus::Rejected);
@@ -335,8 +361,8 @@ namespace engine
     {
         assertOwner_();
 
-        // ¿£Áø outbox(events_)¸¦ "µå·¹ÀÎ"ÇÑ´Ù.
-        // - ÇÑ ¹ø È£ÃâÇÏ¸é Áö±İ±îÁö ½×ÀÎ ÀÌº¥Æ®¸¦ ¸ğµÎ ²¨³»°í ³»ºÎ Å¥´Â ºñ¿î´Ù.
+        // ë‚´ë¶€ outbox(events_)ë¥¼ "ì†Œì§„ì‹œí‚´"í•œë‹¤.
+        // - í•œ ë²ˆ í˜¸ì¶œí•˜ë©´ ì§€ê¸ˆê¹Œì§€ ìŒ“ì¸ ì´ë²¤íŠ¸ë¥¼ ëª¨ë‘ ê°€ì ¸ì™€ì„œ ë‚´ë¶€ íëŠ” ë¹„ì›Œì§.
         std::vector<EngineEvent> out;
         out.reserve(events_.size());
         while (!events_.empty())
@@ -370,11 +396,11 @@ namespace engine
             return false;
         }
 
-        // Upbit Á¤Ã¥:
-        // - ÁöÁ¤°¡(Limit): BID/ASK ¸ğµÎ price + volume(VolumeSize)
-        // - ½ÃÀå°¡(Market):
-        //   * ¸Å¼ö(BID): AmountSize (ÃÑ KRW)
-        //   * ¸Åµµ(ASK): VolumeSize (¼ö·®)
+        // Upbit ì •ì±…:
+        // - ì§€ì •ê°€(Limit): BID/ASK ëª¨ë‘ price + volume(VolumeSize)
+        // - ì‹œì¥ê°€(Market):
+        //   * ë§¤ìˆ˜(BID): AmountSize (ì´ KRW)
+        //   * ë§¤ë„(ASK): VolumeSize (ìˆ˜ëŸ‰)
         if (req.type == core::OrderType::Limit)
         {
             if (!req.price.has_value())
@@ -408,7 +434,7 @@ namespace engine
             }
         }
 
-        // °ª ¹üÀ§ Ã¼Å©(0 ÀÌÇÏ´Â °ÅÀı)
+        // ê°’ ë²”ìœ„ ì²´í¬(0 ì´í•˜ëŠ” ê±°ë˜ë¶ˆê°€)
         if (isAmount && std::get<core::AmountSize>(req.size).value <= 0.0)
         {
             reason = "amount must be > 0";
@@ -430,9 +456,9 @@ namespace engine
 
     void RealOrderEngine::pushEvent_(EngineEvent ev)
     {
-        // ¿£Áø ³»ºÎ ÀÌº¥Æ®(outbox)¿¡ ÀûÀçÇÑ´Ù.
-        // - ´ÜÀÏ ¼ÒÀ¯±Ç ±¸Á¶¿¡¼­´Â events_ Á¢±Ùµµ ¿£Áø ½º·¹µå 1°³·Î °íÁ¤µÇ¹Ç·Î ¶ô ¾øÀÌ ¾ÈÀüÇÏ´Ù.
-        // - ÇâÈÄ Á¤Ã¥(Å¥ ±æÀÌ Á¦ÇÑ/µå·Ó/Åë°è)ÀÌ ÇÊ¿äÇÏ¸é ÀÌ ÁöÁ¡¿¡¼­ ÀÏ°ı Àû¿ë °¡´ÉÇÏ´Ù.
+        // ë‚´ë¶€ ì „ìš© ì´ë²¤íŠ¸(outbox)ì— ì €ì¥í•œë‹¤.
+        // - ì—”ì§„ ë‚´ë¶€ëŠ” ë‹¨ì¼ìŠ¤ë ˆë“œë¡œ events_ ì ‘ê·¼ì€ í•­ìƒ ìŠ¤ë ˆë“œ 1ê°œë§Œ ëŒì•„ê°€ë¯€ë¡œ ë½ ë¶ˆí•„ìš”í•˜ë‹¤.
+        // - ë³µì¡í•œ ì •ì±…(í í¬ê¸° ì œí•œ/ì••ì¶•/í†µí•©)ì´ í•„ìš”í•˜ë©´ ì—¬ê¸° ì¶”ê°€í•˜ê±°ë‚˜ í•˜ë˜ ì§€ê¸ˆ ê°„ë‹¨í•˜ë‹¤.
         events_.emplace_back(std::move(ev));
     }
 

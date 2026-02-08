@@ -1,4 +1,4 @@
-// /api/ws/dto/UpbitMyOrderDto.h
+ï»¿// /api/ws/dto/UpbitMyOrderDto.h
 #pragma once
 
 #include <string>
@@ -11,12 +11,12 @@ namespace api::upbit::dto
 {
     struct UpbitMyOrderDto
     {
-        // ---- ½Äº°ÀÚ ----
+        // ---- ì‹ë³„ì ----
         std::string type;   // "myOrder"
         std::string code;   // market code (e.g. "KRW-BTC")
         std::string uuid;   // order uuid
 
-        // ---- ÁÖ¹® ¼Ó¼º Á¤º¸ ----
+        // ---- ì£¼ë¬¸ ì†ì„± ì •ë³´ ----
         std::string ask_bid;     // "ASK" | "BID"
         std::string order_type;  // "limit" | "price" | "market" | "best"
         std::string state;       // "wait" | "watch" | "trade" | "done" | "cancel" | "prevented"
@@ -47,7 +47,7 @@ namespace api::upbit::dto
         std::optional<std::int64_t> order_timestamp; // ms
         std::optional<std::int64_t> timestamp;       // ms (message timestamp)
 
-        // (SMP / TIF µîÀº ÇöÀç µµ¸ŞÀÎ¿¡¼­ ¾È ¾²¸é »ı·« °¡´É)
+        // (SMP / TIF ë“±ì€ í˜„ì¬ ë„ë©”ì¸ì—ì„œ ì•ˆ ì“°ë©´ ìƒëµ ê°€ëŠ¥)
         // std::optional<std::string> time_in_force;
         // std::optional<std::string> smp_type;
         // std::optional<double> prevented_volume;

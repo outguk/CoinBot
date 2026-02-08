@@ -1,14 +1,14 @@
-// core/domain/Types.h
+ï»¿// core/domain/Types.h
 #pragma once
 
 namespace core 
 {
-	// °íÀ¯ Å¸ÀÔ Á¤ÀÇ
-	using Price = double;		// °¡°Ý(ÄÚÀÎÀÇ °¡°Ý)
+	// ê³ ìœ  íƒ€ìž… ì •ì˜
+	using Price = double;		// ê°€ê²©(ì½”ì¸ì˜ ê°€ê²©)
 
-	// ¸Åµµ´Â Volume ±âÁØÀÌ ¾ÈÁ¤Àû
-	using Volume = double;		// ¼ö·®(ÄÚÀÎÀÌ ¸î°³³Ä)
+	// ë§¤ë„ëŠ” Volume ê¸°ì¤€ì´ ì•ˆì •ì 
+	using Volume = double;		// ìˆ˜ëŸ‰(ì½”ì¸ì´ ëª‡ê°œëƒ)
 
-	// Amount´Â ¸®½ºÅ© °ü¸®ÀÇ ¾ð¾î
-	using Amount = double;		// Prcie * Quantity -> °Å·¡ ±Ý¾×(¾ó¸¶¸¦ »ç°í ÆÈ¾Ò³Ä)
+	// AmountëŠ” ë¦¬ìŠ¤í¬ ê´€ë¦¬ì˜ ì–¸ì–´
+	using Amount = double;		// Prcie * Quantity -> ê±°ëž˜ ê¸ˆì•¡(ì–¼ë§ˆë¥¼ ì‚¬ê³  íŒ”ì•˜ëƒ)
 }

@@ -1,19 +1,19 @@
-#include "app/StartupRecovery.h"
+ï»¿#include "app/StartupRecovery.h"
 
 #include <algorithm>
 #include <iostream>
 
 namespace app {
 
-    // - ¹®ÀÚ¿­ÀÌ prefix·Î ½ÃÀÛÇÏ´ÂÁö °Ë»çÇÑ´Ù.
-    // - "º¿ ÁÖ¹®¸¸ Ãë¼Ò"¸¦ À§ÇØ °¡Àå Áß¿äÇÑ ¾ÈÀüÀåÄ¡.
+    // - ë¬¸ìì—´ì´ prefixë¡œ ì‹œì‘í•˜ëŠ”ì§€ ê²€ì‚¬í•œë‹¤.
+    // - "ë´‡ ì£¼ë¬¸ë§Œ ì·¨ì†Œ"ë¥¼ ìœ„í•´ ê°€ì¥ ì¤‘ìš”í•œ ì•ˆì „ì¥ì¹˜.
     bool StartupRecovery::startsWith(std::string_view s, std::string_view prefix) noexcept
     {
         return s.size() >= prefix.size() && s.substr(0, prefix.size()) == prefix;
     }
 
     // - market: "KRW-BTC" -> "KRW"
-    // - Çü½ÄÀÌ ´Ù¸£¸é ºó string_view ¹İÈ¯.
+    // - í˜•ì‹ì´ ë‹¤ë¥´ë©´ ë¹ˆ string_view ë°˜í™˜.
     std::string_view StartupRecovery::unitCurrency(std::string_view market)
     {
         const auto p = market.find('-');
@@ -32,20 +32,20 @@ namespace app {
         std::string_view market,
         const Options& opt)
     {
-        // 0) prefix°¡ ºñ¾îÀÖÀ¸¸é "¾Æ¹«°Å³ª Ãë¼Ò"·Î ÀÌ¾îÁú ¼ö ÀÖ´Ù.
-        //    -> ¾ÈÀüÀ» À§ÇØ ºó prefix¸é Ãë¼Ò ·çÆ¾À» °Ç³Ê¶Ù´Â ÆíÀÌ ´õ ¾ÈÀüÇÏ´Ù.
+        // 0) prefixê°€ ë¹„ì–´ìˆìœ¼ë©´ "ì•„ë¬´ê±°ë‚˜ ì·¨ì†Œ"ë¡œ ì´ì–´ì§ˆ ìˆ˜ ìˆë‹¤.
+        //    -> ì•ˆì „ì„ ìœ„í•´ ë¹ˆ prefixë©´ ì·¨ì†Œ ë£¨í‹´ì„ ê±´ë„ˆë›°ëŠ” í¸ì´ ë” ì•ˆì „í•˜ë‹¤.
         if (opt.bot_identifier_prefix.empty()) {
             std::cout << "[Startup][Warn] bot_identifier_prefix is empty. skip cancel.\n";
             return;
         }
 
-        // 1) ¹ÌÃ¼°á ÁÖ¹® Á¶È¸
-         //    - UpbitExchangeRestClient::getOpenOrders()°¡ ¼º°øÇÏ¸é vector<Order>, ½ÇÆĞÇÏ¸é RestError
+        // 1) ë¯¸ì²´ê²° ì£¼ë¬¸ ì¡°íšŒ
+         //    - UpbitExchangeRestClient::getOpenOrders()ê°€ ì„±ê³µí•˜ë©´ vector<Order>, ì‹¤íŒ¨í•˜ë©´ RestError
         auto r = api.getOpenOrders(market);
         if (std::holds_alternative<api::rest::RestError>(r)) {
             const auto& e = std::get<api::rest::RestError>(r);
             std::cout << "[Startup][Warn] getOpenOrders failed: " << e.message << "\n";
-            return; // ½ÃÀÛ Á¤Ã¥»ó: Á¶È¸ ½ÇÆĞ¸é Ãë¼Ò ¾øÀÌ ÁøÇà(¿øÇÏ¸é ¿©±â¼­ Á¾·áÇØµµ µÊ)
+            return; // ì‹œì‘ ì •ì±…ìƒ: ì¡°íšŒ ì‹¤íŒ¨ë©´ ì·¨ì†Œ ì—†ì´ ì§„í–‰(ì›í•˜ë©´ ì—¬ê¸°ì„œ ì¢…ë£Œí•´ë„ ë¨)
         }
 
         auto open = std::get<std::vector<core::Order>>(std::move(r));
@@ -53,23 +53,23 @@ namespace app {
 
         for (const auto& o : open)
         {
-            // identifier(ÇÁ·Î±×·¥¿¡¼­ ºÎ¿©)°¡ ¾øÀ¸¸é º¿ ÁÖ¹® ¿©ºÎ ÆÇ´Ü ºÒ°¡ ¡æ °Ç³Ê¶Ü
+            // identifier(í”„ë¡œê·¸ë¨ì—ì„œ ë¶€ì—¬)ê°€ ì—†ìœ¼ë©´ ë´‡ ì£¼ë¬¸ ì—¬ë¶€ íŒë‹¨ ë¶ˆê°€ â†’ ê±´ë„ˆëœ€
             if (!o.identifier.has_value())
                 continue;
 
-            // ¿ÀÃë¼Ò ¹æÁö: prefix ¹ÌÀÏÄ¡¸é °Ç³Ê¶Ü
+            // ì˜¤ì·¨ì†Œ ë°©ì§€: prefix ë¯¸ì¼ì¹˜ë©´ ê±´ë„ˆëœ€
             if (!startsWith(*o.identifier, opt.bot_identifier_prefix))
                 continue;
 
-            // Upbit´Â uuid ¶Ç´Â identifier µÑ Áß ÇÏ³ª·Î Ãë¼Ò °¡´É.
-            // ¿©±â¼­´Â uuid¸¦ ¿ì¼± »ç¿ë(µµ¸ŞÀÎ Order.id¿¡ uuid°¡ µé¾î°£´Ù´Â ÀüÁ¦).
+            // UpbitëŠ” uuid ë˜ëŠ” identifier ë‘˜ ì¤‘ í•˜ë‚˜ë¡œ ì·¨ì†Œ ê°€ëŠ¥.
+            // ì—¬ê¸°ì„œëŠ” uuidë¥¼ ìš°ì„  ì‚¬ìš©(ë„ë©”ì¸ Order.idì— uuidê°€ ë“¤ì–´ê°„ë‹¤ëŠ” ì „ì œ).
             const std::optional<std::string> uuid =
                 o.id.empty() ? std::nullopt : std::optional<std::string>(o.id);
 
             bool ok = false;
 
-            // 3) Ãë¼Ò Àç½Ãµµ
-           //    - ³×Æ®¿öÅ© ÀÏ½Ã ¿À·ù, Upbit ÀÀ´ä Áö¿¬ µî¿¡ ´ëºñ
+            // 3) ì·¨ì†Œ ì¬ì‹œë„
+           //    - ë„¤íŠ¸ì›Œí¬ ì¼ì‹œ ì˜¤ë¥˜, Upbit ì‘ë‹µ ì§€ì—° ë“±ì— ëŒ€ë¹„
             for (int i = 0; i < opt.cancel_retry; ++i)
             {
                 auto cr = api.cancelOrder(uuid, o.identifier);
@@ -79,10 +79,10 @@ namespace app {
                     break;
                 }
 
-                // º¸¿Ï Æ÷ÀÎÆ®:
-                // - ½ÇÆĞ ½Ã RestError ³»¿ëÀ» ·Î±×·Î ³²±â¸é µğ¹ö±ë¿¡ ¸Å¿ì À¯¸®
-                // - (´Ù¸¸ Áö±İ cancelOrder()´Â variant<bool, RestError>¶ó¼­
-                //   ½ÇÆĞ°¡ bool(false)ÀÎÁö RestErrorÀÎÁö ±¸ºĞ °¡´ÉÇÏ°Ô ±¸ÇöÇÏ´Â °Ô ÁÁÀ½)
+                // ë³´ì™„ í¬ì¸íŠ¸:
+                // - ì‹¤íŒ¨ ì‹œ RestError ë‚´ìš©ì„ ë¡œê·¸ë¡œ ë‚¨ê¸°ë©´ ë””ë²„ê¹…ì— ë§¤ìš° ìœ ë¦¬
+                // - (ë‹¤ë§Œ ì§€ê¸ˆ cancelOrder()ëŠ” variant<bool, RestError>ë¼ì„œ
+                //   ì‹¤íŒ¨ê°€ bool(false)ì¸ì§€ RestErrorì¸ì§€ êµ¬ë¶„ ê°€ëŠ¥í•˜ê²Œ êµ¬í˜„í•˜ëŠ” ê²Œ ì¢‹ìŒ)
                 //
                 // if (std::holds_alternative<api::rest::RestError>(cr)) { ... }
             }
@@ -98,14 +98,14 @@ namespace app {
             }
         }
 
-        // 2) Ãë¼Ò ¹İ¿µ È®ÀÎ(¼±ÅÃ)
-        //    - Upbit ÂÊ¿¡¼­ Ãë¼Ò ¹İ¿µÀÌ Áï½Ã µÇÁö ¾ÊÀ» ¼ö ÀÖ¾î¼­, ¸î ¹ø ÀçÁ¶È¸·Î È®ÀÎÇÑ´Ù.
-        //    - verify_retry »çÀÌ¿¡ ÂªÀº sleep/backoff°¡ ÀÖÀ¸¸é ¾ÈÁ¤¼ºÀÌ ÁÁ¾ÆÁø´Ù.
+        // 2) ì·¨ì†Œ ë°˜ì˜ í™•ì¸(ì„ íƒ)
+        //    - Upbit ìª½ì—ì„œ ì·¨ì†Œ ë°˜ì˜ì´ ì¦‰ì‹œ ë˜ì§€ ì•Šì„ ìˆ˜ ìˆì–´ì„œ, ëª‡ ë²ˆ ì¬ì¡°íšŒë¡œ í™•ì¸í•œë‹¤.
+        //    - verify_retry ì‚¬ì´ì— ì§§ì€ sleep/backoffê°€ ìˆìœ¼ë©´ ì•ˆì •ì„±ì´ ì¢‹ì•„ì§„ë‹¤.
         for (int v = 0; v < opt.verify_retry; ++v)
         {
             auto rr = api.getOpenOrders(market);
             if (std::holds_alternative<api::rest::RestError>(rr))
-                break; // Á¶È¸ ½ÇÆĞÇÏ¸é °ËÁõ Áß´Ü
+                break; // ì¡°íšŒ ì‹¤íŒ¨í•˜ë©´ ê²€ì¦ ì¤‘ë‹¨
 
             const auto remain = std::get<std::vector<core::Order>>(std::move(rr));
 
@@ -129,29 +129,29 @@ namespace app {
     {
         trading::PositionSnapshot pos{};
 
-        // 1) °èÁ¤ Á¶È¸
+        // 1) ê³„ì • ì¡°íšŒ
         auto ar = api.getMyAccount();
         if (std::holds_alternative<api::rest::RestError>(ar)) {
             const auto& e = std::get<api::rest::RestError>(ar);
             std::cout << "[Startup][Warn] getMyAccount failed: " << e.message << "\n";
-            return pos; // ½ÇÆĞ ½Ã coin=0À¸·Î ¹İÈ¯ ¡æ Àü·«Àº FlatÀ¸·Î º¹±¸
+            return pos; // ì‹¤íŒ¨ ì‹œ coin=0ìœ¼ë¡œ ë°˜í™˜ â†’ ì „ëµì€ Flatìœ¼ë¡œ ë³µêµ¬
         }
 
         const auto acc = std::get<core::Account>(std::move(ar));
 
-        // 2) market("KRW-BTC")¿¡¼­ base/unit ÃßÃâ
+        // 2) market("KRW-BTC")ì—ì„œ base/unit ì¶”ì¶œ
         const std::string_view base = baseCurrency(market); // BTC
         const std::string_view unit = unitCurrency(market); // KRW
 
-        // º¸¿Ï Æ÷ÀÎÆ®(±¸ÇöµÊ)
-        // - market Çü½ÄÀÌ ±úÁ³À¸¸é base/unitÀÌ ºó°ªÀÌ µÉ ¼ö ÀÖÀ½.
-        //   ÀÌ °æ¿ì ±×³É pos(0,0)¸¦ ¹İÈ¯ÇÏ¸é FlatÀ¸·Î º¹±¸µÊ.
+        // ë³´ì™„ í¬ì¸íŠ¸(êµ¬í˜„ë¨)
+        // - market í˜•ì‹ì´ ê¹¨ì¡Œìœ¼ë©´ base/unitì´ ë¹ˆê°’ì´ ë  ìˆ˜ ìˆìŒ.
+        //   ì´ ê²½ìš° ê·¸ëƒ¥ pos(0,0)ë¥¼ ë°˜í™˜í•˜ë©´ Flatìœ¼ë¡œ ë³µêµ¬ë¨.
         if (base.empty() || unit.empty()) {
             std::cout << "[Startup][Warn] invalid market format: " << market << "\n";
             return pos;
         }
 
-        // 3) °èÁ¤ Æ÷Áö¼Ç¿¡¼­ ÇØ´ç currency Ã£±â
+        // 3) ê³„ì • í¬ì§€ì…˜ì—ì„œ í•´ë‹¹ currency ì°¾ê¸°
         for (const auto& p : acc.positions)
         {
             if (p.currency == base && p.unit_currency == unit)

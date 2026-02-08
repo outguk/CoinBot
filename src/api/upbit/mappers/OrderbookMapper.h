@@ -1,4 +1,4 @@
-// api/upbit/mappers/OrderbookMapper.h
+ï»¿// api/upbit/mappers/OrderbookMapper.h
 #pragma once
 
 #include "../src/core/domain/Orderbook.h"
@@ -27,7 +27,7 @@ namespace api::upbit::mappers {
             ob.top_levels.push_back(lv);
         }
 
-        // ÀÀ´ä levelÀº ¡°°¡°Ý ´ÜÀ§¡±·Î ÀÇ¹Ì º¸°ü
+        // ì‘ë‹µ levelì€ â€œê°€ê²© ë‹¨ìœ„â€ë¡œ ì˜ë¯¸ ë³´ê´€
         if (dto.level > 0.0)
             ob.price_unit = dto.level;
         else

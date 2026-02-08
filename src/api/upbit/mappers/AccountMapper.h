@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 #include <core/domain/Account.h>
 #include <api/upbit/dto/UpbitAssetOrderDtos.h>
 
@@ -38,7 +38,7 @@ namespace api::upbit::mappers
 
 			core::Position p{};
 			p.currency = row.currency;
-			// ÀÌ ºÎºĞµµ ¿À·ù½Ã 0À¸·Î ÇÏ´Â°Ô ¸Â´ÂÁö °ËÅä ÇÊ¿ä
+			// ì´ ë¶€ë¶„ë„ ì˜¤ë¥˜ì‹œ 0ìœ¼ë¡œ í•˜ëŠ”ê²Œ ë§ëŠ”ì§€ ê²€í†  í•„ìš”
 			p.free = toDoubleOrZero(row.balance);
 			p.avg_buy_price = toDoubleOrZero(row.avg_buy_price);
 			p.unit_currency = row.unit_currency;

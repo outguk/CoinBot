@@ -1,4 +1,4 @@
-#include "ClosePriceWindow.h"
+ï»¿#include "ClosePriceWindow.h"
 
 #include "core/domain/Candle.h" // close_price
 
@@ -7,8 +7,8 @@ namespace trading::indicators {
     void ClosePriceWindow::reset(std::size_t delay) {
         delay_ = delay;
 
-        // close[N]¸¦ ¾ò±â À§ÇØ¼­´Â ÃÖ¼Ò N+1°³¸¦ À¯ÁöÇØ¾ß ÇÑ´Ù.
-        // ¿¹: N=20 -> ÃÖ±Ù 21°³ Á¾°¡¸¦ ÀúÀå
+        // close[N]ë¥¼ ì–»ê¸° ìœ„í•´ì„œëŠ” ìµœì†Œ N+1ê°œë¥¼ ìœ ì§€í•´ì•¼ í•œë‹¤.
+        // ì˜ˆ: N=20 -> ìµœê·¼ 21ê°œ ì¢…ê°€ë¥¼ ì €ì¥
         window_.reset(delay_ + 1);
     }
 
@@ -19,9 +19,9 @@ namespace trading::indicators {
     trading::Value<double> ClosePriceWindow::update(double close) {
         trading::Value<double> out{};
 
-        // window_´Â reset¿¡¼­ delay_+1·Î ÀâÈ÷Áö¸¸,
-        // È¤½Ã¶óµµ delay_+1ÀÌ 0ÀÌ µÇ´Â ÄÉÀÌ½º´Â ¾ø´Ù(size_t).
-        // (delay_==0ÀÌ¸é capacity==1 -> close[0]Àº ÃÖ½Å°ª)
+        // window_ëŠ” resetì—ì„œ delay_+1ë¡œ ì¡íˆì§€ë§Œ,
+        // í˜¹ì‹œë¼ë„ delay_+1ì´ 0ì´ ë˜ëŠ” ì¼€ì´ìŠ¤ëŠ” ì—†ë‹¤(size_t).
+        // (delay_==0ì´ë©´ capacity==1 -> close[0]ì€ ìµœì‹ ê°’)
         window_.push(close);
 
         const auto v = window_.valueFromBack(delay_);

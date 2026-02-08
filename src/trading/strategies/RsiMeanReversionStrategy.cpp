@@ -1,29 +1,31 @@
-#include "RsiMeanReversionStrategy.h"
+ï»¿#include "RsiMeanReversionStrategy.h"
 
 #include <algorithm> // std::max, std::min
 #include <cmath>     // std::abs
 #include <utility>   // std::move
 #include <iostream>
 
-// Àç½ÃÀÛ/¸ÖÆ¼ÇÁ·Î¼¼½º ¾ÈÀüÇÑ client_order_id¸¦ À§ÇØ UUID »ç¿ë
+// ì¬ì‹œì‘/ë©€í‹°í”„ë¡œì„¸ìŠ¤ ì•ˆì „í•œ client_order_idë¥¼ ìœ„í•´ UUID ì‚¬ìš©
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/uuid/random_generator.hpp>
 
+#include "util/Config.h"
+#include "util/Logger.h"
+
 namespace trading::strategies {
 
-    static constexpr double kMinNotionalKrw = 5000.0;   // KRW ¸¶ÄÏ ´ëÇ¥ ÃÖ¼Ò ÁÖ¹® ±İ¾×(°£´Ü ¹öÀü)
-    static constexpr double kVolumeSafetyEps = 1e-12;   // oversell ¹æÁö¿ë ¾ÆÁÖ ÀÛÀº ¸¶Áø
-
     template <typename T>
-    void printIndicator_(const char* name, const T& ind)
+    std::string indicatorToString_(const char* name, const T& ind)
     {
-        std::cout << ' ' << name << '=';
-        if (ind.ready) std::cout << std::fixed << std::setprecision(4) << ind.v;
-        else           std::cout << "N/A";
+        std::ostringstream oss;
+        oss << ' ' << name << '=';
+        if (ind.ready) oss << std::fixed << std::setprecision(4) << ind.v;
+        else           oss << "N/A";
+        return oss.str();
     }
 
-    // thread_local: ¸ÖÆ¼½º·¹µå È¯°æ¿¡¼­µµ °æÀïÀ» ÁÙÀÌ°í »ı¼º±â ¾ÈÀü¼ºÀ» ³ôÀÓ
+    // thread_local: ë©€í‹°ìŠ¤ë ˆë“œ í™˜ê²½ì—ì„œë„ ê²½ìŸì„ ì¤„ì´ê³  ìƒì„±ê¸° ì•ˆì „ì„±ì„ ë†’ì„
     std::string makeUuidV4()
     {
         static thread_local boost::uuids::random_generator gen;
@@ -35,7 +37,7 @@ namespace trading::strategies {
     RsiMeanReversionStrategy::RsiMeanReversionStrategy(std::string market, Params p)
         : market_(std::move(market)), params_(p)
     {
-        // ÁöÇ¥ ÃÊ±âÈ­(À©µµ¿ì/±æÀÌ ¼¼ÆÃ)
+        // ì§€í‘œ ì´ˆê¸°í™”(ìœˆë„ìš°/ê¸¸ì´ ì„¸íŒ…)
         rsi_.reset(params_.rsiLength);
         closeN_.reset(params_.trendLookWindow);
         vol_.reset(params_.volatilityWindow);
@@ -45,23 +47,23 @@ namespace trading::strategies {
 
     void RsiMeanReversionStrategy::reset()
     {
-        // »óÅÂ ÃÊ±âÈ­
+        // ìƒíƒœ ì´ˆê¸°í™”
         state_ = State::Flat;
         pending_client_id_.reset();
 
-        // ºÎºĞ/º¹¼ö Ã¼°á ´©Àû°ª ÃÊ±âÈ­
-        // - ½Ç°Å·¡¿¡¼­´Â ÇÑ ÁÖ¹®ÀÌ ¿©·¯ ¹ø ³ª´² Ã¼°áµÉ ¼ö ÀÖÀ¸¹Ç·Î,
-        //   FillEvent°¡ ¿Ã ¶§¸¶´Ù ´©ÀûÇÏ°í, ÃÖÁ¾ È®Á¤Àº ÁÖ¹®»óÅÂ(Filled)¿¡¼­ Ã³¸®ÇÑ´Ù.
+        // ë¶€ë¶„/ë³µìˆ˜ ì²´ê²° ëˆ„ì ê°’ ì´ˆê¸°í™”
+        // - ì‹¤ê±°ë˜ì—ì„œëŠ” í•œ ì£¼ë¬¸ì´ ì—¬ëŸ¬ ë²ˆ ë‚˜ëˆ  ì²´ê²°ë  ìˆ˜ ìˆìœ¼ë¯€ë¡œ,
+        //   FillEventê°€ ì˜¬ ë•Œë§ˆë‹¤ ëˆ„ì í•˜ê³ , ìµœì¢… í™•ì •ì€ ì£¼ë¬¸ìƒíƒœ(Filled)ì—ì„œ ì²˜ë¦¬í•œë‹¤.
         pending_filled_volume_ = 0.0;
         pending_cost_sum_ = 0.0;
         pending_last_price_ = 0.0;
 
-        // Æ÷Áö¼Ç Á¤º¸ ÃÊ±âÈ­
+        // í¬ì§€ì…˜ ì •ë³´ ì´ˆê¸°í™”
         entry_price_.reset();
         stop_price_.reset();
         target_price_.reset();
 
-        // ÁöÇ¥ ³»ºÎ »óÅÂ ÃÊ±âÈ­
+        // ì§€í‘œ ë‚´ë¶€ ìƒíƒœ ì´ˆê¸°í™”
         rsi_.clear();
         closeN_.clear();
         vol_.clear();
@@ -73,10 +75,10 @@ namespace trading::strategies {
 
     void RsiMeanReversionStrategy::syncOnStart(const trading::PositionSnapshot& pos)
     {
-        // - ¹ÌÃ¼°á ÁÖ¹®Àº ¾Û/¿£Áø ½ÃÀÛ ·çÆ¾¿¡¼­ ¡°ÀüºÎ Ãë¼Ò¡±ÇÑ´Ù.
-        // - µû¶ó¼­ Àü·«Àº ¹ÌÃ¼°áÀ» ÀÌ¾î¹ŞÁö ¾Ê°í, Æ÷Áö¼Ç¸¸ º¹±¸ÇÑ´Ù.
+        // - ë¯¸ì²´ê²° ì£¼ë¬¸ì€ ì•±/ì—”ì§„ ì‹œì‘ ë£¨í‹´ì—ì„œ â€œì „ë¶€ ì·¨ì†Œâ€í•œë‹¤.
+        // - ë”°ë¼ì„œ ì „ëµì€ ë¯¸ì²´ê²°ì„ ì´ì–´ë°›ì§€ ì•Šê³ , í¬ì§€ì…˜ë§Œ ë³µêµ¬í•œë‹¤.
 
-        // ½ÃÀÛ ½Ã pending »óÅÂ´Â Ç×»ó Á¦°Å(¹ÌÃ¼°á ÀÌ¾î¹Ş±â X)
+        // ì‹œì‘ ì‹œ pending ìƒíƒœëŠ” í•­ìƒ ì œê±°(ë¯¸ì²´ê²° ì´ì–´ë°›ê¸° X)
         pending_client_id_.reset();
         pending_filled_volume_ = 0.0;
         pending_cost_sum_ = 0.0;
@@ -86,7 +88,7 @@ namespace trading::strategies {
         {
             state_ = State::InPosition;
 
-            // avg_entry_price°¡ ½Å·Ú °¡´ÉÇÏ¸é(entry/stop/target º¹±¸ °¡´É)
+            // avg_entry_priceê°€ ì‹ ë¢° ê°€ëŠ¥í•˜ë©´(entry/stop/target ë³µêµ¬ ê°€ëŠ¥)
             if (pos.avg_entry_price > 0.0)
             {
                 entry_price_ = pos.avg_entry_price;
@@ -94,8 +96,9 @@ namespace trading::strategies {
             }
             else
             {
-                // Æò±Õ¸Å¼ö°¡°¡ ¾ø°Å³ª ½Å·Ú°¡ ³·À¸¸é,
-                // Àü·«ÀÌ ¡°ÀÓÀÇ·Î ±âÁØ°¡¸¦ ¸¸µé¾î¡± stop/targetÀ» ¼³Á¤ÇÏ´Â °ÍÀº À§Çè
+                // í‰ê· ë§¤ìˆ˜ê°€ê°€ ì—†ê±°ë‚˜ ì‹ ë¢°ê°€ ë‚®ìœ¼ë©´,
+                // ì „ëµì´ â€œì„ì˜ë¡œ ê¸°ì¤€ê°€ë¥¼ ë§Œë“¤ì–´â€ stop/targetì„ ì„¤ì •í•˜ëŠ” ê²ƒì€ ìœ„í—˜
+                state_ = State::Flat;
                 entry_price_.reset();
                 stop_price_.reset();
                 target_price_.reset();
@@ -112,45 +115,80 @@ namespace trading::strategies {
 
     Decision RsiMeanReversionStrategy::onCandle(const core::Candle& c, const AccountSnapshot& account)
     {
-        // °üÁ¡ A: market °íÁ¤ Àü·«ÀÌ¹Ç·Î ´Ù¸¥ market ºÀÀÌ µé¾î¿À¸é ¾Æ¹«°Íµµ ÇÏÁö ¾ÊÀ½
+        // ê´€ì  A: market ê³ ì • ì „ëµì´ë¯€ë¡œ ë‹¤ë¥¸ market ë´‰ì´ ë“¤ì–´ì˜¤ë©´ ì•„ë¬´ê²ƒë„ í•˜ì§€ ì•ŠìŒ
         if (c.market != market_)
             return Decision::noAction();
 
-        // °°Àº ts(°°Àº 1ºĞ Äµµé ¾÷µ¥ÀÌÆ®)°¡ ¹İº¹µÇ¸é ÁöÇ¥¿¡ ´©ÀûÇÏÁö ¾ÊÀ½
+        // ê°™ì€ ts(ê°™ì€ 1ë¶„ ìº”ë“¤ ì—…ë°ì´íŠ¸)ê°€ ë°˜ë³µë˜ë©´ ì§€í‘œì— ëˆ„ì í•˜ì§€ ì•ŠìŒ
         if (last_candle_ts_.has_value() && *last_candle_ts_ == c.start_timestamp)
         {
-            // ÇÊ¿äÇÏ¸é µğ¹ö±× È®ÀÎ¿ë ·Î±×(¿øÀÎ °ËÁõ)
-            std::cout << "[Strategy][Dedup] same candle ts ignored. market=" << c.market
-                << " ts=" << c.start_timestamp
-                << " close=" << static_cast<double>(c.close_price);
+            // í•„ìš”í•˜ë©´ ë””ë²„ê·¸ í™•ì¸ìš© ë¡œê·¸(ì›ì¸ ê²€ì¦)
+            util::Logger::instance().debug("[Strategy][Dedup] same candle ts ignored. market=", c.market,
+                " ts=", c.start_timestamp, " close=", static_cast<double>(c.close_price));
 
             return Decision::noAction();
         }
         last_candle_ts_ = c.start_timestamp;
 
-        // 1) ÁöÇ¥/ÇÊÅÍ ½º³À¼¦ »ı¼º(¿©±â¼­ update°¡ ¸ğµÎ ³¡³²)
+        // 1) ì§€í‘œ/í•„í„° ìŠ¤ëƒ…ìƒ· ìƒì„±(ì—¬ê¸°ì„œ updateê°€ ëª¨ë‘ ëë‚¨)
         const Snapshot s = buildSnapshot(c);
-        
-        // ÁöÇ¥ È®ÀÎ ·Î±×
-        printIndicator_("rsi", s.rsi);
-        printIndicator_("vol", s.volatility);
 
-        std::cout << " trendStrength=";
-        if (s.trendReady) std::cout << std::fixed << std::setprecision(6) << s.trendStrength;
-        else              std::cout << "N/A";
+        // ì§€í‘œ í™•ì¸ ë¡œê·¸
+        std::ostringstream oss;
+        oss << indicatorToString_("rsi", s.rsi)
+            << indicatorToString_("vol", s.volatility)
+            << " trendStrength=";
+        if (s.trendReady) oss << std::fixed << std::setprecision(6) << s.trendStrength;
+        else              oss << "N/A";
 
-        // --- self-heal: Àü·« »óÅÂ¸¦ ½ÇÁ¦ º¸À¯ ÀÚ»ê°ú ÀÏ°üµÇ°Ô À¯Áö ---
+        util::Logger::instance().debug("[Strategy][Indicators]", oss.str());
+
+        // --- self-heal: ì „ëµ ìƒíƒœë¥¼ ì‹¤ì œ ë³´ìœ  ìì‚°ê³¼ ì¼ê´€ë˜ê²Œ ìœ ì§€ ---
         const double posNotional = account.coin_available * s.close;
-        const bool hasMeaningfulPos = (posNotional >= kMinNotionalKrw);
+        const bool hasMeaningfulPos = (posNotional >= util::AppConfig::instance().strategy.min_notional_krw);
 
+        // PendingEntry ë³µêµ¬: ì½”ì¸ì´ ìƒê²¼ìœ¼ë©´ ì²´ê²°ë¨ (WS ì´ë²¤íŠ¸ ìœ ì‹¤ ëŒ€ì‘)
+        if (state_ == State::PendingEntry && hasMeaningfulPos)
+        {
+            util::Logger::instance().info("[Strategy][SelfHeal] PendingEntry -> InPosition (WS missed)");
+            state_ = State::InPosition;
+
+            // ì •í™•í•œ ì²´ê²°ê°€ë¥¼ ëª¨ë¥´ë©´ í˜„ì¬ê°€ë¡œ ì†ì ˆ/ìµì ˆ ì„¤ì •
+            if (!entry_price_.has_value()) {
+                entry_price_ = s.close;
+                setStopsFromEntry(*entry_price_);
+            }
+
+            pending_client_id_.reset();
+            pending_filled_volume_ = 0.0;
+            pending_cost_sum_ = 0.0;
+            pending_last_price_ = 0.0;
+        }
+
+        // PendingExit ë³µêµ¬: ì½”ì¸ì´ ì—†ê±°ë‚˜ dustë§Œ ë‚¨ìœ¼ë©´ ì²­ì‚°ë¨
+        if (state_ == State::PendingExit && !hasMeaningfulPos)
+        {
+            util::Logger::instance().info("[Strategy][SelfHeal] PendingExit -> Flat (WS missed)");
+            state_ = State::Flat;
+            entry_price_.reset();
+            stop_price_.reset();
+            target_price_.reset();
+
+            pending_client_id_.reset();
+            pending_filled_volume_ = 0.0;
+            pending_cost_sum_ = 0.0;
+            pending_last_price_ = 0.0;
+        }
+
+        // ê¸°ì¡´ ë³µêµ¬ ë¡œì§
         if (state_ == State::Flat && hasMeaningfulPos)
         {
-            // restart/partial-exit/dust »óÈ²¿¡¼­ "½ÇÁ¦ º¸À¯"¸¦ ±âÁØÀ¸·Î InPosition º¹±¸
+            // restart/partial-exit/dust ìƒí™©ì—ì„œ "ì‹¤ì œ ë³´ìœ "ë¥¼ ê¸°ì¤€ìœ¼ë¡œ InPosition ë³µêµ¬
             state_ = State::InPosition;
         }
         else if (state_ == State::InPosition && !hasMeaningfulPos)
         {
-            // ÆÈ ¼ö ¾ø´Â dust¸é Flat Ãë±ŞÇØ¼­ °íÂø ¹æÁö
+            // íŒ” ìˆ˜ ì—†ëŠ” dustë©´ Flat ì·¨ê¸‰í•´ì„œ ê³ ì°© ë°©ì§€
             state_ = State::Flat;
             entry_price_.reset();
             stop_price_.reset();
@@ -158,13 +196,13 @@ namespace trading::strategies {
         }
         // -----------------------------------------------------------
 
-        // 2) »óÅÂ¿¡ µû¶ó ¡°ÁøÀÔ¡± ¶Ç´Â ¡°Ã»»ê¡± ÆÇ´Ü
+        // 2) ìƒíƒœì— ë”°ë¼ â€œì§„ì…â€ ë˜ëŠ” â€œì²­ì‚°â€ íŒë‹¨
         switch (state_) {
         case State::Flat:
             return maybeEnter(s, account);
 
         case State::PendingEntry:
-            // ÁÖ¹® ³Ö°í Ã¼°á ´ë±â Áß¿¡´Â Ãß°¡ ÁÖ¹® ±İÁö
+            // ì£¼ë¬¸ ë„£ê³  ì²´ê²° ëŒ€ê¸° ì¤‘ì—ëŠ” ì¶”ê°€ ì£¼ë¬¸ ê¸ˆì§€
             return Decision::noAction();
 
         case State::InPosition:
@@ -183,14 +221,14 @@ namespace trading::strategies {
         Snapshot s{};
         s.close = static_cast<double>(c.close_price);
 
-        // --- ÁöÇ¥ ¾÷µ¥ÀÌÆ®(ÇÙ½É: ¡°ÇÑ ºÀ¿¡ ÇÑ ¹ø¾¿¡± update) ---
+        // --- ì§€í‘œ ì—…ë°ì´íŠ¸(í•µì‹¬: â€œí•œ ë´‰ì— í•œ ë²ˆì”©â€ update) ---
         s.rsi = rsi_.update(c);
         s.closeN = closeN_.update(c);
         s.volatility = vol_.update(c);
 
 
 
-        // --- ÆÄ»ı ÇÊÅÍ: trendStrength = abs(close - closeN) / closeN ---
+        // --- íŒŒìƒ í•„í„°: trendStrength = abs(close - closeN) / closeN ---
         if (s.closeN.ready && s.closeN.v != 0.0) {
             s.trendReady = true;
             s.trendStrength = std::abs(s.close - s.closeN.v) / s.closeN.v;
@@ -200,80 +238,80 @@ namespace trading::strategies {
             s.trendStrength = 0.0;
         }
 
-        // --- ½ÃÀå ÀûÇÕ¼º ÆÇ´Ü(ÇÊÅÍ Á¾ÇÕ) ---
-        // 1) Ãß¼¼°¡ ³Ê¹« °­ÇÏ¸é Æò±ÕÈ¸±Í°¡ ¡°¿ªÃß¼¼ Àâ±â¡±°¡ µÇ¾î À§ÇèÇØÁü -> ¹èÁ¦
+        // --- ì‹œì¥ ì í•©ì„± íŒë‹¨(í•„í„° ì¢…í•©) ---
+        // 1) ì¶”ì„¸ê°€ ë„ˆë¬´ ê°•í•˜ë©´ í‰ê· íšŒê·€ê°€ â€œì—­ì¶”ì„¸ ì¡ê¸°â€ê°€ ë˜ì–´ ìœ„í—˜í•´ì§ -> ë°°ì œ
         const bool trendOk = s.trendReady ? (s.trendStrength <= params_.maxTrendStrength) : false;
 
-        // 2) º¯µ¿¼ºÀÌ ³Ê¹« ³·À¸¸é ¡°¿òÁ÷ÀÓÀÌ ¾øÀ½¡± -> ¸ñÇ¥/¼ÕÀı µµ´ŞÀÌ ¾î·Á¿ò -> ¹èÁ¦
-        // ChangeVolatilityIndicator´Â ¡°¼öÀÍ·ü(ÆÛ¼¾Æ® º¯È­À²) Ç¥ÁØÆíÂ÷¡±¸¦ ¹İÈ¯ÇÏ¹Ç·Î
-        // minVolatility=0.01 Àº ¡°´ë·« 1% ¼öÁØ¡± ±âÁØÀ¸·Î ÇØ¼® °¡´É
+        // 2) ë³€ë™ì„±ì´ ë„ˆë¬´ ë‚®ìœ¼ë©´ â€œì›€ì§ì„ì´ ì—†ìŒâ€ -> ëª©í‘œ/ì†ì ˆ ë„ë‹¬ì´ ì–´ë ¤ì›€ -> ë°°ì œ
+        // ChangeVolatilityIndicatorëŠ” â€œìˆ˜ìµë¥ (í¼ì„¼íŠ¸ ë³€í™”ìœ¨) í‘œì¤€í¸ì°¨â€ë¥¼ ë°˜í™˜í•˜ë¯€ë¡œ
+        // minVolatility=0.01 ì€ â€œëŒ€ëµ 1% ìˆ˜ì¤€â€ ê¸°ì¤€ìœ¼ë¡œ í•´ì„ ê°€ëŠ¥
         const bool volOk = s.volatility.ready ? (s.volatility.v >= params_.minVolatility) : false;
 
-        // 3) RSI ÁØºñ ¿©ºÎµµ Æ÷ÇÔ(ÁØºñ ¾È µÈ »óÅÂ¸é ÁøÀÔ/Ã»»ê ÆÇ´Ü ÀÚÃ¼¸¦ À¯¿¹ÇÏ´Â°Ô ¾ÈÀü)
+        // 3) RSI ì¤€ë¹„ ì—¬ë¶€ë„ í¬í•¨(ì¤€ë¹„ ì•ˆ ëœ ìƒíƒœë©´ ì§„ì…/ì²­ì‚° íŒë‹¨ ìì²´ë¥¼ ìœ ì˜ˆí•˜ëŠ”ê²Œ ì•ˆì „)
         const bool rsiOk = s.rsi.ready;
 
         s.marketOk = (trendOk && volOk && rsiOk);
 
-        // ¸¶Áö¸· ½º³À¼¦ ÀúÀå (Å×½ºÆ®¿¡¼­ RSI¸¦ ¿©±â¼­ ÀĞ°Ô µÊ)
+        // ë§ˆì§€ë§‰ ìŠ¤ëƒ…ìƒ· ì €ì¥ (í…ŒìŠ¤íŠ¸ì—ì„œ RSIë¥¼ ì—¬ê¸°ì„œ ì½ê²Œ ë¨)
         last_snapshot_ = s;
         return s;
     }
 
     Decision RsiMeanReversionStrategy::maybeEnter(const Snapshot& s, const AccountSnapshot& account)
     {
-        // °èÁÂ¿¡ ¸Å¼öÇÒ KRW°¡ ¾øÀ¸¸é ÁøÀÔ ºÒ°¡
+        // ê³„ì¢Œì— ë§¤ìˆ˜í•  KRWê°€ ì—†ìœ¼ë©´ ì§„ì… ë¶ˆê°€
         if (!account.canBuy())
             return Decision::noAction();
 
-        // ½º³À¼¦ÀÌ ¡°½ÃÀå ÀûÇÕ¼º OK¡±°¡ ¾Æ´Ï¸é ´ë±â
+        // ìŠ¤ëƒ…ìƒ·ì´ â€œì‹œì¥ ì í•©ì„± OKâ€ê°€ ì•„ë‹ˆë©´ ëŒ€ê¸°
         if (!s.marketOk)
             return Decision::noAction();
 
-        // RSI Æò±ÕÈ¸±Í ÁøÀÔ Á¶°Ç(¿¹: oversold ÀÌÇÏ)
+        // RSI í‰ê· íšŒê·€ ì§„ì… ì¡°ê±´(ì˜ˆ: oversold ì´í•˜)
         if (!(s.rsi.v <= params_.oversold))
             return Decision::noAction();
 
-        // ½ÇÁ¦ ¸Å¼ö ±İ¾× = krw_available * riskPercent
+        // ì‹¤ì œ ë§¤ìˆ˜ ê¸ˆì•¡ = krw_available * riskPercent
         const double pct = std::clamp(params_.riskPercent, 0.0, 100.0);
         const double krw_to_use = account.krw_available * (pct / 100.0);
 
-        if (krw_to_use < kMinNotionalKrw) 
+        if (krw_to_use < util::AppConfig::instance().strategy.min_notional_krw)
             return Decision::noAction();
 
-        // ³Ê¹« ÀÛÀº ÁÖ¹® ¹æÁö(µ¥¸ğ/½Ç°Å·¡ °øÅëÀ¸·Î ¡°ÀÇ¹Ì ¾ø´Â ÁÖ¹®¡± ¹æÁö)
+        // ë„ˆë¬´ ì‘ì€ ì£¼ë¬¸ ë°©ì§€(ë°ëª¨/ì‹¤ê±°ë˜ ê³µí†µìœ¼ë¡œ â€œì˜ë¯¸ ì—†ëŠ” ì£¼ë¬¸â€ ë°©ì§€)
         if (krw_to_use <= 0.0)
             return Decision::noAction();
 
-        // ÁÖ¹® »ı¼º
+        // ì£¼ë¬¸ ìƒì„±
         const std::string cid = makeIdentifier("entry");
-        core::OrderRequest req = makeMarketBuyByAmount(krw_to_use, "entry"); // ¿ì¼± ½ÃÀå°¡·Î
+        core::OrderRequest req = makeMarketBuyByAmount(krw_to_use, "entry"); // ìš°ì„  ì‹œì¥ê°€ë¡œ
         req.identifier = cid;
 
-        // ÀÌ ÁÖ¹®¿¡ ´ëÇÑ ºÎºĞ Ã¼°á ´©ÀûÀ» »õ·Î ½ÃÀÛ
+        // ì´ ì£¼ë¬¸ì— ëŒ€í•œ ë¶€ë¶„ ì²´ê²° ëˆ„ì ì„ ìƒˆë¡œ ì‹œì‘
         pending_filled_volume_ = 0.0;
         pending_cost_sum_ = 0.0;
         pending_last_price_ = 0.0;
 
-        // »óÅÂ ÀüÀÌ: Flat -> PendingEntry
+        // ìƒíƒœ ì „ì´: Flat -> PendingEntry
         state_ = State::PendingEntry;
         pending_client_id_ = cid;
 
-        // entry °¡°İÀº onFill¿¡¼­ ´©ÀûÇÏ°í, ÃÖÁ¾ È®Á¤Àº onOrderUpdate(Filled)¿¡¼­
+        // entry ê°€ê²©ì€ onFillì—ì„œ ëˆ„ì í•˜ê³ , ìµœì¢… í™•ì •ì€ onOrderUpdate(Filled)ì—ì„œ
         return Decision::submit(std::move(req));
     }
 
     Decision RsiMeanReversionStrategy::maybeExit(const Snapshot& s, const AccountSnapshot& account)
     {
-        // º¸À¯ ¼ö·®ÀÌ ¾øÀ¸¸é(È¤Àº ½º³À¼¦ ºÒÀÏÄ¡) ¾ÈÀüÇÏ°Ô FlatÀ¸·Î º¹±Í½ÃÅ°´Â °Íµµ ¹æ¹ıÀÌÁö¸¸,
-        // ¿©±â¼­´Â ¡°Ã»»ê ÁÖ¹® ºÒ°¡¡±·Î¸¸ Ã³¸®
+        // ë³´ìœ  ìˆ˜ëŸ‰ì´ ì—†ìœ¼ë©´(í˜¹ì€ ìŠ¤ëƒ…ìƒ· ë¶ˆì¼ì¹˜) ì•ˆì „í•˜ê²Œ Flatìœ¼ë¡œ ë³µê·€ì‹œí‚¤ëŠ” ê²ƒë„ ë°©ë²•ì´ì§€ë§Œ,
+        // ì—¬ê¸°ì„œëŠ” â€œì²­ì‚° ì£¼ë¬¸ ë¶ˆê°€â€ë¡œë§Œ ì²˜ë¦¬
         if (!account.canSell())
             return Decision::noAction();
 
-        // ------------------------ Ã»»ê Á¶°Ç ------------------------
-        // 1. °ú¸Å¼ö ½ÅÈ£
+        // ------------------------ ì²­ì‚° ì¡°ê±´ ------------------------
+        // 1. ê³¼ë§¤ìˆ˜ ì‹ í˜¸
         const bool rsiExit = (s.rsi.ready && (s.rsi.v >= params_.overbought));
 
-        // RSI ±â¹İ Ã»»êÀº Çã¿ëÇØ¼­ InPosition °íÂøÀ» ¹æÁö
+        // RSI ê¸°ë°˜ ì²­ì‚°ì€ í—ˆìš©í•´ì„œ InPosition ê³ ì°©ì„ ë°©ì§€
         if (!entry_price_.has_value() || !stop_price_.has_value() || !target_price_.has_value())
         {
             if (!rsiExit)
@@ -283,10 +321,10 @@ namespace trading::strategies {
         {
             const double close = s.close;
 
-            // 2. ¼ÕÀı
+            // 2. ì†ì ˆ
             const bool hitStop = (close <= *stop_price_);
 
-            // 3. ÀÍÀı
+            // 3. ìµì ˆ
             const bool hitTarget = (close >= *target_price_);
 
             if (!(hitStop || hitTarget || rsiExit))
@@ -294,41 +332,41 @@ namespace trading::strategies {
         }
 
         const std::string cid = makeIdentifier("exit");
-        const double sellVol = std::max(0.0, account.coin_available - kVolumeSafetyEps);
-        if (sellVol * s.close < kMinNotionalKrw)
+        const double sellVol = std::max(0.0, account.coin_available - util::AppConfig::instance().strategy.volume_safety_eps);
+        if (sellVol * s.close < util::AppConfig::instance().strategy.min_notional_krw)
             return Decision::noAction();
 
         core::OrderRequest req = makeMarketSellByVolume(sellVol, "exit");
         req.identifier = cid;
 
-        // ÀÌ ÁÖ¹®¿¡ ´ëÇÑ ºÎºĞ Ã¼°á ´©ÀûÀ» »õ·Î ½ÃÀÛ
+        // ì´ ì£¼ë¬¸ì— ëŒ€í•œ ë¶€ë¶„ ì²´ê²° ëˆ„ì ì„ ìƒˆë¡œ ì‹œì‘
         pending_filled_volume_ = 0.0;
         pending_cost_sum_ = 0.0;
         pending_last_price_ = 0.0;
 
-        // »óÅÂ ÀüÀÌ: InPosition -> PendingExit
+        // ìƒíƒœ ì „ì´: InPosition -> PendingExit
         state_ = State::PendingExit;
         pending_client_id_ = cid;
 
         return Decision::submit(std::move(req));
     }
 
-    // ¡°ºÎºĞÃ¼°á ´ëÀÀ ÇÊ¿ä¡±
+    // â€œë¶€ë¶„ì²´ê²° ëŒ€ì‘ í•„ìš”â€
     void RsiMeanReversionStrategy::onFill(const FillEvent& fill)
     {
-        // 1) ¡°³»°¡ ³½ pending ÁÖ¹®¡±ÀÎÁö È®ÀÎ
+        // 1) â€œë‚´ê°€ ë‚¸ pending ì£¼ë¬¸â€ì¸ì§€ í™•ì¸
         if (!pending_client_id_.has_value())
             return;
 
         if (fill.identifier != *pending_client_id_)
             return;
 
-        // 2) ºÎºĞ/º¹¼ö Ã¼°á ´©Àû
-        // - FillEvent´Â ¿©·¯ ¹ø ¿Ã ¼ö ÀÖ°í, ÀÌ°Í¸¸À¸·Î ¿ÏÀü Ã¼°áÀ» º¸ÀåÇÏÁö ¾ÊÀ½
-        // - µû¶ó¼­ ¿©±â¼­´Â "´©Àû¸¸" ÇÏ°í, pending ÇØÁ¦/»óÅÂ È®Á¤Àº onOrderUpdate(Filled)¿¡¼­ ¼öÇàÇÑ´Ù.
+        // 2) ë¶€ë¶„/ë³µìˆ˜ ì²´ê²° ëˆ„ì 
+        // - FillEventëŠ” ì—¬ëŸ¬ ë²ˆ ì˜¬ ìˆ˜ ìˆê³ , ì´ê²ƒë§Œìœ¼ë¡œ ì™„ì „ ì²´ê²°ì„ ë³´ì¥í•˜ì§€ ì•ŠìŒ
+        // - ë”°ë¼ì„œ ì—¬ê¸°ì„œëŠ” "ëˆ„ì ë§Œ" í•˜ê³ , pending í•´ì œ/ìƒíƒœ í™•ì •ì€ onOrderUpdate(Filled)ì—ì„œ ìˆ˜í–‰í•œë‹¤.
         pending_last_price_ = fill.fill_price;
 
-        // ÀÏºÎ WS ±¸Çö/È¯°æ¿¡¼­´Â filled_volumeÀÌ 0À¸·Î ¿Ã ¼ö ÀÖ¾î ¹æ¾îÀûÀ¸·Î Ã³¸®
+        // ì¼ë¶€ WS êµ¬í˜„/í™˜ê²½ì—ì„œëŠ” filled_volumeì´ 0ìœ¼ë¡œ ì˜¬ ìˆ˜ ìˆì–´ ë°©ì–´ì ìœ¼ë¡œ ì²˜ë¦¬
         if (fill.filled_volume > 0.0) {
             pending_filled_volume_ += fill.filled_volume;
             pending_cost_sum_ += (fill.fill_price * fill.filled_volume);
@@ -337,9 +375,9 @@ namespace trading::strategies {
 
     void RsiMeanReversionStrategy::onOrderUpdate(const OrderStatusEvent& ev)
     {
-        // ÁÖ¹®»óÅÂ ÀÌº¥Æ®´Â Pending ÇØÁ¦/È®Á¤/·Ñ¹éÀÇ ±âÁØÁ¡
-        // - Rejected/Canceled: pendingÀ» Ç®°í ÀÌÀü »óÅÂ·Î ·Ñ¹é
-        // - Filled: ´©Àû Ã¼°á°ª(VWAP)À¸·Î entry/exit¸¦ ÃÖÁ¾ È®Á¤
+        // ì£¼ë¬¸ìƒíƒœ ì´ë²¤íŠ¸ëŠ” Pending í•´ì œ/í™•ì •/ë¡¤ë°±ì˜ ê¸°ì¤€ì 
+        // - Rejected/Canceled: pendingì„ í’€ê³  ì´ì „ ìƒíƒœë¡œ ë¡¤ë°±
+        // - Filled: ëˆ„ì  ì²´ê²°ê°’(VWAP)ìœ¼ë¡œ entry/exitë¥¼ ìµœì¢… í™•ì •
 
         if (!pending_client_id_.has_value())
             return;
@@ -347,9 +385,10 @@ namespace trading::strategies {
         if (ev.identifier != *pending_client_id_)
             return;
 
-        // 1) ½ÇÆĞ/Ãë¼Ò: pending ÇØÁ¦ + ·Ñ¹é
+        // 1) ì‹¤íŒ¨/ì·¨ì†Œ: pending í•´ì œ + ë¡¤ë°±
         if (ev.status == core::OrderStatus::Rejected || ev.status == core::OrderStatus::Canceled) 
         {
+
             if (pending_filled_volume_ <= 0.0)
             {
                 if (state_ == State::PendingEntry)
@@ -369,19 +408,20 @@ namespace trading::strategies {
             }
             else
             {
-                // cancel after trade: "½ÇÁúÀûÀ¸·Î Ã¼°á ¹ß»ı" -> È®Á¤ Ã³¸®
-                const double vwap = pending_cost_sum_ / pending_filled_volume_;
+                // cancel after trade: "ì‹¤ì§ˆì ìœ¼ë¡œ ì²´ê²° ë°œìƒ" -> í™•ì • ì²˜ë¦¬
+                const double vwap = pending_cost_sum_ / pending_filled_volume_; // ì§€ê¸ˆê¹Œì§€ ë§¤ìˆ˜ëœ ê¸ˆì•¡
                 if (state_ == State::PendingEntry) {
                     entry_price_ = vwap;
                     setStopsFromEntry(*entry_price_);
+                    logEntryConfirmed_("cancel_after_trade", *entry_price_);
                     state_ = State::InPosition;
                 }
                 else if (state_ == State::PendingExit) {
-                    // ºÎºĞ Ã»»ê: ¼ö·® ÃßÀûÀº °èÁÂ ½º³À¼¦¿¡ ¸Ã±â°í InPosition À¯Áö
+                    // ë¶€ë¶„ ì²­ì‚°: ìˆ˜ëŸ‰ ì¶”ì ì€ ê³„ì¢Œ ìŠ¤ëƒ…ìƒ·ì— ë§¡ê¸°ê³  InPosition ìœ ì§€
                     state_ = State::InPosition;
                 }
 
-                // pendingÀ» ³¡³ÂÀ¸´Ï ¹İµå½Ã Á¤¸®ÇÏ°í Á¾·á
+                // pendingì„ ëëƒˆìœ¼ë‹ˆ ë°˜ë“œì‹œ ì •ë¦¬í•˜ê³  ì¢…ë£Œ
                 pending_client_id_.reset();
                 pending_filled_volume_ = 0.0;
                 pending_cost_sum_ = 0.0;
@@ -390,27 +430,28 @@ namespace trading::strategies {
             }
         }
 
-        // 2) ¿ÏÀü Ã¼°á: pending ÇØÁ¦ + »óÅÂ È®Á¤
+        // 2) ì™„ì „ ì²´ê²°: pending í•´ì œ + ìƒíƒœ í™•ì •
         if (ev.status == core::OrderStatus::Filled) 
         {
-            // Æò±Õ Ã¼°á°¡(VWAP). ´©Àû ¼ö·®ÀÌ ¾øÀ¸¸é ¸¶Áö¸· °¡°İÀ» Æú¹éÀ¸·Î »ç¿ë
+            // í‰ê·  ì²´ê²°ê°€(VWAP). ëˆ„ì  ìˆ˜ëŸ‰ì´ ì—†ìœ¼ë©´ ë§ˆì§€ë§‰ ê°€ê²©ì„ í´ë°±ìœ¼ë¡œ ì‚¬ìš©
             const double final_price = (pending_filled_volume_ > 0.0)
                 ? (pending_cost_sum_ / pending_filled_volume_)
                 : pending_last_price_;
 
             if (state_ == State::PendingEntry) 
             {
-                // ÁøÀÔ È®Á¤
+                // ì§„ì… í™•ì •
                 if (final_price > 0.0) 
                 {
                     entry_price_ = final_price;
                     setStopsFromEntry(*entry_price_);
+                    logEntryConfirmed_("cancel_after_trade", *entry_price_);
                 }
                 state_ = State::InPosition;
             }
             else if (state_ == State::PendingExit) 
             {
-                // Ã»»ê È®Á¤
+                // ì²­ì‚° í™•ì •
                 state_ = State::Flat;
                 entry_price_.reset();
                 stop_price_.reset();
@@ -424,19 +465,19 @@ namespace trading::strategies {
             return;
         }
 
-        // Open/Pending/New µîÀÇ »óÅÂ´Â ±×´ë·Î À¯ÁöÇÑ´Ù.
-        // - »óÅÂ º¯È­´Â Filled/Canceled/Rejected¿¡¼­¸¸ È®Á¤
+        // Open/Pending/New ë“±ì˜ ìƒíƒœëŠ” ê·¸ëŒ€ë¡œ ìœ ì§€í•œë‹¤.
+        // - ìƒíƒœ ë³€í™”ëŠ” Filled/Canceled/Rejectedì—ì„œë§Œ í™•ì •
     };
 
     void RsiMeanReversionStrategy::onSubmitFailed()
     {
-        // ¿£Áø submit(=ÁÖ¹® POST)ÀÌ ½ÇÆĞÇÏ¸é WS ÀÌº¥Æ®°¡ Àı´ë ¿ÀÁö ¾Ê´Â´Ù.
-        // µû¶ó¼­ Pending »óÅÂ°¡ ¿µ¿øÈ÷ Ç®¸®Áö ¾Êµµ·Ï, ¿©±â¼­ Áï½Ã ·Ñ¹éÇÑ´Ù.
+        // ì—”ì§„ submit(=ì£¼ë¬¸ POST)ì´ ì‹¤íŒ¨í•˜ë©´ WS ì´ë²¤íŠ¸ê°€ ì ˆëŒ€ ì˜¤ì§€ ì•ŠëŠ”ë‹¤.
+        // ë”°ë¼ì„œ Pending ìƒíƒœê°€ ì˜ì›íˆ í’€ë¦¬ì§€ ì•Šë„ë¡, ì—¬ê¸°ì„œ ì¦‰ì‹œ ë¡¤ë°±í•œë‹¤.
         //
-        // Á¤Ã¥(ÃÖ¼Ò º¯°æ):
-        // - PendingEntry: FlatÀ¸·Î º¹±Í
-        // - PendingExit : InPositionÀ¸·Î º¹±Í
-        // - ºÎºĞ Ã¼°áÀº "submit ½ÇÆĞ" ÄÉÀÌ½º¿¡¼­´Â ¹ß»ıÇÏÁö ¾Ê´Â´Ù°í °¡Á¤(POST ÀÚÃ¼°¡ ½ÇÆĞ)
+        // ì •ì±…(ìµœì†Œ ë³€ê²½):
+        // - PendingEntry: Flatìœ¼ë¡œ ë³µê·€
+        // - PendingExit : InPositionìœ¼ë¡œ ë³µê·€
+        // - ë¶€ë¶„ ì²´ê²°ì€ "submit ì‹¤íŒ¨" ì¼€ì´ìŠ¤ì—ì„œëŠ” ë°œìƒí•˜ì§€ ì•ŠëŠ”ë‹¤ê³  ê°€ì •(POST ìì²´ê°€ ì‹¤íŒ¨)
 
         if (!pending_client_id_.has_value())
             return;
@@ -450,7 +491,7 @@ namespace trading::strategies {
             state_ = State::InPosition;
         }
 
-        // pending ´©Àû°ª Á¤¸®(¾ÈÀü)
+        // pending ëˆ„ì ê°’ ì •ë¦¬(ì•ˆì „)
         pending_client_id_.reset();
         pending_filled_volume_ = 0.0;
         pending_cost_sum_ = 0.0;
@@ -460,7 +501,7 @@ namespace trading::strategies {
 
     void RsiMeanReversionStrategy::setStopsFromEntry(double entry)
     {
-        // ¼ÕÀı/ÀÍÀı %´Â ¡°ÁøÀÔ°¡ ±âÁØ ÆÛ¼¾Æ®¡±
+        // ì†ì ˆ/ìµì ˆ %ëŠ” â€œì§„ì…ê°€ ê¸°ì¤€ í¼ì„¼íŠ¸â€
         const double sl = std::max(0.0, params_.stopLossPct);
         const double tp = std::max(0.0, params_.profitTargetPct);
 
@@ -468,10 +509,25 @@ namespace trading::strategies {
         target_price_ = entry * (1.0 + tp / 100.0);
     }
 
+    void RsiMeanReversionStrategy::logEntryConfirmed_(std::string_view reason, double entry)
+    {
+        // entry í™•ì • ì‹œì ì—ë§Œ í˜¸ì¶œí•˜ëŠ” ë¡œê¹… í—¬í¼
+        // stop/targetì€ setStopsFromEntry()ê°€ ë¨¼ì € í˜¸ì¶œë˜ì–´ ê°’ì´ ì„¸íŒ…ë˜ì–´ ìˆì–´ì•¼ í•¨
+        const double stop = stop_price_.value_or(0.0);
+        const double target = target_price_.value_or(0.0);
+
+        util::Logger::instance().info("[Strategy][EntryConfirmed] reason=", reason,
+            " market=", market_,
+            " entry=", entry,
+            " stop=", stop,
+            " target=", target,
+            " (SL%=", params_.stopLossPct, ", TP%=", params_.profitTargetPct, ")");
+    }
+
     std::string RsiMeanReversionStrategy::makeIdentifier(std::string_view tag)
     {
-        // Àü·« ³»ºÎ À¯´ÏÅ© ID (demo/real °øÅë: client_order_id·Î ¸ÅÄª)
-        // ¿¹: "rsi_mean_reversion:KRW-BTC:entry:1"
+        // ì „ëµ ë‚´ë¶€ ìœ ë‹ˆí¬ ID (demo/real ê³µí†µ: client_order_idë¡œ ë§¤ì¹­)
+        // ì˜ˆ: "rsi_mean_reversion:KRW-BTC:entry:1"
         ++seq_;
 
         std::string cid;
@@ -495,14 +551,14 @@ namespace trading::strategies {
         req.position = core::OrderPosition::BID;
         req.type = core::OrderType::Market;
 
-        // BID(¸Å¼ö)´Â ¡°±İ¾×(Amount)¡± ±âÁØÀÌ ÀÚ¿¬½º·¯¿ò
+        // BID(ë§¤ìˆ˜)ëŠ” â€œê¸ˆì•¡(Amount)â€ ê¸°ì¤€ì´ ìì—°ìŠ¤ëŸ¬ì›€
         req.size = core::AmountSize{ krw_amount };
 
-        req.price.reset(); // ½ÃÀå°¡
+        req.price.reset(); // ì‹œì¥ê°€
         req.strategy_id = std::string(id());
         req.client_tag = std::string(tag);
 
-        // client_order_id´Â ¹Ù±ù¿¡¼­ »ı¼ºÇØ ÁÖÀÔ(»óÅÂ ÀüÀÌ¿Í ¸Â¹°¸®±â ¶§¹®)
+        // client_order_idëŠ” ë°”ê¹¥ì—ì„œ ìƒì„±í•´ ì£¼ì…(ìƒíƒœ ì „ì´ì™€ ë§ë¬¼ë¦¬ê¸° ë•Œë¬¸)
         req.identifier.clear();
         return req;
     }
@@ -514,10 +570,10 @@ namespace trading::strategies {
         req.position = core::OrderPosition::ASK;
         req.type = core::OrderType::Market;
 
-        // ASK(¸Åµµ)´Â ¡°¼ö·®(Volume)¡± ±âÁØÀÌ ÀÚ¿¬½º·¯¿ò
+        // ASK(ë§¤ë„)ëŠ” â€œìˆ˜ëŸ‰(Volume)â€ ê¸°ì¤€ì´ ìì—°ìŠ¤ëŸ¬ì›€
         req.size = core::VolumeSize{ volume };
 
-        req.price.reset(); // ½ÃÀå°¡
+        req.price.reset(); // ì‹œì¥ê°€
         req.strategy_id = std::string(id());
         req.client_tag = std::string(tag);
 

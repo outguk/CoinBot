@@ -1,7 +1,8 @@
-#include "RsiWilder.h"
+ï»¿#include "RsiWilder.h"
 
 namespace trading::indicators
 {
+	// lengthë¡œ ë¦¬ì…‹
 	void RsiWilder::reset(std::size_t length)
 	{
 		length_ = length;
@@ -29,37 +30,37 @@ namespace trading::indicators
 		out.ready = false;
 		out.v = 0.0;
 
-		// length==0ÀÌ¸é ÁöÇ¥ ºñÈ°¼º »óÅÂ(¾Æ¹«°Íµµ °è»êÇÏÁö ¾ÊÀ½)
+		// length==0ì´ë©´ ì§€í‘œ ë¹„í™œì„± ìƒíƒœ(ì•„ë¬´ê²ƒë„ ê³„ì‚°í•˜ì§€ ì•ŠìŒ)
 		if (length_ == 0)
 			return out;
 
-		// Ã¹ °¡°İÀº º¯È­·®(delta)À» ¸¸µé ¼ö ¾øÀ¸´Ï prev¸¸ ¼¼ÆÃÇÏ°í Á¾·á
+		// ì²« ê°€ê²©ì€ ë³€í™”ëŸ‰(delta)ì„ ë§Œë“¤ ìˆ˜ ì—†ìœ¼ë‹ˆ prevë§Œ ì„¸íŒ…í•˜ê³  ì¢…ë£Œ
 		if (!prev_price_.has_value())
 		{
 			prev_price_ = close_price;
 			return out;
 		}
 
-		// º¯È­·® °è»ê
+		// ë³€í™”ëŸ‰ ê³„ì‚°
 		const double delta = close_price - *prev_price_;
 		prev_price_ = close_price;
 
-		// gain/loss ºĞ¸® (loss´Â Àı´ë°ª·Î ÀúÀå)
+		// gain/loss ë¶„ë¦¬ (lossëŠ” ì ˆëŒ€ê°’ë¡œ ì €ì¥)
 		const double gain = (delta > 0.0) ? delta : 0.0;
 		const double loss = (delta < 0.0) ? (-delta) : 0.0;
 
-		// 1) seed ±¸°£: length°³ÀÇ º¯È­·®À» ¸ğ¾Æ ÃÊ±â Æò±Õ gain/loss¸¦ ¸¸µç´Ù.
+		// 1) seed êµ¬ê°„: lengthê°œì˜ ë³€í™”ëŸ‰ì„ ëª¨ì•„ ì´ˆê¸° í‰ê·  gain/lossë¥¼ ë§Œë“ ë‹¤.
 		if (seed_count_ < length_)
 		{
 			seed_gain_sum_ += gain;
 			seed_loss_sum_ += loss;
 			++seed_count_;
 
-			// seed°¡ ¾ÆÁ÷ ´ú Ã¡À¸¸é ready=false
+			// seedê°€ ì•„ì§ ëœ ì°¼ìœ¼ë©´ ready=false
 			if (seed_count_ < length_)
 				return out;
 
-			// seed ¿Ï·á: ÃÊ±â avgGain/avgLoss È®Á¤
+			// seed ì™„ë£Œ: ì´ˆê¸° avgGain/avgLoss í™•ì •
 			const double n = static_cast<double>(length_);
 			avg_gain_ = seed_gain_sum_ / n;
 			avg_loss_ = seed_loss_sum_ / n;
@@ -70,7 +71,7 @@ namespace trading::indicators
 			return out;
 		}
 
-		// 2) seed ÀÌÈÄ: Wilder smoothing
+		// 2) seed ì´í›„: Wilder smoothing
 		const double n = static_cast<double>(length_);
 		avg_gain_ = (avg_gain_ * (n - 1.0) + gain) / n;
 		avg_loss_ = (avg_loss_ * (n - 1.0) + loss) / n;
@@ -93,15 +94,15 @@ namespace trading::indicators
 
 	double RsiWilder::computeRsi(double avg_gain, double avg_loss) noexcept
 	{
-		// º¯È­°¡ ÀüÇô ¾ø´Â °æ¿ì(¿ÏÀü È¾º¸): Áß¸³°ª 50
+		// ë³€í™”ê°€ ì „í˜€ ì—†ëŠ” ê²½ìš°(ì™„ì „ íš¡ë³´): ì¤‘ë¦½ê°’ 50
 		if (avg_gain == 0.0 && avg_loss == 0.0)
 			return 50.0;
 
-		// ¼Õ½ÇÀÌ 0ÀÌ¸é RSI´Â 100(»ó½Â¸¸ Á¸Àç)
+		// ì†ì‹¤ì´ 0ì´ë©´ RSIëŠ” 100(ìƒìŠ¹ë§Œ ì¡´ì¬)
 		if (avg_loss == 0.0)
 			return 100.0;
 
-		// ÀÌµæÀÌ 0ÀÌ¸é RSI´Â 0(ÇÏ¶ô¸¸ Á¸Àç)
+		// ì´ë“ì´ 0ì´ë©´ RSIëŠ” 0(í•˜ë½ë§Œ ì¡´ì¬)
 		if (avg_gain == 0.0)
 			return 0.0;
 

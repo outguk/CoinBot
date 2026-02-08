@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include <cstddef>
 #include <optional>
@@ -13,31 +13,31 @@ namespace trading::indicators {
     /*
      * ChangeVolatilityIndicator
      *
-     * ¸ñÀû:
-     * - change(close)ÀÇ Ç¥ÁØÆíÂ÷(rolling stdev)¸¦ À¯ÁöÇÑ´Ù.
-     * - recentVolatility ÇÊÅÍÀÇ ÇÙ½É ÀÔ·ÂÀ¸·Î »ç¿ëÇÑ´Ù.
+     * ëª©ì :
+     * - change(close)ì˜ í‘œì¤€í¸ì°¨(rolling stdev)ë¥¼ ìœ ì§€í•œë‹¤.
+     * - recentVolatility í•„í„°ì˜ í•µì‹¬ ì…ë ¥ìœ¼ë¡œ ì‚¬ìš©í•œë‹¤.
      *
-     * change Á¤ÀÇ(±ÇÀå):
-     * - return r = (close - prevClose) / prevClose  (ÆÛ¼¾Æ® º¯È­À², ´ÜÀ§: ºñÀ²)
-     *   ¿¹: +1% -> 0.01
+     * change ì •ì˜(ê¶Œì¥):
+     * - return r = (close - prevClose) / prevClose  (í¼ì„¼íŠ¸ ë³€í™”ìœ¨, ë‹¨ìœ„: ë¹„ìœ¨)
+     *   ì˜ˆ: +1% -> 0.01
      *
-     * ·Ñ¸µ Ç¥ÁØÆíÂ÷ °è»ê:
-     * - ÃÖ±Ù window_°³ rÀ» À¯Áö
-     * - sum, sumsq¸¦ O(1)·Î °»½ÅÇÏ¿© ºĞ»ê/Ç¥ÁØÆíÂ÷ °è»ê
+     * ë¡¤ë§ í‘œì¤€í¸ì°¨ ê³„ì‚°:
+     * - ìµœê·¼ window_ê°œ rì„ ìœ ì§€
+     * - sum, sumsqë¥¼ O(1)ë¡œ ê°±ì‹ í•˜ì—¬ ë¶„ì‚°/í‘œì¤€í¸ì°¨ ê³„ì‚°
      *
-     * ready Á¶°Ç:
-     * - º¯È­À²À» ¸¸µé±â À§ÇØ prevClose°¡ ÇÊ¿ä (ÃÖ¼Ò 2°³ close)
-     * - ±×¸®°í º¯È­À² À©µµ¿ì(window_)°¡ ²Ë Â÷¾ß ready=true
+     * ready ì¡°ê±´:
+     * - ë³€í™”ìœ¨ì„ ë§Œë“¤ê¸° ìœ„í•´ prevCloseê°€ í•„ìš” (ìµœì†Œ 2ê°œ close)
+     * - ê·¸ë¦¬ê³  ë³€í™”ìœ¨ ìœˆë„ìš°(window_)ê°€ ê½‰ ì°¨ì•¼ ready=true
      */
     class ChangeVolatilityIndicator final {
     public:
         ChangeVolatilityIndicator() = default;
         explicit ChangeVolatilityIndicator(std::size_t window) { reset(window); }
 
-        // Ç¥ÁØÆíÂ÷ À©µµ¿ì Å©±â ¼³Á¤(=volatilityWindow)
+        // í‘œì¤€í¸ì°¨ ìœˆë„ìš° í¬ê¸° ì„¤ì •(=volatilityWindow)
         void reset(std::size_t window);
 
-        // À©µµ¿ì Å©±â´Â À¯ÁöÇÏ°í »óÅÂ¸¸ ÃÊ±âÈ­
+        // ìœˆë„ìš° í¬ê¸°ëŠ” ìœ ì§€í•˜ê³  ìƒíƒœë§Œ ì´ˆê¸°í™”
         void clear() noexcept;
 
         [[nodiscard]] std::size_t window() const noexcept { return window_; }
@@ -45,33 +45,33 @@ namespace trading::indicators {
 
         /*
          * update(close)
-         * - close·ÎºÎÅÍ º¯È­À² rÀ» ¸¸µé°í(ÀÌÀü close ÇÊ¿ä)
-         * - rÀÇ ·Ñ¸µ Ç¥ÁØÆíÂ÷¸¦ ¹İÈ¯
+         * - closeë¡œë¶€í„° ë³€í™”ìœ¨ rì„ ë§Œë“¤ê³ (ì´ì „ close í•„ìš”)
+         * - rì˜ ë¡¤ë§ í‘œì¤€í¸ì°¨ë¥¼ ë°˜í™˜
          */
         trading::Value<double> update(double close);
 
-        // Candle ±â¹İ ÆíÀÇ ÇÔ¼ö (close_price »ç¿ë)
+        // Candle ê¸°ë°˜ í¸ì˜ í•¨ìˆ˜ (close_price ì‚¬ìš©)
         trading::Value<double> update(const core::Candle& c);
 
-        // ÇöÀç Ç¥ÁØÆíÂ÷ Á¶È¸(»óÅÂ º¯È­ ¾øÀ½)
+        // í˜„ì¬ í‘œì¤€í¸ì°¨ ì¡°íšŒ(ìƒíƒœ ë³€í™” ì—†ìŒ)
         [[nodiscard]] trading::Value<double> value() const noexcept;
 
     private:
-        // Ç¥ÁØ ÆíÂ÷¸¦ ±¸ÇÒ ¶§ ¸î°³ÀÇ º¯È­À²À» »ç¿ëÇÒÁö(Ç¥º» ÁıÇÕ Å©±â)
+        // í‘œì¤€ í¸ì°¨ë¥¼ êµ¬í•  ë•Œ ëª‡ê°œì˜ ë³€í™”ìœ¨ì„ ì‚¬ìš©í• ì§€(í‘œë³¸ ì§‘í•© í¬ê¸°)
         std::size_t window_{ 0 };
 
-        // ÃÖ±Ù window_°³ ºÀÀÇ change(close) °ª(º¯È­À² r)À» ÀúÀå
+        // ìµœê·¼ window_ê°œ ë´‰ì˜ change(close) ê°’(ë³€í™”ìœ¨ r)ì„ ì €ì¥
         RingBuffer<double> returns_{};
 
-        // ·Ñ¸µ ÇÕ/Á¦°öÇÕ (ÃÖ±Ù W°³ rÀÇ ÇÕ°ú r^2ÀÇ ÇÕ) - Ç¥ÁØ ÆíÂ÷ °è»ê¿ë
+        // ë¡¤ë§ í•©/ì œê³±í•© (ìµœê·¼ Wê°œ rì˜ í•©ê³¼ r^2ì˜ í•©) - í‘œì¤€ í¸ì°¨ ê³„ì‚°ìš©
         double sum_{ 0.0 };
         double sumsq_{ 0.0 };
 
-        // º¯È­À² °è»êÀ» À§ÇÑ Á÷Àü Á¾°¡
+        // ë³€í™”ìœ¨ ê³„ì‚°ì„ ìœ„í•œ ì§ì „ ì¢…ê°€
         std::optional<double> prevClose_{};
 
     private:
-        // ³»ºÎ °è»ê: Ç¥ÁØÆíÂ÷(¸ğÁı´Ü ±âÁØ, ddof=0)
+        // ë‚´ë¶€ ê³„ì‚°: í‘œì¤€í¸ì°¨(ëª¨ì§‘ë‹¨ ê¸°ì¤€, ddof=0)
         [[nodiscard]] double stdev_() const noexcept;
     };
 

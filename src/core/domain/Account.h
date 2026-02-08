@@ -1,4 +1,4 @@
-// core/domain/Account.h
+ï»¿// core/domain/Account.h
 #pragma once
 
 #include <string>
@@ -9,21 +9,21 @@
 namespace core 
 {
 	/*
-	* °èÁÂ Á¤º¸
-	* »ç¿ëÀÚÀÇ ÀüÃ¼ ÀÚ»ê ÇöÈ²
-	* ÀÜ°í, ¿¹¼ö±İ, ÃÑ ÀÚ»ê °¡Ä¡ µî
+	* ê³„ì¢Œ ì •ë³´
+	* ì‚¬ìš©ìì˜ ì „ì²´ ìì‚° í˜„í™©
+	* ì”ê³ , ì˜ˆìˆ˜ê¸ˆ, ì´ ìì‚° ê°€ì¹˜ ë“±
 	*/
 
 	struct Account 
 	{
-		std::string				id = "inguk";			// °èÁÂ ID
+		std::string				id = "inguk";			// ê³„ì¢Œ ID
 
-		// ¿øÈ­ ÀÜ°í(°¡¿ë/Àá±è) - KRWÇà¿¡¼­ ¿À´Â ºÎºĞ µû·Î ¶§³¿
+		// ì›í™” ì”ê³ (ê°€ìš©/ì ê¹€) - KRWí–‰ì—ì„œ ì˜¤ëŠ” ë¶€ë¶„ ë”°ë¡œ ë•Œëƒ„
 		Amount krw_free{ 0 };
 		Amount krw_locked{ 0 };
 
-		std::vector<Position>	positions;				// º¸À¯ Æ÷Áö¼Ç(ÄÚÀÎ) ¸ñ·Ï
+		std::vector<Position>	positions;				// ë³´ìœ  í¬ì§€ì…˜(ì½”ì¸) ëª©ë¡
 
-		Amount					totalAssetValue = 0;	// ÃÑ ÀÚ»ê °¡Ä¡ (¿¹: ÀÜ°í + ¹ÌÃ¼°á ÁÖ¹® ±İ¾×)
+		Amount					totalAssetValue = 0;	// ì´ ìì‚° ê°€ì¹˜ (ì˜ˆ: ì”ê³  + ë¯¸ì²´ê²° ì£¼ë¬¸ ê¸ˆì•¡)
 	};
 }

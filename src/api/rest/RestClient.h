@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 #include "HttpTypes.h"
 #include "RestError.h"
 #include "RetryPolicy.h"
@@ -6,38 +6,39 @@
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/ssl/context.hpp>
 #include <variant>
+#include <chrono>
 
 /*
 * RestClient.h
-* RestClientÀÇ °ø¿ë ÀÎÅÍÆäÀÌ½º
+* RestClientì˜ ê³µìš© ì¸í„°í˜ì´ìŠ¤
 * 
 */
 
 
 namespace api::rest
 {
-	// ¿äÃ»¿¡ ¼º°øÇÏ¸é HttpResponse, ½ÇÆĞ ½Ã RestError
-	// - ¿¹¿Ü¸¦ ³²¹ßÇÏÁö ¾Ê°í È£ÃâÀÚ°¡ ºĞ±â Ã³¸® °¡´É
+	// ìš”ì²­ì— ì„±ê³µí•˜ë©´ HttpResponse, ì‹¤íŒ¨ ì‹œ RestError
+	// - ì˜ˆì™¸ë¥¼ ë‚¨ë°œí•˜ì§€ ì•Šê³  í˜¸ì¶œìê°€ ë¶„ê¸° ì²˜ë¦¬ ê°€ëŠ¥
 	using Result = std::variant< HttpResponse, RestError>;
 
 	class RestClient
 	{
 	public:
-		// io_context/ssl_context´Â ¾Û¿¡¼­ 1°³¸¦ ¸¸µé°í °øÀ¯ÇÏ´Â ±¸Á¶°¡ º¸Åë ¾ÈÁ¤Àû
-		// &¸¦ ÅëÇØ »ç¿ë¸¸ÇÏ°í ¼ÒÀ¯ x
+		// io_context/ssl_contextëŠ” ì•±ì—ì„œ 1ê°œë¥¼ ë§Œë“¤ê³  ê³µìœ í•˜ëŠ” êµ¬ì¡°ê°€ ë³´í†µ ì•ˆì •ì 
+		// &ë¥¼ í†µí•´ ì‚¬ìš©ë§Œí•˜ê³  ì†Œìœ  x
 		RestClient(boost::asio::io_context& ioc,
 			boost::asio::ssl::context& ssl_ctx);
 
-		// perform - Àç½Ãµµ¸¦ Æ÷ÇÔÇÑ "°í¼öÁØ" È£Ãâ
-		// RetryPolicy¸¦ ÆÄ¶ó¹ÌÅÍ·Î ¹Ş¾Æ È£Ãâ¸¶´Ù ´Ù¸£°Ô Àû¿ë °¡´É
+		// perform - ì¬ì‹œë„ë¥¼ í¬í•¨í•œ "ê³ ìˆ˜ì¤€" í˜¸ì¶œ
+		// RetryPolicyë¥¼ íŒŒë¼ë¯¸í„°ë¡œ ë°›ì•„ í˜¸ì¶œë§ˆë‹¤ ë‹¤ë¥´ê²Œ ì ìš© ê°€ëŠ¥
 		Result perform(const HttpRequest& req, const RetryPolicy& retry = {}) const;
 
 	private:
-		// performOnce - Àç½Ãµµ ¾ø´Â 1È¸ ½Ãµµ
-		// - ½ÇÁ¦ HTTPS ¿äÃ»/ÀÀ´ä Ã³¸®ÀÇ ÇÙ½É
+		// performOnce - ì¬ì‹œë„ ì—†ëŠ” 1íšŒ ì‹œë„
+		// - ì‹¤ì œ HTTPS ìš”ì²­/ì‘ë‹µ ì²˜ë¦¬ì˜ í•µì‹¬
 		Result performOnce(const HttpRequest& req) const;
 
-		// Àç½Ãµµ ÆÇ´Ü ·ÎÁ÷ ºĞ¸® (°¡µ¶¼º/Å×½ºÆ®¼º¡è)
+		// ì¬ì‹œë„ íŒë‹¨ ë¡œì§ ë¶„ë¦¬ (ê°€ë…ì„±/í…ŒìŠ¤íŠ¸ì„±â†‘)
 		static bool shouldRetryStatus(int status, const RetryPolicy& p) noexcept;
 		static bool shouldRetryError(const RestError& e, const RetryPolicy& p) noexcept;
 		static std::chrono::milliseconds nextDelay(std::chrono::milliseconds cur, double mult) noexcept;

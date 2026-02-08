@@ -1,4 +1,4 @@
-// engine/input/EngineInput.h
+ï»¿// engine/input/EngineInput.h
 #pragma once
 
 #include <string>
@@ -6,13 +6,13 @@
 
 namespace engine::input
 {
-    // WS¿¡¼­ ¹ŞÀº ¿ø¹®(myOrder)
+    // WSì—ì„œ ë°›ì€ ì›ë¬¸(myOrder)
     struct MyOrderRaw
     {
         std::string json;
     };
 
-    // WS¿¡¼­ ¹ŞÀº ¿ø¹®(candle µî ¸¶ÄÏµ¥ÀÌÅÍ) - Áö±İÀº candle¸¸ ¿¹½Ã·Î µÒ
+    // WSì—ì„œ ë°›ì€ ì›ë¬¸(candle ë“± ë§ˆì¼“ë°ì´í„°) - ì§€ê¸ˆì€ candleë§Œ ì˜ˆì‹œë¡œ ë‘ 
     struct MarketDataRaw
     {
         std::string json;

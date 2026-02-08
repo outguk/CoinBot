@@ -1,10 +1,10 @@
-#include "MyOrderEventBridge.h"
+ï»¿#include "MyOrderEventBridge.h"
 
 #include <iostream>
 
 namespace app {
 
-    // °£´ÜÇÑ left - trim(°ø¹é / ÅÇ / °³Çà)
+    // ê°„ë‹¨í•œ left - trim(ê³µë°± / íƒ­ / ê°œí–‰)
         std::string_view MyOrderEventBridge::trimLeft(std::string_view s) noexcept
     {
         while (!s.empty())
@@ -18,19 +18,19 @@ namespace app {
 
     bool MyOrderEventBridge::onWsMessage(std::string_view msg)
     {
-        // ¿©±â¿¡¼­´Â JSON ÆÄ½ÌÀ» ÇÏÁö ¾Ê°í type¸¸ ºü¸£°Ô °Ë»ç
+        // ì—¬ê¸°ì—ì„œëŠ” JSON íŒŒì‹±ì„ í•˜ì§€ ì•Šê³  typeë§Œ ë¹ ë¥´ê²Œ ê²€ì‚¬
         if (!isMyOrderMessage(msg))
             return false; // not myOrder => ignore
 
-        // À¯½Ç ºÒ°¡: ¿£Áø ½º·¹µå°¡ popÇØ¼­ Ã³¸®ÇÏµµ·Ï Å¥¿¡ ÀûÀç
-        // (¿£Áø ½º·¹µå¿¡¼­ ´Ü ÇÑ ¹ø¸¸ JSON ÆÄ½Ì + DTO º¯È¯)
+        // ìœ ì‹¤ ë¶ˆê°€: ì—”ì§„ ìŠ¤ë ˆë“œê°€ popí•´ì„œ ì²˜ë¦¬í•˜ë„ë¡ íì— ì ì¬
+        // (ì—”ì§„ ìŠ¤ë ˆë“œì—ì„œ ë‹¨ í•œ ë²ˆë§Œ JSON íŒŒì‹± + DTO ë³€í™˜)
         private_q_.push(engine::input::MyOrderRaw{ std::string(msg) });
         return true;
     }
 
     bool MyOrderEventBridge::isMyOrderMessage(std::string_view msg) noexcept
     {
-        // ÃÖ¼Ò ÇÊÅÍ: "type" + "myOrder" Æ÷ÇÔ ¿©ºÎ
+        // ìµœì†Œ í•„í„°: "type" + "myOrder" í¬í•¨ ì—¬ë¶€
         if (msg.find("\"type\"") == std::string_view::npos) return false;
         if (msg.find("myOrder") == std::string_view::npos) return false;
         return true;
@@ -50,7 +50,7 @@ namespace app {
     //    case S::Pending:
     //        return false;
     //    }
-    //    return false; // enum È®Àå ´ëºñ
+    //    return false; // enum í™•ì¥ ëŒ€ë¹„
     //}
 
 } // namespace app

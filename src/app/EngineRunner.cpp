@@ -1,4 +1,4 @@
-// app/EngineRunner.cpp
+ï»¿// app/EngineRunner.cpp
 #include "app/EngineRunner.h"
 
 #include <iostream>
@@ -10,9 +10,11 @@
 
 #include <json.hpp>
 
-// myOrder DTO/mapper´Â app¿¡¼­¸¸ »ç¿ë(°èÃş °æ°è)
+// myOrder DTO/mapperëŠ” appì—ì„œë§Œ ì‚¬ìš©(ê³„ì¸µ ê²½ê³„)
 #include "api/upbit/mappers/MyOrderMapper.h"
 #include "api/upbit/mappers/CandleMapper.h"
+
+#include "util/Logger.h"
 
 namespace app
 {
@@ -31,13 +33,13 @@ namespace app
             }
         }
 
-        // (1) ¾î¶² Å¸ÀÔÀÌ ostream(<<)À¸·Î Ãâ·Â °¡´ÉÇÑÁö Ã¼Å©
+        // (1) ì–´ë–¤ íƒ€ì…ì´ ostream(<<)ìœ¼ë¡œ ì¶œë ¥ ê°€ëŠ¥í•œì§€ ì²´í¬
         template <typename T>
         concept OStreamable = requires(std::ostream & os, const T & v) {
             { os << v } -> std::same_as<std::ostream&>;
         };
 
-        // (2) °ª ÇÏ³ª¸¦ ·Î±×¿ë ¹®ÀÚ¿­·Î ¹Ù²Ù±â
+        // (2) ê°’ í•˜ë‚˜ë¥¼ ë¡œê·¸ìš© ë¬¸ìì—´ë¡œ ë°”ê¾¸ê¸°
         template <typename T>
         static std::string toLogValue(const T& v)
         {
@@ -50,20 +52,20 @@ namespace app
                 return std::to_string(v);
             }
             else {
-                // Price/VolumeÀÌ ·¡ÆÛ¶ó << µµ ¾È µÇ°í »ê¼úµµ ¾Æ´Ï¸é ¿©±â·Î ¿Â´Ù.
-                // ÀÌ °æ¿ì¿£ ¡°ÇÁ·ÎÁ§Æ® Å¸ÀÔ¿¡ ¸ÂÃá Æ¯¼öÈ­¡±¸¦ ¾Æ·¡¿¡ Ãß°¡ÇÏ¸é µÈ´Ù.
+                // Price/Volumeì´ ë˜í¼ë¼ << ë„ ì•ˆ ë˜ê³  ì‚°ìˆ ë„ ì•„ë‹ˆë©´ ì—¬ê¸°ë¡œ ì˜¨ë‹¤.
+                // ì´ ê²½ìš°ì—” â€œí”„ë¡œì íŠ¸ íƒ€ì…ì— ë§ì¶˜ íŠ¹ìˆ˜í™”â€ë¥¼ ì•„ë˜ì— ì¶”ê°€í•˜ë©´ ëœë‹¤.
                 return "<non-streamable>";
             }
         }
 
-        // (3) optionalÀ» ·Î±×¿ë ¹®ÀÚ¿­·Î ¹Ù²Ù±â
+        // (3) optionalì„ ë¡œê·¸ìš© ë¬¸ìì—´ë¡œ ë°”ê¾¸ê¸°
         template <typename T>
         static std::string optToLog(const std::optional<T>& opt, std::string_view none = "<none>")
         {
             return opt ? toLogValue(*opt) : std::string(none);
         }
 
-        // OrderSize¸¦ ·Î±×¿ë ¹®ÀÚ¿­·Î º¯È¯
+        // OrderSizeë¥¼ ë¡œê·¸ìš© ë¬¸ìì—´ë¡œ ë³€í™˜
         static std::string orderSizeToLog(const core::OrderSize& size)
         {
             return std::visit([](const auto& s) -> std::string {
@@ -99,14 +101,14 @@ namespace app
 
     void EngineRunner::rebuildAccountSnapshot_()
     {
-        // ¿£ÁøÀÌ À¯Áö/°»½ÅÇÏ´Â core::Account¿¡¼­ ÇÊ¿äÇÑ °ª¸¸ »Ì¾Æ¼­
-        //    trading::AccountSnapshot ÇüÅÂ·Î "¾è°Ô" Ä³½ÌÇÑ´Ù.
+        // ì—”ì§„ì´ ìœ ì§€/ê°±ì‹ í•˜ëŠ” core::Accountì—ì„œ í•„ìš”í•œ ê°’ë§Œ ë½‘ì•„ì„œ
+        //    trading::AccountSnapshot í˜•íƒœë¡œ "ì–•ê²Œ" ìºì‹±í•œë‹¤.
         last_account_.krw_available = static_cast<double>(account_.krw_free);
 
         const std::string cur = extractCurrency_(market_);
         double coin = 0.0;
 
-        // positions¿¡¼­ ÇØ´ç currency¸¦ Ã£¾Æ balance¸¦ coin_available·Î »ç¿ë
+        // positionsì—ì„œ í•´ë‹¹ currencyë¥¼ ì°¾ì•„ balanceë¥¼ coin_availableë¡œ ì‚¬ìš©
         for (const auto& p : account_.positions)
         {
             if (p.currency == cur)
@@ -124,14 +126,14 @@ namespace app
 
         while (!stop_flag.load(std::memory_order_relaxed))
         {
-            // ¹«±âÇÑ ºí·ÎÅ· ´ë½Å "Âª°Ô ´ë±â" ÈÄ ±ú¾î³ª stop_flag¸¦ ÀçÈ®ÀÎ
+            // ë¬´ê¸°í•œ ë¸”ë¡œí‚¹ ëŒ€ì‹  "ì§§ê²Œ ëŒ€ê¸°" í›„ ê¹¨ì–´ë‚˜ stop_flagë¥¼ ì¬í™•ì¸
             auto maybe = private_q_.pop_for(200ms);
 
             if (maybe.has_value())
                 handleOne_(*maybe);
 
-            // ¿£ÁøÀÌ ½×¾ÆµĞ ÀÌº¥Æ®¸¦ Àü·«À¸·Î Àü´Ş
-            // (Ç×»ó ¿£Áø ½º·¹µå¿¡¼­¸¸ poll)
+            // ì—”ì§„ì´ ìŒ“ì•„ë‘” ì´ë²¤íŠ¸ë¥¼ ì „ëµìœ¼ë¡œ ì „ë‹¬
+            // (í•­ìƒ ì—”ì§„ ìŠ¤ë ˆë“œì—ì„œë§Œ poll)
             auto out = engine_.pollEvents();
             if (!out.empty())
                 handleEngineEvents_(out);
@@ -146,165 +148,155 @@ namespace app
 
                 if constexpr (std::is_same_v<T, engine::input::MyOrderRaw>)
                 {
-                    const nlohmann::json j = nlohmann::json::parse(x.json, nullptr, false);
-                    if (j.is_discarded())
-                    {
-                        std::cout << "[EngineRunner] myOrder JSON parse failed\n";
-                        return;
-                    }
-
-                    // 1) JSON -> DTO
-                    api::upbit::dto::UpbitMyOrderDto dto{};
-                    try
-                    {
-                        dto = j.get<api::upbit::dto::UpbitMyOrderDto>();
-                    }
-                    catch (const std::exception& e)
-                    {
-                        std::cout << "[EngineRunner] myOrder dto convert failed: " << e.what() << "\n";
-                        return;
-                    }
-
-                    // 2) DTO -> (Order snapshot, MyTrade) ÀÌº¥Æ® ºĞÇØ
-                    const auto events = api::upbit::mappers::toEvents(dto);
-
-                    // 3) ¿£Áø »óÅÂ ¹İ¿µ (¿£Áø ´ÜÀÏ ¼ÒÀ¯±Ç: ¿©±â¼­¸¸ È£Ãâ)
-                    for (const auto& ev : events)
-                    {
-                        if (std::holds_alternative<core::Order>(ev))
-                        {
-                            const auto& o = std::get<core::Order>(ev);
-                            engine_.onOrderSnapshot(o);
-
-                            // [DBG] ³»°¡ ³ÖÀº ÁÖ¹®ÀÇ »óÅÂ º¯È­
-                            std::cout << "[Runner][OrderEvent] snapshot status=" 
-                                << static_cast<int>(o.status)
-                                << " uuid=" << o.id
-                                //<< " ident=" << optToLog(o.identifier)
-                                << "\n";
-
-                            // terminal ÆÇÁ¤/¹ßÇàÀº ¿£Áø(onOrderSnapshot)¿¡¼­ Ã¥ÀÓÁø´Ù.
-                        }
-                        else
-                        {
-                            const auto& t = std::get<core::MyTrade>(ev);
-                            engine_.onMyTrade(t);
-
-                            // [DBG] ½ÇÁ¦ Ã¼°á ¹ß»ı½Ã
-                            std::cout << "[Runner][TradeEvent]"
-                                //<< "trade_id = " << t.trade_id
-                                << " uuid=" << t.order_id
-                                << " price=" << t.price
-                                << " vol=" << t.volume
-                                //<< " ident=" << optToLog(t.identifier)
-                                << "\n";
-                        }
-                    }
-                    rebuildAccountSnapshot_();
-                    std::cout << "[Runner][Account] krw=" << last_account_.krw_available
-                        << " coin=" << last_account_.coin_available << "\n";
+                    handleMyOrder_(x);
                 }
                 else if constexpr (std::is_same_v<T, engine::input::MarketDataRaw>)
                 {
-                    // Äµµé/¸¶ÄÏµ¥ÀÌÅÍ´Â ¿£Áø ½º·¹µå¿¡¼­¸¸ JSON ÆÄ½Ì (Áßº¹ ÆÄ½Ì ¹æÁö ¹æÇâ)
-                    const nlohmann::json j = nlohmann::json::parse(x.json, nullptr, false);
-                    if (j.is_discarded())
-                    {
-                        std::cout << "[EngineRunner] MarketData JSON parse failed\n";
-                        return;
-                    }
-
-                    // type È®ÀÎ: candle.{unit} ÇüÅÂ(¿¹: "candle.1s", "candle.3", ...)
-                    const std::string type = j.value("type", "");
-                    if (type.rfind("candle", 0) != 0)
-                    {
-                        // Áö±İ ´Ü°è¿¡¼­´Â candle¸¸ Ã³¸®.
-                        // ticker/orderbook µîÀº ÃßÈÄ È®Àå Æ÷ÀÎÆ®·Î ³²±è.
-                        return;
-                    }
-
-                    // 1) JSON -> Candle DTO
-                    api::upbit::dto::CandleDto_Minute candleDto{};
-                    try
-                    {
-                        candleDto = j.get<api::upbit::dto::CandleDto_Minute>();
-                    }
-                    catch (const std::exception& e)
-                    {
-                        std::cout << "[EngineRunner] candle dto convert failed: " << e.what() << "\n";
-                        return;
-                    }
-
-                    // 2) DTO -> core::Candle (µµ¸ŞÀÎ ¿À¿° ¹æÁö: json ±¸Á¶¸¦ µµ¸ŞÀÎ¿¡ ³ÖÁö ¾ÊÀ½)
-                    const core::Candle candle = api::upbit::mappers::toDomain(candleDto);
-
-                    // °°Àº market¿¡¼­ °°Àº 1ºĞ(ts) ÄµµéÀÌ ¹İº¹µÇ¸é Á¶¿ëÈ÷ ¹«½Ã
-                    static std::unordered_map<std::string, std::string> last_ts_by_market;
-
-                    auto& last_ts = last_ts_by_market[candle.market];
-                    if (!last_ts.empty() && last_ts == candle.start_timestamp)
-                    {
-                        // Áßº¹ ¾÷µ¥ÀÌÆ®´Â µå·Ó (¼º´É + ·Î±× ½ºÆÔ ¹æÁö)
-                        return;
-                    }
-                    last_ts = candle.start_timestamp;
-
-                    // Äµµé ¼ö½Å + Àü·« ÁøÀÔ È®ÀÎ¿ë ·Î±×
-                    std::cout 
-                        <<"\n"
-                        << "[Runner][Candle] market=" << candle.market
-                        << " ts=" << candle.start_timestamp
-                        << " close=" << candle.close_price
-                        ;
-
-                    // 3) Àü·« ½ÇÇà (RSI). account´Â Ä³½ÃµÈ ÃÖ½Å ½º³À¼¦À» »ç¿ëÇÑ´Ù.
-                    const trading::Decision d = strategy_.onCandle(candle, last_account_);
-
-                    // Àü·«¿¡ »óÅÂ ÀÌ»óÀ¯¹« È®ÀÎ ·Î±×
-                    std::cout 
-                        << "\n"
-                        << "[Runner][Strategy] state="
-                        << toStringState(strategy_.state())
-                        << "\n"
-                        << "\n"
-                        ;
-
-
-                    // 4) ÁÖ¹® ÀÇµµ°¡ ÀÖÀ¸¸é ¿£Áø¿¡ submit (½ÃÀå°¡ ÀüÁ¦)
-                    if (d.hasOrder())
-                    {
-                        const auto& req = *d.order;
-
-                        // ÁÖ¹® »ı¼º È®ÀÎ ·Î±× (½Äº°ÀÚ/side/¼ö·®/°¡°İ)
-                        std::cout << "[Runner][Decision] ÁÖ¹® »ı¼º"
-                            << " side=" << (d.order->position == core::OrderPosition::BID ? "BUY" : "SELL")
-                            //<< " ident=" << d.order->identifier
-                            << " vol=" << orderSizeToLog(d.order->size)
-                            << "\n";
-
-                        const auto r = engine_.submit(req);
-
-                        // ÄÉÀÌ½º A: submitÀÌ ½ÇÆĞÇß´Âµ¥ Runner°¡ ¹«½ÃÇØ¼­ Àü·«¸¸ PendingEntry°¡ µÊ
-                        std::cout << "[Runner][Submit] success=" << r.success
-                            << " code=" << static_cast<int>(r.code)
-                            << " hasOrder=" << r.order.has_value()
-                            << " msg=" << r.message
-                            << "\n";
-
-                        if (!r.success)
-                        {
-                            std::cout << "[Runner][Submit] FAILED -> rollback strategy pending\n";
-                            strategy_.onSubmitFailed();
-                        }
-                    }
-                        
+                    handleMarketData_(x);
                 }
                 else
                 {
-                    // ´Ù¸¥ EngineInput variant°¡ »ı±â¸é ¿©±â¼­ È®Àå
+                    // ë‹¤ë¥¸ EngineInput variantê°€ ìƒê¸°ë©´ ì—¬ê¸°ì„œ í™•ì¥
                 }
 
             }, in);
+    }
+
+    void EngineRunner::handleMyOrder_(const engine::input::MyOrderRaw& raw)
+    {
+        auto& logger = util::Logger::instance();
+
+        const nlohmann::json j = nlohmann::json::parse(raw.json, nullptr, false);
+        if (j.is_discarded())
+        {
+            logger.error("[EngineRunner] myOrder JSON parse failed");
+            return;
+        }
+
+        // 1) JSON -> DTO
+        api::upbit::dto::UpbitMyOrderDto dto{};
+        try
+        {
+            dto = j.get<api::upbit::dto::UpbitMyOrderDto>();
+        }
+        catch (const std::exception& e)
+        {
+            logger.error("[EngineRunner] myOrder dto convert failed: ", e.what());
+            return;
+        }
+
+        // 2) DTO -> (Order snapshot, MyTrade) ì´ë²¤íŠ¸ ë¶„í•´
+        const auto events = api::upbit::mappers::toEvents(dto);
+
+        // 3) ì—”ì§„ ìƒíƒœ ë°˜ì˜ (ì—”ì§„ ë‹¨ì¼ ì†Œìœ ê¶Œ: ì—¬ê¸°ì„œë§Œ í˜¸ì¶œ)
+        for (const auto& ev : events)
+        {
+            if (std::holds_alternative<core::Order>(ev))
+            {
+                const auto& o = std::get<core::Order>(ev);
+                engine_.onOrderSnapshot(o);
+
+                // [DBG] ë‚´ê°€ ë„£ì€ ì£¼ë¬¸ì˜ ìƒíƒœ ë³€í™”
+                logger.info("[Runner][OrderEvent] snapshot status=", static_cast<int>(o.status),
+                    " uuid=", o.id);
+
+                // terminal íŒì •/ë°œí–‰ì€ ì—”ì§„(onOrderSnapshot)ì—ì„œ ì±…ì„ì§„ë‹¤.
+            }
+            else
+            {
+                const auto& t = std::get<core::MyTrade>(ev);
+                engine_.onMyTrade(t);
+
+                // [DBG] ì‹¤ì œ ì²´ê²° ë°œìƒì‹œ
+                logger.info("[Runner][TradeEvent] uuid=", t.order_id,
+                    " price=", t.price, " vol=", t.volume);
+            }
+        }
+        rebuildAccountSnapshot_();
+        logger.info("[Runner][Account] krw=", last_account_.krw_available,
+            " coin=", last_account_.coin_available);
+    }
+
+    void EngineRunner::handleMarketData_(const engine::input::MarketDataRaw& raw)
+    {
+        auto& logger = util::Logger::instance();
+
+        // ìº”ë“¤/ë§ˆì¼“ë°ì´í„°ëŠ” ì—”ì§„ ìŠ¤ë ˆë“œì—ì„œë§Œ JSON íŒŒì‹± (ì¤‘ë³µ íŒŒì‹± ë°©ì§€ ë°©í–¥)
+        const nlohmann::json j = nlohmann::json::parse(raw.json, nullptr, false);
+        if (j.is_discarded())
+        {
+            logger.error("[EngineRunner] MarketData JSON parse failed");
+            return;
+        }
+
+        // type í™•ì¸: candle.{unit} í˜•íƒœ(ì˜ˆ: "candle.1s", "candle.3", ...)
+        const std::string type = j.value("type", "");
+        if (type.rfind("candle", 0) != 0)
+        {
+            // ì§€ê¸ˆ ë‹¨ê³„ì—ì„œëŠ” candleë§Œ ì²˜ë¦¬.
+            // ticker/orderbook ë“±ì€ ì¶”í›„ í™•ì¥ í¬ì¸íŠ¸ë¡œ ë‚¨ê¹€.
+            return;
+        }
+
+        // 1) JSON -> Candle DTO
+        api::upbit::dto::CandleDto_Minute candleDto{};
+        try
+        {
+            candleDto = j.get<api::upbit::dto::CandleDto_Minute>();
+        }
+        catch (const std::exception& e)
+        {
+            logger.error("[EngineRunner] candle dto convert failed: ", e.what());
+            return;
+        }
+
+        // 2) DTO -> core::Candle (ë„ë©”ì¸ ì˜¤ì—¼ ë°©ì§€: json êµ¬ì¡°ë¥¼ ë„ë©”ì¸ì— ë„£ì§€ ì•ŠìŒ)
+        const core::Candle candle = api::upbit::mappers::toDomain(candleDto);
+
+        // ê°™ì€ marketì—ì„œ ê°™ì€ 1ë¶„(ts) ìº”ë“¤ì´ ë°˜ë³µë˜ë©´ ì¡°ìš©íˆ ë¬´ì‹œ
+        auto& last_ts = last_candle_ts_[candle.market];
+        if (!last_ts.empty() && last_ts == candle.start_timestamp)
+        {
+            // ì¤‘ë³µ ì—…ë°ì´íŠ¸ëŠ” ë“œë¡­ (ì„±ëŠ¥ + ë¡œê·¸ ìŠ¤íŒ¸ ë°©ì§€)
+            return;
+        }
+        last_ts = candle.start_timestamp;
+
+        // ìº”ë“¤ ìˆ˜ì‹  + ì „ëµ ì§„ì… í™•ì¸ìš© ë¡œê·¸
+        logger.info("[Runner][Candle] market=", candle.market,
+            " ts=", candle.start_timestamp, " close=", candle.close_price);
+
+        // 3) ì „ëµ ì‹¤í–‰ (RSI). accountëŠ” ìºì‹œëœ ìµœì‹  ìŠ¤ëƒ…ìƒ·ì„ ì‚¬ìš©í•œë‹¤.
+        const trading::Decision d = strategy_.onCandle(candle, last_account_);
+
+        // ì „ëµì— ìƒíƒœ ì´ìƒìœ ë¬´ í™•ì¸ ë¡œê·¸
+        logger.info("[Runner][Strategy] state=", toStringState(strategy_.state()));
+
+
+        // 4) ì£¼ë¬¸ ì˜ë„ê°€ ìˆìœ¼ë©´ ì—”ì§„ì— submit (ì‹œì¥ê°€ ì „ì œ)
+        if (d.hasOrder())
+        {
+            const auto& req = *d.order;
+
+            // ì£¼ë¬¸ ìƒì„± í™•ì¸ ë¡œê·¸ (ì‹ë³„ì/side/ìˆ˜ëŸ‰/ê°€ê²©)
+            logger.info("[Runner][Decision] ì£¼ë¬¸ ìƒì„± side=",
+                (d.order->position == core::OrderPosition::BID ? "BUY" : "SELL"),
+                " vol=", orderSizeToLog(d.order->size));
+
+            const auto r = engine_.submit(req);
+
+            // ì¼€ì´ìŠ¤ A: submitì´ ì‹¤íŒ¨í–ˆëŠ”ë° Runnerê°€ ë¬´ì‹œí•´ì„œ ì „ëµë§Œ PendingEntryê°€ ë¨
+            logger.info("[Runner][Submit] success=", r.success,
+                " code=", static_cast<int>(r.code),
+                " hasOrder=", r.order.has_value(),
+                " msg=", r.message);
+
+            if (!r.success)
+            {
+                logger.warn("[Runner][Submit] FAILED -> rollback strategy pending");
+                strategy_.onSubmitFailed();
+            }
+        }
     }
 
     void EngineRunner::handleEngineEvents_(const std::vector<engine::EngineEvent>& evs)
@@ -315,7 +307,7 @@ namespace app
             {
                 const auto& e = std::get<engine::EngineFillEvent>(ev);
 
-                // ¿£Áø ÀÌº¥Æ® -> Àü·« ÀÌº¥Æ® º¯È¯
+                // ì—”ì§„ ì´ë²¤íŠ¸ -> ì „ëµ ì´ë²¤íŠ¸ ë³€í™˜
                 const trading::FillEvent fill{
                     e.identifier,
                     e.position,
@@ -329,7 +321,7 @@ namespace app
             {
                 const auto& e = std::get<engine::EngineOrderStatusEvent>(ev);
 
-                // ¿£Áø ÀÌº¥Æ® -> Àü·« ÀÌº¥Æ® º¯È¯
+                // ì—”ì§„ ì´ë²¤íŠ¸ -> ì „ëµ ì´ë²¤íŠ¸ ë³€í™˜
                 trading::OrderStatusEvent out{
                     e.identifier,
                     e.status,

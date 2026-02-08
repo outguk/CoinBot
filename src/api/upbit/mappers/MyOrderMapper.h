@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include <string>
 #include <vector>
@@ -8,24 +8,24 @@
 
 #include "core/domain/Order.h"
 #include "core/domain/MyTrade.h"
-#include "api/upbit/dto/UpbitWsDtos.h" // ³×°¡ ¸¸µç DTO °æ·Î¿¡ ¸ÂÃç Á¶Á¤
+#include "api/upbit/dto/UpbitWsDtos.h" // ë„¤ê°€ ë§Œë“  DTO ê²½ë¡œì— ë§ì¶° ì¡°ì •
 
 namespace api::upbit::mappers
 {
-    // "ÀÌº¥Æ® ½ºÆ®¸²" Å¸ÀÔ
+    // "ì´ë²¤íŠ¸ ìŠ¤íŠ¸ë¦¼" íƒ€ì…
     using MyOrderEvent = std::variant<core::Order, core::MyTrade>;
 
     // ---------- small helpers ----------
     inline core::OrderPosition toSide(const std::string& ask_bid) noexcept
     {
-        // Upbit: "ASK"=¸Åµµ, "BID"=¸Å¼ö
+        // Upbit: "ASK"=ë§¤ë„, "BID"=ë§¤ìˆ˜
         return (ask_bid == "ASK") ? core::OrderPosition::ASK : core::OrderPosition::BID;
     }
 
     inline core::OrderType toOrderType(const std::string& order_type) noexcept
     {
-        // Upbit: limit | price(½ÃÀå°¡¸Å¼ö) | market(½ÃÀå°¡¸Åµµ) | best(ÃÖÀ¯¸®)
-        // core´Â Market/Limit¸¸ ÀÖÀ¸´Ï ´Ü¼øÈ­
+        // Upbit: limit | price(ì‹œì¥ê°€ë§¤ìˆ˜) | market(ì‹œì¥ê°€ë§¤ë„) | best(ìµœìœ ë¦¬)
+        // coreëŠ” Market/Limitë§Œ ìˆìœ¼ë‹ˆ ë‹¨ìˆœí™”
         if (order_type == "limit" || order_type == "best") return core::OrderType::Limit;
         return core::OrderType::Market;
     }
@@ -40,13 +40,13 @@ namespace api::upbit::mappers
 
         if (state == "trade")
         {
-            // trade ÀÌº¥Æ®°¡ ¿Ô´õ¶óµµ ³²Àº ¹°·®ÀÌ ÀÖÀ¸¸é "ºÎºĞ Ã¼°á"
+            // trade ì´ë²¤íŠ¸ê°€ ì™”ë”ë¼ë„ ë‚¨ì€ ë¬¼ëŸ‰ì´ ìˆìœ¼ë©´ "ë¶€ë¶„ ì²´ê²°"
             return (remaining_volume <= 0.0) ? core::OrderStatus::Filled : core::OrderStatus::Open;
         }
 
         if (state == "done")   return core::OrderStatus::Filled;
         if (state == "cancel") return core::OrderStatus::Canceled;
-        if (state == "prevented") return core::OrderStatus::Canceled; // SMP µîÀ¸·Î Ãë¼ÒµÈ ÄÉÀÌ½º
+        if (state == "prevented") return core::OrderStatus::Canceled; // SMP ë“±ìœ¼ë¡œ ì·¨ì†Œëœ ì¼€ì´ìŠ¤
 
         // prevented / unknown
         return core::OrderStatus::Rejected;
@@ -58,7 +58,7 @@ namespace api::upbit::mappers
         std::vector<MyOrderEvent> out;
         out.reserve(2);
 
-        // (1) Ç×»ó Order ½º³À¼¦ ÀÌº¥Æ® »ı¼º
+        // (1) í•­ìƒ Order ìŠ¤ëƒ…ìƒ· ì´ë²¤íŠ¸ ìƒì„±
         core::Order o;
         o.market = d.code;
         o.id = d.uuid;
@@ -66,21 +66,21 @@ namespace api::upbit::mappers
         o.type = toOrderType(d.order_type);
         o.status = toOrderStatus(d.state, d.remaining_volume);
 
-        // identifier´Â ÀÖÀ¸¸é ºÙ¿©µÎ¸é ¡°Àç½ÃÀÛ º¹¿ø/µğ¹ö±ë¡±¿¡ À¯¸®
+        // identifierëŠ” ìˆìœ¼ë©´ ë¶™ì—¬ë‘ë©´ â€œì¬ì‹œì‘ ë³µì›/ë””ë²„ê¹…â€ì— ìœ ë¦¬
         if (d.identifier.has_value()) o.identifier = *d.identifier;
 
-        // created_at: core::Order°¡ stringÀÌ¹Ç·Î WS timestamp(ms)¸¦ stringÀ¸·Î ÀúÀå
+        // created_at: core::Orderê°€ stringì´ë¯€ë¡œ WS timestamp(ms)ë¥¼ stringìœ¼ë¡œ ì €ì¥
         if (d.order_timestamp.has_value())      o.created_at = std::to_string(*d.order_timestamp);
         else if (d.timestamp.has_value())       o.created_at = std::to_string(*d.timestamp);
         else                                    o.created_at.clear();
 
-        // price/volume: Upbit´Â state=="trade"ÀÏ ¶§ ÀÌ °ªÀÌ ¡°Ã¼°á°¡/Ã¼°á·®¡± ÀÇ¹Ì·Î ¹Ù²ğ ¼ö ÀÖÀ½
-        // - ±×·¡µµ ½º³À¼¦ °üÁ¡¿¡¼± ´©Àû(executed/remaining)ÀÌ ´õ Áß¿äÇÏ´Ï,
-        //   ¿©±â¼­´Â raw¸¦ ³ÖµÇ, ·ÎÁ÷Àº executed/remaining ±â¹İÀ¸·Î ÆÇ´ÜÇÏ´Â Á¤Ã¥.
+        // price/volume: UpbitëŠ” state=="trade"ì¼ ë•Œ ì´ ê°’ì´ â€œì²´ê²°ê°€/ì²´ê²°ëŸ‰â€ ì˜ë¯¸ë¡œ ë°”ë€” ìˆ˜ ìˆìŒ
+        // - ê·¸ë˜ë„ ìŠ¤ëƒ…ìƒ· ê´€ì ì—ì„  ëˆ„ì (executed/remaining)ì´ ë” ì¤‘ìš”í•˜ë‹ˆ,
+        //   ì—¬ê¸°ì„œëŠ” rawë¥¼ ë„£ë˜, ë¡œì§ì€ executed/remaining ê¸°ë°˜ìœ¼ë¡œ íŒë‹¨í•˜ëŠ” ì •ì±….
         o.price = core::Price{ d.price };
         o.volume = core::Volume{ d.volume };
 
-        // ´©Àû ½º³À¼¦(Áß¿ä)
+        // ëˆ„ì  ìŠ¤ëƒ…ìƒ·(ì¤‘ìš”)
         o.executed_volume = core::Volume{ d.executed_volume };
         o.remaining_volume = core::Volume{ d.remaining_volume };
         o.trades_count = d.trades_count;
@@ -89,11 +89,12 @@ namespace api::upbit::mappers
         o.remaining_fee = core::Amount{ d.remaining_fee };
         o.paid_fee = core::Amount{ d.paid_fee };
         o.locked = core::Amount{ d.locked };
+        o.executed_funds = core::Amount{ d.executed_funds };
 
         out.emplace_back(std::move(o));
 
-        // (2) tradeÀÏ ¶§¸¸ MyTrade ÀÌº¥Æ® »ı¼º
-        // trade_uuid°¡ ÀÖ¾î¾ß ¡°Ã¼°á 1°Ç ½Äº°¡±ÀÌ °¡´ÉÇÏ´Ï ÀÌ¸¦ ±âÁØÀ¸·Î »ı¼º
+        // (2) tradeì¼ ë•Œë§Œ MyTrade ì´ë²¤íŠ¸ ìƒì„±
+        // trade_uuidê°€ ìˆì–´ì•¼ â€œì²´ê²° 1ê±´ ì‹ë³„â€ì´ ê°€ëŠ¥í•˜ë‹ˆ ì´ë¥¼ ê¸°ì¤€ìœ¼ë¡œ ìƒì„±
         if (d.state == "trade" && d.trade_uuid.has_value())
         {
             core::MyTrade t;
@@ -103,11 +104,11 @@ namespace api::upbit::mappers
             t.market = d.code;
             t.side = toSide(d.ask_bid);
 
-            // trade »óÅÂ¿¡¼­ price/volumeÀº "Ã¼°á°¡/Ã¼°á·®" ÀÇ¹Ì·Î »ç¿ë
+            // trade ìƒíƒœì—ì„œ price/volumeì€ "ì²´ê²°ê°€/ì²´ê²°ëŸ‰" ì˜ë¯¸ë¡œ ì‚¬ìš©
             t.price = core::Price{ d.price };
             t.volume = core::Volume{ d.volume };
 
-            // 1°Ç Ã¼°á ±İ¾×(¸íÈ®ÇÏ°Ô price*volume)
+            // 1ê±´ ì²´ê²° ê¸ˆì•¡(ëª…í™•í•˜ê²Œ price*volume)
             t.executed_funds = core::Amount{ d.price * d.volume };
 
             if (d.trade_fee.has_value()) t.fee = core::Amount{ *d.trade_fee };

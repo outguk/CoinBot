@@ -1,33 +1,33 @@
-// core/domain/OrderTypes.h
+ï»¿// core/domain/OrderTypes.h
 #pragma once
 
-// ÁÖ¹® ¹æÇâ/Å¸ÀÔ/»óÅÂ µî¿¡ ´ëÇÑ Enum Á¤ÀÇ
+// ì£¼ë¬¸ ë°©í–¥/íƒ€ì…/ìƒíƒœ ë“±ì— ëŒ€í•œ Enum ì •ì˜
 namespace core 
 {
 
-	// ÁÖ¹® ½Ã »ç¿ëÇÏ´Â ¸Å¼ö/¸Åµµ ±¸ºĞ Enum
+	// ì£¼ë¬¸ ì‹œ ì‚¬ìš©í•˜ëŠ” ë§¤ìˆ˜/ë§¤ë„ êµ¬ë¶„ Enum
 	enum class OrderPosition 
 	{
 		ASK,
 		BID
-		// ÃßÈÄ Ãß°¡
+		// ì¶”í›„ ì¶”ê°€
 	};
 
-	// ÁÖ¹® Å¸ÀÔ Enum
+	// ì£¼ë¬¸ íƒ€ì… Enum
 	enum class OrderType 
 	{
-		Market,		// ½ÃÀå°¡
-		Limit		// ÁöÁ¤°¡
+		Market,		// ì‹œì¥ê°€
+		Limit		// ì§€ì •ê°€
 	};
 
 	enum class OrderStatus 
 	{
-		New,		// ½Å±Ô ÁÖ¹®
-		Open,		// ¹ÌÃ¼°á(È£°¡ ´ë±â) »óÅÂ
-		Pending,	// ÁÖ¹® Á¢¼öµÊ
-		Filled,		// ÁÖ¹® Ã¼°áµÊ
-		Canceled,	// ÁÖ¹® Ãë¼ÒµÊ
-		Rejected	// ÁÖ¹® °ÅºÎµÊ
+		New,		// ì‹ ê·œ ì£¼ë¬¸
+		Open,		// ë¯¸ì²´ê²°(í˜¸ê°€ ëŒ€ê¸°) ìƒíƒœ
+		Pending,	// ì£¼ë¬¸ ì ‘ìˆ˜ë¨
+		Filled,		// ì£¼ë¬¸ ì²´ê²°ë¨
+		Canceled,	// ì£¼ë¬¸ ì·¨ì†Œë¨
+		Rejected	// ì£¼ë¬¸ ê±°ë¶€ë¨
 	};
 
 	enum class PriceChangeState {
@@ -36,9 +36,9 @@ namespace core
 		Fall
 	};
 
-	// [ÀÇµµ]
-// - ·Î±×/µğ¹ö±ë¿¡¼­ enum °ªÀ» »ç¶÷ÀÌ ÀĞÀ» ¼ö ÀÖ°Ô Ãâ·Â
-// - µµ¸ŞÀÎ ·ÎÁ÷¿¡´Â ¿µÇâ ¾øÀ½ (Ç¥Çö °èÃş)
+	// [ì˜ë„]
+// - ë¡œê·¸/ë””ë²„ê¹…ì—ì„œ enum ê°’ì„ ì‚¬ëŒì´ ì½ì„ ìˆ˜ ìˆê²Œ ì¶œë ¥
+// - ë„ë©”ì¸ ë¡œì§ì—ëŠ” ì˜í–¥ ì—†ìŒ (í‘œí˜„ ê³„ì¸µ)
 	inline const char* to_string(OrderStatus s) noexcept {
 		switch (s) {
 		case OrderStatus::New:             return "New";

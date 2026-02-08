@@ -1,25 +1,25 @@
-#include "RestClient.h"
+ï»¿#include "RestClient.h"
 
-// ³×Æ®¿öÅ©(Asio) + HTTP/SSL(Beast) ±¸¼º¿ä¼Ò¸¦ »ç¿ëÇÏ±â À§ÇØ ÇÊ¿äÇÑ Boost Çì´õµé.
+// ë„¤íŠ¸ì›Œí¬(Asio) + HTTP/SSL(Beast) êµ¬ì„±ìš”ì†Œë¥¼ ì‚¬ìš©í•˜ê¸° ìœ„í•´ í•„ìš”í•œ Boost í—¤ë”ë“¤.
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/error.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/ssl.hpp>
 
-#include <thread> // sleep_for (µ¿±â È£ÃâÀÌ¶ó ³ªÁß¿¡ Websocket ¿¬°á ½Ã º¯°æ) Àç½Ãµµ ¹é¿ÀÇÁ(´ë±â) ±¸Çö
-#include <utility> // move/forward °°Àº À¯Æ¿
+#include <thread> // sleep_for (ë™ê¸° í˜¸ì¶œì´ë¼ ë‚˜ì¤‘ì— Websocket ì—°ê²° ì‹œ ë³€ê²½) ì¬ì‹œë„ ë°±ì˜¤í”„(ëŒ€ê¸°) êµ¬í˜„
+#include <utility> // move/forward ê°™ì€ ìœ í‹¸
 
 
 /*
 * RestClient.cpp
-* HTTP ¿äÃ» º¸³»°í(Boost.Beast), Å¸ÀÓ¾Æ¿ô/¸®Æ®¶óÀÌ/¿¡·¯ Ç¥ÁØÈ­±îÁö Ã¥ÀÓ
-* Boost.Beast + Asio + SSL ·Î ½ÇÁ¦ HTTPS ¿äÃ» ¼öÇà
-* TLS(SNI/handshake), connect/read/write timeout, ÀÀ´ä ÆÄ½Ì µîÀ» ´ã´ç
-* ¡°DTO ÆÄ½Ì/Domain º¯È¯¡±Àº ¿©±â ³ÖÁö ¾ÊÀ½ (µµ¸ŞÀÎ ¿À¿° ¹æÁö)
+* HTTP ìš”ì²­ ë³´ë‚´ê³ (Boost.Beast), íƒ€ì„ì•„ì›ƒ/ë¦¬íŠ¸ë¼ì´/ì—ëŸ¬ í‘œì¤€í™”ê¹Œì§€ ì±…ì„
+* Boost.Beast + Asio + SSL ë¡œ ì‹¤ì œ HTTPS ìš”ì²­ ìˆ˜í–‰
+* TLS(SNI/handshake), connect/read/write timeout, ì‘ë‹µ íŒŒì‹± ë“±ì„ ë‹´ë‹¹
+* â€œDTO íŒŒì‹±/Domain ë³€í™˜â€ì€ ì—¬ê¸° ë„£ì§€ ì•ŠìŒ (ë„ë©”ì¸ ì˜¤ì—¼ ë°©ì§€)
 */
 
-// ÇöÀç Rest´Â µ¿±â ±¸Á¶ -> ºñµ¿±â·Î ¹Ù²ã¾ß ÇÏ³ª?? (ÃßÈÄ ÇØº¸µµ·Ï)
+// í˜„ì¬ RestëŠ” ë™ê¸° êµ¬ì¡° -> ë¹„ë™ê¸°ë¡œ ë°”ê¿”ì•¼ í•˜ë‚˜?? (ì¶”í›„ í•´ë³´ë„ë¡)
 namespace api::rest
 {
 	namespace beast		= boost::beast;
@@ -29,8 +29,8 @@ namespace api::rest
 
 	using tcp =	net::ip::tcp;
 
-	// ³»ºÎ ÇïÆÛ: ÇÁ·ÎÁ§Æ®ÀÇ HttpMethod(¿ì¸® enum)¸¦ Boost.Beast°¡ ¿ä±¸ÇÏ´Â Å¸ÀÔ(http::verb)À¸·Î ¹Ù²Û´Ù
-	// ³»ºÎ¿¡¼­¸¸ Boost Å¸ÀÔÀ» ¾²°Ô ÇØ¼­ ¶óÀÌºê·¯¸® Á¾¼ÓÀ» ÁÙÀÌ°í RestClient´Â enumÀ¸·Î ¸¸µç °ø¿ë Å¸ÀÔ¸¸ »ç¿ë
+	// ë‚´ë¶€ í—¬í¼: í”„ë¡œì íŠ¸ì˜ HttpMethod(ìš°ë¦¬ enum)ë¥¼ Boost.Beastê°€ ìš”êµ¬í•˜ëŠ” íƒ€ì…(http::verb)ìœ¼ë¡œ ë°”ê¾¼ë‹¤
+	// ë‚´ë¶€ì—ì„œë§Œ Boost íƒ€ì…ì„ ì“°ê²Œ í•´ì„œ ë¼ì´ë¸ŒëŸ¬ë¦¬ ì¢…ì†ì„ ì¤„ì´ê³  RestClientëŠ” enumìœ¼ë¡œ ë§Œë“  ê³µìš© íƒ€ì…ë§Œ ì‚¬ìš©
 	static http::verb toBeastVerb(HttpMethod m)
 	{
 		switch (m) 
@@ -40,61 +40,61 @@ namespace api::rest
 			case HttpMethod::Put: return http::verb::put;
 			case HttpMethod::Delete: return http::verb::delete_;
 		}
-		return http::verb::get; // ¿¹»óÄ¡ ¸øÇÑ °ªÀÌ µé¾î¿À¸é getÀ¸·Î Ã³¸®
+		return http::verb::get; // ì˜ˆìƒì¹˜ ëª»í•œ ê°’ì´ ë“¤ì–´ì˜¤ë©´ getìœ¼ë¡œ ì²˜ë¦¬
 	}
 
-	/* -------------------- ¿¡·¯ ¸ÅÇÎ°ú timeoutÀ» ÆÇ´ÜÇÏ´Â helper ÇÔ¼öµé -------------------- */
+	/* -------------------- ì—ëŸ¬ ë§¤í•‘ê³¼ timeoutì„ íŒë‹¨í•˜ëŠ” helper í•¨ìˆ˜ë“¤ -------------------- */
 
-	// Boost ¿¡·¯ÄÚµå(ec)¸¦ ¿ì¸® ÇÁ·ÎÁ§Æ®ÀÇ RestError·Î Æ÷Àå
+	// Boost ì—ëŸ¬ì½”ë“œ(ec)ë¥¼ ìš°ë¦¬ í”„ë¡œì íŠ¸ì˜ RestErrorë¡œ í¬ì¥
 	static RestError makeError(RestErrorCode code, const beast::error_code& ec, int http_status = 0)
 	{
-		// ec.message()´Â »ç¶÷ÀÌ ÀĞÀ» ¼ö ÀÖ´Â ¿¡·¯ ¸Ş½ÃÁö¸¦ ¹İÈ¯
+		// ec.message()ëŠ” ì‚¬ëŒì´ ì½ì„ ìˆ˜ ìˆëŠ” ì—ëŸ¬ ë©”ì‹œì§€ë¥¼ ë°˜í™˜
 		return RestError{ code, ec.message(), http_status };
 	}
 
-	// ÀÌ ¿¡·¯ÄÚµå°¡ ¡°Å¸ÀÓ¾Æ¿ô °è¿­ÀÎÁö¡± ÆÇÁ¤
-	// asio ·¹º§¿¡¼­ÀÇ Å¸ÀÓ¾Æ¿ô ÀÌ°Å³ª beast(http/websocket)¿¡¼­ÀÇ Å¸ÀÓ¾Æ¿ôÀÌ¸é true return
+	// ì´ ì—ëŸ¬ì½”ë“œê°€ â€œíƒ€ì„ì•„ì›ƒ ê³„ì—´ì¸ì§€â€ íŒì •
+	// asio ë ˆë²¨ì—ì„œì˜ íƒ€ì„ì•„ì›ƒ ì´ê±°ë‚˜ beast(http/websocket)ì—ì„œì˜ íƒ€ì„ì•„ì›ƒì´ë©´ true return
 	static bool isTimeoutEc(const beast::error_code& ec) noexcept
 	{
 		return ec == net::error::timed_out || ec == beast::error::timeout;
 	}
 
-	// TLS shutdown °úÁ¤¿¡¼­ ÀÚÁÖ ¶ß´Â ¡°¹«ÇØÇÑ¡± ¿¡·¯µéÀ» °É·¯ÁØ´Ù.
+	// TLS shutdown ê³¼ì •ì—ì„œ ìì£¼ ëœ¨ëŠ” â€œë¬´í•´í•œâ€ ì—ëŸ¬ë“¤ì„ ê±¸ëŸ¬ì¤€ë‹¤.
 	static bool isHarmlessShutdownEc(const beast::error_code& ec) noexcept
 	{
-		// TLS shutdown¿¡¼­ ¾Æ·¡ ·ù´Â ÈçÈ÷ ¹ß»ı(»ó´ë°¡ ¸ÕÀú close µî)
+		// TLS shutdownì—ì„œ ì•„ë˜ ë¥˜ëŠ” í”íˆ ë°œìƒ(ìƒëŒ€ê°€ ë¨¼ì € close ë“±)
 		return ec == net::error::eof || ec == ssl::error::stream_truncated;
 	}
 
 	/* ---------------------------------------------------------------------------------- */
 
 
-	/* -------------------- RestClient »ı¼ºÀÚ ¹× ·ÎÁ÷ ±¸Çö (hÆÄÀÏ ÂüÁ¶ÇØ¼­ ÀÌÇØ) -------------------- */
+	/* -------------------- RestClient ìƒì„±ì ë° ë¡œì§ êµ¬í˜„ (híŒŒì¼ ì°¸ì¡°í•´ì„œ ì´í•´) -------------------- */
 
-	// RestClint »ı¼ºÀÚ
+	// RestClint ìƒì„±ì
 	RestClient::RestClient(net::io_context& ioc, ssl::context& ssl_ctx)
-		// io_context¿Í ssl::context¸¦ ¼ÒÀ¯ x, ÂüÁ¶ -> ¾Û¿¡¼­ ÇÏ³ª ¸¸µé¾î ¿©·¯ Å¬¶óÀÌ¾ğÆ®/¼¼¼ÇÀÌ °øÀ¯ÇÏ´Â ¹æ½Ä
-		// ¸®¼Ò½º ¼ö¸íµµ ¾ÛÀÌ °ü¸®ÇÏ´Â ÆíÀÌ ¾ÈÁ¤Àû
+		// io_contextì™€ ssl::contextë¥¼ ì†Œìœ  x, ì°¸ì¡° -> ì•±ì—ì„œ í•˜ë‚˜ ë§Œë“¤ì–´ ì—¬ëŸ¬ í´ë¼ì´ì–¸íŠ¸/ì„¸ì…˜ì´ ê³µìœ í•˜ëŠ” ë°©ì‹
+		// ë¦¬ì†ŒìŠ¤ ìˆ˜ëª…ë„ ì•±ì´ ê´€ë¦¬í•˜ëŠ” í¸ì´ ì•ˆì •ì 
 		: ioc_(ioc), ssl_ctx_(ssl_ctx) {}	
 
 	
-	/* ----------------------------- Àç½Ãµµ ÆÇ´Ü ·ÎÁ÷ ----------------------------- */
-	// °¢ Á¤Ã¥ÀÇ ¹İÈ¯ °ªÀÌ true¸é Àç½Ãµµ, false¸é Àç½Ãµµ ÇÏÁö ¾Ê´Â °ÍÀ¸·Î ¼³Á¤
+	/* ----------------------------- ì¬ì‹œë„ íŒë‹¨ ë¡œì§ ----------------------------- */
+	// ê° ì •ì±…ì˜ ë°˜í™˜ ê°’ì´ trueë©´ ì¬ì‹œë„, falseë©´ ì¬ì‹œë„ í•˜ì§€ ì•ŠëŠ” ê²ƒìœ¼ë¡œ ì„¤ì •
 
-	// (1) HTTP status ±â¹İ (ÀÀ´äÀÌ 429, 5xxµî ÀÎ °æ¿ì, Á¤ÀÇÇÑ RetryPolicy¿¡ µû¶ó Àç½Ãµµ °áÁ¤
+	// (1) HTTP status ê¸°ë°˜ (ì‘ë‹µì´ 429, 5xxë“± ì¸ ê²½ìš°, ì •ì˜í•œ RetryPolicyì— ë”°ë¼ ì¬ì‹œë„ ê²°ì •
 	bool RestClient::shouldRetryStatus(int status, const RetryPolicy& p) noexcept
 	{
 		const bool is429 = (status == 429);
 		const bool is5xx = (status >= 500 && status <=599);
 		if (is429) return p.retry_on_429;
 		if (is5xx) return p.retry_on_5xx;
-		return false; // 4xx ´ëºÎºĞÀº Àç½Ãµµ ¹«ÀÇ¹ÌÇØ¼­ ±×¸¸ÇÔ
+		return false; // 4xx ëŒ€ë¶€ë¶„ì€ ì¬ì‹œë„ ë¬´ì˜ë¯¸í•´ì„œ ê·¸ë§Œí•¨
 	}
 
-	// (2) ³×Æ®¿öÅ© ¿¡·¯ ±â¹İ (ÀÀ´ä ÀÚÃ¼¸¦ ¸ø ¹Ş¾Ò°Å³ª ¿äÃ»/ÀÀ´ä ¼Û¼ö½Å Áß ¿À·ù°¡ ³­ °æ¿ì)
+	// (2) ë„¤íŠ¸ì›Œí¬ ì—ëŸ¬ ê¸°ë°˜ (ì‘ë‹µ ìì²´ë¥¼ ëª» ë°›ì•˜ê±°ë‚˜ ìš”ì²­/ì‘ë‹µ ì†¡ìˆ˜ì‹  ì¤‘ ì˜¤ë¥˜ê°€ ë‚œ ê²½ìš°)
 	bool RestClient::shouldRetryError(const RestError& e, const RetryPolicy& p) noexcept
 	{
-		// Policy¿¡ µû¶ó timeout, connect, read/write¸¦ Á¦¾îÇÑ´Ù
+		// Policyì— ë”°ë¼ timeout, connect, read/writeë¥¼ ì œì–´í•œë‹¤
 		switch (e.code)
 		{
 		case RestErrorCode::Timeout:
@@ -114,61 +114,61 @@ namespace api::rest
 		}
 	}
 
-	// (3) ¹é¿ÀÇÁ ´ÙÀ½ Áö¿¬ °è»ê (ÇöÀç Áö¿¬ ½Ã°£(cur)¿¡ ¹è¼ö(mult)¸¦ °öÇØ¼­ ´ÙÀ½ Áö¿¬À» ¸¸µë)
+	// (3) ë°±ì˜¤í”„ ë‹¤ìŒ ì§€ì—° ê³„ì‚° (í˜„ì¬ ì§€ì—° ì‹œê°„(cur)ì— ë°°ìˆ˜(mult)ë¥¼ ê³±í•´ì„œ ë‹¤ìŒ ì§€ì—°ì„ ë§Œë“¬)
 	std::chrono::milliseconds RestClient::nextDelay(std::chrono::milliseconds cur, double mult) noexcept
 	{
 		auto next = static_cast<long long>(cur.count() * mult);
 
 		if (next < 0) 
 			next = cur.count();
-		// ¹«ÇÑÁ¤ ÆøÁÖ ¹æÁö »óÇÑ ¼³Á¤ (10ÃÊ)
+		// ë¬´í•œì • í­ì£¼ ë°©ì§€ ìƒí•œ ì„¤ì • (10ì´ˆ)
 		if (next > 10000) 
 			next = 10000;
 
-		return std::chrono::milliseconds(next);		// Áö¿¬½Ã°£ ¹İÈ¯
+		return std::chrono::milliseconds(next);		// ì§€ì—°ì‹œê°„ ë°˜í™˜
 	}
 
 	/* ------------------------------------------------------------------------------ */
 
 
-	/* ------------------------ perform: Àç½Ãµµ ·çÇÁ (ÇÙ½É ÄÁÆ®·Ñ·¯) ---------------------- */
+	/* ------------------------ perform: ì¬ì‹œë„ ë£¨í”„ (í•µì‹¬ ì»¨íŠ¸ë¡¤ëŸ¬) ---------------------- */
 
 	Result RestClient::perform(const HttpRequest& req, const RetryPolicy& retry) const
 	{
-		// ¿äÃ»¿¡ ÇÊ¼öÀÎ host¿Í targetÀÌ ¾øÀ¸¸é Áï½Ã ½ÇÆĞ ¹İÈ¯
+		// ìš”ì²­ì— í•„ìˆ˜ì¸ hostì™€ targetì´ ì—†ìœ¼ë©´ ì¦‰ì‹œ ì‹¤íŒ¨ ë°˜í™˜
 		if (req.host.empty() || req.target.empty())
-			return RestError{ RestErrorCode::InvaildArgiment, "host/target is empty" };
+			return RestError{ RestErrorCode::InvalidArgument, "host/target is empty" };
 
-		std::size_t attempt = 0;								// ÇöÀç ¸î¹øÂ° ½ÃµµÀÎÁö Ä«¿îÆ®
-		std::chrono::milliseconds delay = retry.base_delay;		// Àç½Ãµµ ´ë±â ½Ã°£
+		std::size_t attempt = 0;								// í˜„ì¬ ëª‡ë²ˆì§¸ ì‹œë„ì¸ì§€ ì¹´ìš´íŠ¸
+		std::chrono::milliseconds delay = retry.base_delay;		// ì¬ì‹œë„ ëŒ€ê¸° ì‹œê°„
 
-		// ·çÇÁ ¾È¿¡¼­ ¸Å¹ø 1È¸ È£ÃâÀ» ½Ãµµ
+		// ë£¨í”„ ì•ˆì—ì„œ ë§¤ë²ˆ 1íšŒ í˜¸ì¶œì„ ì‹œë„
 		while (true)
 		{
 			++attempt;
-			Result r = performOnce(req);	// performOnce°¡ ½ÇÁ¦ ³×Æ®¿öÅ© È£ÃâÀ» ½ÇÇà
+			Result r = performOnce(req);	// performOnceê°€ ì‹¤ì œ ë„¤íŠ¸ì›Œí¬ í˜¸ì¶œì„ ì‹¤í–‰
 
-			// (A) ÀÀ´äÀÌ ¿Â °æ¿ì
+			// (A) ì‘ë‹µì´ ì˜¨ ê²½ìš°
 			if (std::holds_alternative<HttpResponse>(r))
 			{
-				auto& resp = std::get<HttpResponse>(r);		// ¾î¶² HttpResponseÀÎÁö ²¨³¿
+				auto& resp = std::get<HttpResponse>(r);		// ì–´ë–¤ HttpResponseì¸ì§€ êº¼ëƒ„
 
-				// status ¿À·ù¶ó¸é (Àç½Ãµµ ÆÇ´Ü)
+				// status ì˜¤ë¥˜ë¼ë©´ (ì¬ì‹œë„ íŒë‹¨)
 				if (shouldRetryStatus(resp.status, retry) && attempt < retry.max_attempts)
 				{
-					// sleep_for(delay) ¸¸Å­ ±â´Ù·È´Ù°¡ delay¸¦ Áõ°¡ ½ÃÅ°°í ´ÙÀ½ ·çÇÁ·Î Àç½Ãµµ
+					// sleep_for(delay) ë§Œí¼ ê¸°ë‹¤ë ¸ë‹¤ê°€ delayë¥¼ ì¦ê°€ ì‹œí‚¤ê³  ë‹¤ìŒ ë£¨í”„ë¡œ ì¬ì‹œë„
 					std::this_thread::sleep_for(delay);
 					delay = nextDelay(delay, retry.backoff_multiplier);
 					continue;
 				}
 
-				return r;	// Àç½Ãµµ ´ë»óÀÌ ¾Æ´Ï°Å³ª ½Ãµµ È½¼ö ÃÊ°ú¶ó¸é ±×´ë·Î Response ¹İÈ¯
+				return r;	// ì¬ì‹œë„ ëŒ€ìƒì´ ì•„ë‹ˆê±°ë‚˜ ì‹œë„ íšŸìˆ˜ ì´ˆê³¼ë¼ë©´ ê·¸ëŒ€ë¡œ Response ë°˜í™˜
 			}
 
-			// (B) ³×Æ®¿öÅ©/ÇÁ·ÎÅäÄİ ½ÇÆĞÀÎ °æ¿ì
-			auto& err = std::get<RestError>(r);		// ½ÇÆĞ ÄÉÀÌ½º¿¡¼­ RestError¸¦ ²¨³¿
+			// (B) ë„¤íŠ¸ì›Œí¬/í”„ë¡œí† ì½œ ì‹¤íŒ¨ì¸ ê²½ìš°
+			auto& err = std::get<RestError>(r);		// ì‹¤íŒ¨ ì¼€ì´ìŠ¤ì—ì„œ RestErrorë¥¼ êº¼ëƒ„
 
-			// ¿¡·¯ Å¸ÀÔ¿¡ µû¶ó Àç½ÃµµÇÒ °¡Ä¡°¡ ÀÖÀ¸¸é(Á¤Ã¥ÀÌ true¸é) µ¿ÀÏÇÑ ¹æ½ÄÀ¸·Î Àç½Ãµµ
+			// ì—ëŸ¬ íƒ€ì…ì— ë”°ë¼ ì¬ì‹œë„í•  ê°€ì¹˜ê°€ ìˆìœ¼ë©´(ì •ì±…ì´ trueë©´) ë™ì¼í•œ ë°©ì‹ìœ¼ë¡œ ì¬ì‹œë„
 			if (shouldRetryError(err, retry) && attempt < retry.max_attempts)
 			{
 				std::this_thread::sleep_for(delay);
@@ -176,78 +176,78 @@ namespace api::rest
 				continue;
 			}
 
-			return r;		// Àç½ÃµµÇÏÁö ¾Ê°Å³ª, ÃÖ´ë È½¼ö ÃÊ°ú¸é ½ÇÆĞ ±×´ë·Î ¹İÈ¯
+			return r;		// ì¬ì‹œë„í•˜ì§€ ì•Šê±°ë‚˜, ìµœëŒ€ íšŸìˆ˜ ì´ˆê³¼ë©´ ì‹¤íŒ¨ ê·¸ëŒ€ë¡œ ë°˜í™˜
 		}
 	}
 
-	// performOnce: ½ÇÁ¦ HTTPS 1È¸ È£Ãâ
+	// performOnce: ì‹¤ì œ HTTPS 1íšŒ í˜¸ì¶œ
 	Result RestClient::performOnce(const HttpRequest& req) const
 	{
-		beast::error_code ec;	// ³×Æ®¿öÅ© ÀÛ¾÷¿¡¼­ ¹ß»ıÇÑ ¿¡·¯¸¦ ´ã´Â ec
+		beast::error_code ec;	// ë„¤íŠ¸ì›Œí¬ ì‘ì—…ì—ì„œ ë°œìƒí•œ ì—ëŸ¬ë¥¼ ë‹´ëŠ” ec
 
-		// host/port¸¦ ½ÇÁ¦ Á¢¼Ó °¡´ÉÇÑ endpoint ¸ñ·ÏÀ¸·Î º¯È¯ÇÑ´Ù(DNS Á¶È¸ Æ÷ÇÔ)
+		// host/portë¥¼ ì‹¤ì œ ì ‘ì† ê°€ëŠ¥í•œ endpoint ëª©ë¡ìœ¼ë¡œ ë³€í™˜í•œë‹¤(DNS ì¡°íšŒ í¬í•¨)
 		tcp::resolver resolver(ioc_);	// (1) DNS Resolve
 		auto results = resolver.resolve(req.host, req.port, ec);
 
-		// resolve ½ÇÆĞ ½Ã ¿¡·¯ ¹İÈ¯
+		// resolve ì‹¤íŒ¨ ì‹œ ì—ëŸ¬ ë°˜í™˜
 		if (ec)
 		{
-			// resolve timeoutµµ ÄÉÀÌ½º¿¡ µû¶ó ¼¯ÀÏ ¼ö ÀÖÀ½(È¯°æ¸¶´Ù)
+			// resolve timeoutë„ ì¼€ì´ìŠ¤ì— ë”°ë¼ ì„ì¼ ìˆ˜ ìˆìŒ(í™˜ê²½ë§ˆë‹¤)
 			if (isTimeoutEc(ec))
 				return makeError(RestErrorCode::Timeout, ec);
 
 			return makeError(RestErrorCode::ResolveFailed, ec);
 		}
 
-		// (2) SSL Stream »ı¼º (TCP À§¿¡ TLS(SSL) °èÃşÀ» ¾ñÀº ½ºÆ®¸²) -> ÀÌ ½ºÆ®¸²À¸·Î HTTPS Åë½Å
+		// (2) SSL Stream ìƒì„± (TCP ìœ„ì— TLS(SSL) ê³„ì¸µì„ ì–¹ì€ ìŠ¤íŠ¸ë¦¼) -> ì´ ìŠ¤íŠ¸ë¦¼ìœ¼ë¡œ HTTPS í†µì‹ 
 		beast::ssl_stream<beast::tcp_stream> stream(ioc_, ssl_ctx_);
 
-		// (3) SNI ¼³Á¤ (¡°³ª´Â ÀÌ host·Î Á¢¼ÓÇÑ´Ù¡±¸¦ TLS handshake¿¡ ¾Ë·ÁÁÖ´Â ±â´É)
+		// (3) SNI ì„¤ì • (â€œë‚˜ëŠ” ì´ hostë¡œ ì ‘ì†í•œë‹¤â€ë¥¼ TLS handshakeì— ì•Œë ¤ì£¼ëŠ” ê¸°ëŠ¥)
 		if (!SSL_set_tlsext_host_name(stream.native_handle(), req.host.c_str()))
 		{
-			// ½ÇÆĞ ½Ã handshake ÀÚÃ¼°¡ ²¿ÀÏ ¼ö ÀÖ¾î¼­ HandshakeFailed·Î Ã³¸®
+			// ì‹¤íŒ¨ ì‹œ handshake ìì²´ê°€ ê¼¬ì¼ ìˆ˜ ìˆì–´ì„œ HandshakeFailedë¡œ ì²˜ë¦¬
 			return RestError{ RestErrorCode::HandshakeFailed, "SNI set failed", 0 };
 		}
 
 		// (4) TCP connect + timeout
-		beast::get_lowest_layer(stream).expires_after(req.timeout);	// ÀÌ ÀÛ¾÷ÀÇ Á¦ÇÑ ½Ã°£ ¼³Á¤
-		beast::get_lowest_layer(stream).connect(results, ec);		// ½ÇÁ¦ TCP ¿¬°á ¼öÇà
-		if (ec)		// ½ÇÆĞ ½Ã ¿¡·¯ ¹İÈ¯ (°øÅë ¿¡·¯ Ã³¸®)
+		beast::get_lowest_layer(stream).expires_after(req.timeout);	// ì´ ì‘ì—…ì˜ ì œí•œ ì‹œê°„ ì„¤ì •
+		beast::get_lowest_layer(stream).connect(results, ec);		// ì‹¤ì œ TCP ì—°ê²° ìˆ˜í–‰
+		if (ec)		// ì‹¤íŒ¨ ì‹œ ì—ëŸ¬ ë°˜í™˜ (ê³µí†µ ì—ëŸ¬ ì²˜ë¦¬)
 		{
 			if (isTimeoutEc(ec)) 
 				return makeError(RestErrorCode::Timeout, ec);
 			return makeError(RestErrorCode::ConnectFailed, ec);
 		}
 
-		// (5) TLS handshake + timeout (TLS handshake´Â ¾ÏÈ£È­ ¿¬°á Çù»ó + ÀÎÁõ¼­ °ËÁõ ´Ü°è)
-		beast::get_lowest_layer(stream).expires_after(req.timeout);	// Á¦ÇÑ ½Ã°£
-		stream.handshake(ssl::stream_base::client, ec);				// Å¬¶óÀÌ¾ğÆ® ¸ğµå·Î handshake
-		if (ec)		// ½ÇÆĞ ½Ã ¿¡·¯ ¹İÈ¯ (°øÅë ¿¡·¯ Ã³¸®)
+		// (5) TLS handshake + timeout (TLS handshakeëŠ” ì•”í˜¸í™” ì—°ê²° í˜‘ìƒ + ì¸ì¦ì„œ ê²€ì¦ ë‹¨ê³„)
+		beast::get_lowest_layer(stream).expires_after(req.timeout);	// ì œí•œ ì‹œê°„
+		stream.handshake(ssl::stream_base::client, ec);				// í´ë¼ì´ì–¸íŠ¸ ëª¨ë“œë¡œ handshake
+		if (ec)		// ì‹¤íŒ¨ ì‹œ ì—ëŸ¬ ë°˜í™˜ (ê³µí†µ ì—ëŸ¬ ì²˜ë¦¬)
 		{
 			if (isTimeoutEc(ec))
 				return makeError(RestErrorCode::Timeout, ec);
 			return makeError(RestErrorCode::HandshakeFailed, ec);
 		}
 
-		// (6) HTTP Request ±¸¼º
+		// (6) HTTP Request êµ¬ì„±
 
-		// Beast HTTP ¿äÃ» °´Ã¼ »ı¼º (11Àº HTTP/1.1)
+		// Beast HTTP ìš”ì²­ ê°ì²´ ìƒì„± (11ì€ HTTP/1.1)
 		http::request<http::string_body> http_req{ toBeastVerb(req.method), req.target, 11 };
-		http_req.set(http::field::host, req.host);				// Host Çì´õ´Â HTTP/1.1¿¡¼­ Áß¿ä
-		http_req.set(http::field::user_agent, "CoinBot/1.0");	// User-Agent´Â µğ¹ö±ë/¼­¹ö ·Î±×¿ë
+		http_req.set(http::field::host, req.host);				// Host í—¤ë”ëŠ” HTTP/1.1ì—ì„œ ì¤‘ìš”
+		http_req.set(http::field::user_agent, "CoinBot/1.0");	// User-AgentëŠ” ë””ë²„ê¹…/ì„œë²„ ë¡œê·¸ìš©
 
-		// È£ÃâÀÚ°¡ ³ÖÀº Ãß°¡ Çì´õ¸¦ ¸ğµÎ ¹İ¿µ(Authorization µî)
+		// í˜¸ì¶œìê°€ ë„£ì€ ì¶”ê°€ í—¤ë”ë¥¼ ëª¨ë‘ ë°˜ì˜(Authorization ë“±)
 		for (const auto& [k, v] : req.headers) http_req.set(k, v);
 
-		// body¸¦ ³Ö°í, body°¡ ÀÖÀ¸¸é prepare_payload()
+		// bodyë¥¼ ë„£ê³ , bodyê°€ ìˆìœ¼ë©´ prepare_payload()
 		http_req.body() = req.body;
 		if (!req.body.empty())
-			http_req.prepare_payload();	// ´Ù½Ã ¼³¸í
+			http_req.prepare_payload();	// http_reqì˜ body ë¶€ë¶„ì„ ê²€í† í•´ ìˆìœ¼ë©´ ê·¸ì— ë§ëŠ” ê¸¸ì´ë¥¼ ê³„ì‚°, ì—…ìœ¼ë©´ ì œê±°/ì •ë¦¬í•œë‹¤.
 
 		// (7) write + timeout
-		beast::get_lowest_layer(stream).expires_after(req.timeout);	// Á¦ÇÑ ½Ã°£
-		http::write(stream, http_req, ec); // write HTTP ¿äÃ»À» Àü¼Û
-		if (ec)		// ½ÇÆĞ ½Ã ¿¡·¯ ¹İÈ¯ (°øÅë ¿¡·¯ Ã³¸®)
+		beast::get_lowest_layer(stream).expires_after(req.timeout);	// ì œí•œ ì‹œê°„
+		http::write(stream, http_req, ec); // write HTTP ìš”ì²­ì„ ì „ì†¡
+		if (ec)		// ì‹¤íŒ¨ ì‹œ ì—ëŸ¬ ë°˜í™˜ (ê³µí†µ ì—ëŸ¬ ì²˜ë¦¬)
 		{
 			if (isTimeoutEc(ec))
 				return makeError(RestErrorCode::Timeout, ec);
@@ -255,40 +255,40 @@ namespace api::rest
 		}
 
 		// (8) read + timeout
-		beast::flat_buffer buffer;					// ¼ö½Å µ¥ÀÌÅÍ ÀÓ½Ã ¹öÆÛ
-		http::response<http::string_body> http_res;	// ÀÀ´äÀ» ¹ŞÀ» °´Ã¼
+		beast::flat_buffer buffer;					// ìˆ˜ì‹  ë°ì´í„° ì„ì‹œ ë²„í¼
+		http::response<http::string_body> http_res;	// ì‘ë‹µì„ ë°›ì„ ê°ì²´
 
 		beast::get_lowest_layer(stream).expires_after(req.timeout);
-		http::read(stream, buffer, http_res, ec);	// Á¦ÇÑ ½Ã°£À» °É°í ÀÀ´äÀ» ÀĞÀ½
-		if (ec)		// ½ÇÆĞ ½Ã ¿¡·¯ ¹İÈ¯ (°øÅë ¿¡·¯ Ã³¸®)
+		http::read(stream, buffer, http_res, ec);	// ì œí•œ ì‹œê°„ì„ ê±¸ê³  ì‘ë‹µì„ ì½ìŒ
+		if (ec)		// ì‹¤íŒ¨ ì‹œ ì—ëŸ¬ ë°˜í™˜ (ê³µí†µ ì—ëŸ¬ ì²˜ë¦¬)
 		{
 			if (isTimeoutEc(ec))
 				return makeError(RestErrorCode::Timeout, ec);
 			return makeError(RestErrorCode::ReadFailed, ec);
 		}
 
-		// (9) shutdown (¹«ÇØ ¿¡·¯ ¹«½Ã)
+		// (9) shutdown (ë¬´í•´ ì—ëŸ¬ ë¬´ì‹œ)
 
-		// TLS ¿¬°áÀ» Á¤»ó Á¾·á(Á¾·á ¾Ë¸² ±³È¯)
+		// TLS ì—°ê²°ì„ ì •ìƒ ì¢…ë£Œ(ì¢…ë£Œ ì•Œë¦¼ êµí™˜)
 		beast::get_lowest_layer(stream).expires_after(req.timeout);
 		stream.shutdown(ec);
 		if (ec && !isHarmlessShutdownEc(ec))
 		{
-			// shutdown ¿¡·¯¸¦ Ä¡¸íÀº ¾Æ´Ô"À¸·Î µÎ°í ·Î±×¸¸ ³²±âÀÚ
+			// shutdown ì—ëŸ¬ë¥¼ ì¹˜ëª…ì€ ì•„ë‹˜"ìœ¼ë¡œ ë‘ê³  ë¡œê·¸ë§Œ ë‚¨ê¸°ì
 		}
 
-		// (10) ¿ì¸® °ø¿ë Å¸ÀÔÀ¸·Î º¯È¯ÇØ¼­ ¹İÈ¯
+		// (10) ìš°ë¦¬ ê³µìš© íƒ€ì…ìœ¼ë¡œ ë³€í™˜í•´ì„œ ë°˜í™˜
 		HttpResponse resp;
-		resp.status = static_cast<int>(http_res.result_int());	// Beast ÀÀ´ä ¡æ HttpResponse·Î º¯È¯
-		resp.body = std::move(http_res.body());					// body´Â std::move·Î º¹»ç ºñ¿ë ÁÙÀÌ±â
+		resp.status = static_cast<int>(http_res.result_int());	// Beast ì‘ë‹µ â†’ HttpResponseë¡œ ë³€í™˜
+		resp.body = std::move(http_res.body());					// bodyëŠ” std::moveë¡œ ë³µì‚¬ ë¹„ìš© ì¤„ì´ê¸°
 
-		// Beast ÀÀ´ä Çì´õµéÀ» mapÀ¸·Î º¹»çÇØ¼­ ÀúÀå
+		// Beast ì‘ë‹µ í—¤ë”ë“¤ì„ mapìœ¼ë¡œ ë³µì‚¬í•´ì„œ ì €ì¥
 		for (auto const& h : http_res)
 		{
 			resp.headers.emplace(std::string(h.name_string()), std::string(h.value()));
 		}
 
-		return resp;	// ¼º°ø °á°ú ¹İÈ¯
+		return resp;	// ì„±ê³µ ê²°ê³¼ ë°˜í™˜
 	}
 
 	/* ------------------------------------------------------------------------------ */

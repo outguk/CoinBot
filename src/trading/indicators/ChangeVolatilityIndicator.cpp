@@ -1,4 +1,4 @@
-#include "ChangeVolatilityIndicator.h"
+ï»¿#include "ChangeVolatilityIndicator.h"
 
 #include <cmath> // std::sqrt, std::max
 
@@ -6,14 +6,16 @@
 
 namespace trading::indicators {
 
+    // í¬ê¸°ë¶€í„° ì „ì²´ë¥¼ ë¹„ì›€
     void ChangeVolatilityIndicator::reset(std::size_t window) {
-        window_ = (window < 2) ? 2 : window;
-        returns_.reset(window_);
+        window_ = (window < 2) ? 2 : window;    // ìœˆë„ìš° ì„¤ì •
+        returns_.reset(window_);    // ë²„í¼ë„ ìœˆë„ìš°ë¡œ ë§ì¶¤
         sum_ = 0.0;
         sumsq_ = 0.0;
         prevClose_.reset();
     }
 
+    // ë°ì´í„°ë§Œ ë¹„ìš´ë‹¤
     void ChangeVolatilityIndicator::clear() noexcept {
         returns_.clear();
         sum_ = 0.0;
@@ -24,14 +26,14 @@ namespace trading::indicators {
     trading::Value<double> ChangeVolatilityIndicator::update(double close) {
         trading::Value<double> out{};
 
-        // ºñÈ°¼º
+        // ë¹„í™œì„±
         if (window_ == 0) {
             out.ready = false;
             out.v = 0.0;
             return out;
         }
 
-        // º¯È­À²À» ¸¸µé±â À§ÇØ¼­´Â ÀÌÀü Á¾°¡°¡ ÇÊ¿ä
+        // ë³€í™”ìœ¨ì„ ë§Œë“¤ê¸° ìœ„í•´ì„œëŠ” ì´ì „ ì¢…ê°€ê°€ í•„ìš”
         if (!prevClose_.has_value()) {
             prevClose_ = close;
             out.ready = false;
@@ -42,18 +44,18 @@ namespace trading::indicators {
         const double prev = *prevClose_;
         prevClose_ = close;
 
-        // ºĞ¸ğ 0 ¹æ¾î: prev°¡ 0ÀÌ¸é º¯È­À² Á¤ÀÇ ºÒ°¡ -> ÀÌ¹ø »ùÇÃÀº ½ºÅµ
-        // (¾ÏÈ£È­Æó °¡°İÀÌ 0ÀÌ µÇ´Â °Ç Çö½ÇÀûÀ¸·Î ¾øÁö¸¸, ¾ÈÀüÇÏ°Ô Ã³¸®)
+        // ë¶„ëª¨ 0 ë°©ì–´: prevê°€ 0ì´ë©´ ë³€í™”ìœ¨ ì •ì˜ ë¶ˆê°€ -> ì´ë²ˆ ìƒ˜í”Œì€ ìŠ¤í‚µ
+        // (ì•”í˜¸í™”í ê°€ê²©ì´ 0ì´ ë˜ëŠ” ê±´ í˜„ì‹¤ì ìœ¼ë¡œ ì—†ì§€ë§Œ, ì•ˆì „í•˜ê²Œ ì²˜ë¦¬)
         if (prev == 0.0) {
             out.ready = false;
             out.v = 0.0;
             return out;
         }
 
-        // ÆÛ¼¾Æ® º¯È­À²
+        // í¼ì„¼íŠ¸ ë³€í™”ìœ¨
         const double r = (close - prev) / prev;
 
-        // returns_¿¡ pushÇÏ°í, µ¤¾î¾´ °ªÀÌ ÀÖÀ¸¸é sum/sumsq¿¡¼­ Á¦°Å
+        // returns_ì— pushí•˜ê³ , ë®ì–´ì“´ ê°’ì´ ìˆìœ¼ë©´ sum/sumsqì—ì„œ ì œê±°
         const auto overwritten = returns_.push(r);
         if (overwritten.has_value()) {
             const double old = *overwritten;
@@ -61,11 +63,11 @@ namespace trading::indicators {
             sumsq_ -= old * old;
         }
 
-        // »õ °ª ¹İ¿µ
+        // ìƒˆ ê°’ ë°˜ì˜
         sum_ += r;
         sumsq_ += r * r;
 
-        // À©µµ¿ì°¡ ²Ë Ã¡À» ¶§¸¸ º¯µ¿¼º(stdev)À» ½Å·Ú(ready=true)
+        // ìœˆë„ìš°ê°€ ê½‰ ì°¼ì„ ë•Œë§Œ ë³€ë™ì„±(stdev)ì„ ì‹ ë¢°(ready=true)
         out.ready = returns_.full();
         out.v = out.ready ? stdev_() : 0.0;
         return out;
@@ -83,7 +85,7 @@ namespace trading::indicators {
     }
 
     double ChangeVolatilityIndicator::stdev_() const noexcept {
-        // returns_°¡ fullÀÏ ¶§¸¸ È£ÃâµÈ´Ù°í °¡Á¤(È£ÃâºÎ¿¡¼­ ready Ã¼Å©)
+        // returns_ê°€ fullì¼ ë•Œë§Œ í˜¸ì¶œëœë‹¤ê³  ê°€ì •(í˜¸ì¶œë¶€ì—ì„œ ready ì²´í¬)
         const double n = static_cast<double>(window_);
         if (n <= 2.0) return 0.0;
 
@@ -91,7 +93,7 @@ namespace trading::indicators {
         // Var = E[x^2] - (E[x])^2
         double var = (sumsq_ / n) - (mean * mean);
 
-        // ºÎµ¿¼Ò¼ö ¿ÀÂ÷·Î À½¼ö·Î »ìÂ¦ ³»·Á°¥ ¼ö ÀÖ¾î clamp
+        // ë¶€ë™ì†Œìˆ˜ ì˜¤ì°¨ë¡œ ìŒìˆ˜ë¡œ ì‚´ì§ ë‚´ë ¤ê°ˆ ìˆ˜ ìˆì–´ clamp
         if (var < 0.0) var = 0.0;
 
         return std::sqrt(var);

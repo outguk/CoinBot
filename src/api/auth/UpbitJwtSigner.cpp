@@ -1,4 +1,4 @@
-#include "UpbitJwtSigner.h"
+ï»¿#include "UpbitJwtSigner.h"
 
 #include <json.hpp>
 #include <boost/uuid/uuid.hpp>
@@ -13,21 +13,21 @@
 #include <iomanip>
 #include <vector>
 
-// Upbit ÀÎÁõ¿ë JWT(HS256) ÅäÅ«À» »ı¼ºÇØ¼­, HTTP ¿äÃ» Çì´õ¿¡ ³ÖÀ» ¼ö ÀÖ°Ô ÇØÁÖ´Â ¿ªÇÒ
+// Upbit ì¸ì¦ìš© JWT(HS256) í† í°ì„ ìƒì„±í•´ì„œ, HTTP ìš”ì²­ í—¤ë”ì— ë„£ì„ ìˆ˜ ìˆê²Œ í•´ì£¼ëŠ” ì—­í• 
 
 namespace {
 
-    // 1) base64url ÀÎÄÚµù ÇÔ¼ö
-    // JWT´Â base64°¡ ¾Æ´Ï¶ó "base64url"À» ¾´´Ù
+    // 1) base64url ì¸ì½”ë”© í•¨ìˆ˜
+    // JWTëŠ” base64ê°€ ì•„ë‹ˆë¼ "base64url"ì„ ì“´ë‹¤
     std::string base64UrlEncode(const unsigned char* data, std::size_t len) {
-        // °£´Ü ±¸Çö(ÇÁ·Î´ö¼Ç¿¡¼± util·Î ºĞ¸® ÃßÃµ)
-        // OpenSSL EVP_EncodeBlockÀº base64(+/ =) ÇüÅÂ¶ó URL-safe·Î Ä¡È¯
+        // ê°„ë‹¨ êµ¬í˜„(í”„ë¡œë•ì…˜ì—ì„  utilë¡œ ë¶„ë¦¬ ì¶”ì²œ)
+        // OpenSSL EVP_EncodeBlockì€ base64(+/ =) í˜•íƒœë¼ URL-safeë¡œ ì¹˜í™˜
         static const char* b64 =
             "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
         std::string out;
         out.reserve(((len + 2) / 3) * 4);
 
-        // 3¹ÙÀÌÆ®¾¿ ÀĞ¾î¼­ 4°³ÀÇ base64 ¹®ÀÚ·Î º¯È¯
+        // 3ë°”ì´íŠ¸ì”© ì½ì–´ì„œ 4ê°œì˜ base64 ë¬¸ìë¡œ ë³€í™˜
         std::size_t i = 0;
         while (i + 3 <= len) {
             const unsigned v = (data[i] << 16) | (data[i + 1] << 8) | data[i + 2];
@@ -38,7 +38,7 @@ namespace {
             i += 3;
         }
 
-        // ³²Àº ¹ÙÀÌÆ®°¡ 1~2°³¸é padding '=' Æ÷ÇÔÇÏ¿© ¸¶¹«¸®
+        // ë‚¨ì€ ë°”ì´íŠ¸ê°€ 1~2ê°œë©´ padding '=' í¬í•¨í•˜ì—¬ ë§ˆë¬´ë¦¬
         if (i < len) {
             unsigned v = data[i] << 16;
             out.push_back(b64[(v >> 18) & 63]);
@@ -55,18 +55,18 @@ namespace {
             }
         }
 
-        // URL-safe: + -> -, / -> _, padding Á¦°Å, URL-safe Ä¡È¯
+        // URL-safe: + -> -, / -> _, padding ì œê±°, URL-safe ì¹˜í™˜
         for (auto& c : out) {
             if (c == '+') c = '-';
             else if (c == '/') c = '_';
         }
 
-        // padding '=' Á¦°Å
+        // padding '=' ì œê±°
         while (!out.empty() && out.back() == '=') out.pop_back();
         return out;
     }
 
-    // 2) sha512 ÇØ½Ã¸¦ hex ¹®ÀÚ¿­·Î º¯È¯
+    // 2) sha512 í•´ì‹œë¥¼ hex ë¬¸ìì—´ë¡œ ë³€í™˜
     std::string sha512Hex(std::string_view s) {
         std::array<unsigned char, SHA512_DIGEST_LENGTH> hash{};
         SHA512(reinterpret_cast<const unsigned char*>(s.data()), s.size(), hash.data());
@@ -101,7 +101,7 @@ namespace api::auth {
 
         const json header = { {"alg","HS256"}, {"typ","JWT"} };
 
-        // nonce´Â UUID v4
+        // nonceëŠ” UUID v4
         const auto nonce = boost::uuids::to_string(boost::uuids::random_generator()());
 
         json payload = {

@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(tree:*)",
+      "Bash(cmake:*)",
+      "Bash(cmd /c \"cmake --preset x64-debug\")",
+      "Bash(powershell -Command \"cd ''C:/cpp/CoinBot''; cmake --preset x64-debug 2>&1\")",
+      "Bash(cmd /c \"\"\"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\2022\\\\Community\\\\VC\\\\Auxiliary\\\\Build\\\\vcvars64.bat\"\" && cmake --preset x64-debug\")",
+      "Bash(powershell -Command:*)",
+      "Bash(\"/c/Program Files/Microsoft Visual Studio/2022/Community/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe\" --version)",
+      "Bash(\"/c/Program Files/Microsoft Visual Studio/2022/Community/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe\" --preset x64-debug)",
+      "Bash(export PATH=\"/c/Program Files/Microsoft Visual Studio/2022/Community/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja:$PATH\")",
+      "mcp__sequential-thinking__sequentialthinking",
+      "Bash(del:*)",
+      "Bash(cmd /c \"cmake --build out/build/x64-debug 2>&1\")",
+      "Bash(cmd.exe /c \"cd /d C:\\\\cpp\\\\CoinBot && cmake --build out/build/x64-debug\")",
+      "WebSearch",
+      "WebFetch(domain:docs.upbit.com)"
+    ]
+  }
+}
