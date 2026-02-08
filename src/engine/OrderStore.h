@@ -1,5 +1,6 @@
-#pragma once
+ï»¿#pragma once
 
+#include <deque>
 #include <optional>
 #include <shared_mutex>
 #include <string>
@@ -13,50 +14,62 @@ namespace engine
 {
 	/*
 	 * OrderStore
-	 * -  ³»ºÎ¿¡¼­ "ÁÖ¹® »óÅÂ"¸¦ ¾ÈÀüÇÏ°Ô ÀúÀå/Á¶È¸/°»½ÅÇÏ±â À§ÇÑ ÀúÀå¼Ò
+	 * - í•˜ë‚˜ì˜ "ì£¼ë¬¸ ì €ì¥ì†Œ"ë¥¼ êµ¬í˜„í•˜ê³  ì¶”ê°€/ì¡°íšŒ/ê°±ì‹ í•˜ê¸° ì‰½ê²Œ ë§Œë“¦
 	 *
-	 * ¼³°è Æ÷ÀÎÆ®(5´Ü°è ±âÁØ):
-	 * 1) ¿£Áø ¿ÜºÎ(app/strategy)°¡ ³»ºÎ ÄÁÅ×ÀÌ³Ê¿¡ Á÷Á¢ Á¢±ÙÇÏÁö ¸øÇÏ°Ô ÇÔ
-	 * 2) order_id ·Î ºü¸£°Ô Ã£À» ¼ö ÀÖ¾î¾ß ÇÔ (unordered_map)
-	 * 3) get()Àº "º¹»çº»"À» ¹İÈ¯ÇÏ¿© ¿ÜºÎ°¡ ³»ºÎ »óÅÂ¸¦ ¸Á°¡¶ß¸®Áö ¸øÇÏ°Ô ÇÔ
-	 * 4) update´Â "ÀüÃ¼ Order ±³Ã¼" ¹æ½Ä (´Ü¼øÇÏ°í ¿¹Ãø °¡´É)
-	 * 5) ¸ÖÆ¼½º·¹µå ´ëºñ¸¦ À§ÇØ shared_mutex »ç¿ë(ÀĞ±â ´ÙÁß, ¾²±â ´ÜÀÏ)
+	 * ì„¤ê³„ ìš”êµ¬ì‚¬í•­(5ê°€ì§€ ê´€ì ):
+	 * 1) ì—¬ëŸ¬ ì™¸ë¶€(app/strategy)ì—ì„œ ë™ì¼ ì»¨í…Œì´ë„ˆì— ì ‘ê·¼ ê°€ëŠ¥í•´ì•¼ í•¨
+	 * 2) uuid ë¥¼ ê¸°ì¤€ìœ¼ë¡œ ì°¾ì„ ìˆ˜ ìˆì–´ì•¼ í•¨ (unordered_map)
+	 * 3) get()ì€ "ë³µì‚¬ë³¸"ì„ ë°˜í™˜í•˜ì—¬ ì™¸ë¶€ê°€ ë‚´ë¶€ ìƒíƒœë¥¼ ë§ê°€ëœ¨ë¦´ ìˆ˜ ì—†ê²Œ í•¨
+	 * 4) updateëŠ” "ì „ì²´ Order ê°ì²´" êµì²´ (ë‹¨ìˆœí•˜ê³  ëª…í™• ì˜ë„)
+	 * 5) ë©€í‹°ìŠ¤ë ˆë“œ í™˜ê²½ ëŒ€ë¹„ shared_mutex ì‚¬ìš©(ì½ê¸° ë³‘ë ¬, ì“°ê¸° ë°°íƒ€)
+	 * 6) ì™„ë£Œ ì£¼ë¬¸(Filled/Canceled/Rejected) ìë™ ì •ë¦¬ (ìµœëŒ€ 1000ê°œ ìœ ì§€)
 	 */
 	class OrderStore
 	{
 	public:
 		OrderStore() = default;
 
-		// »õ ÁÖ¹®À» ÀúÀå
-		// - ÀÌ¹Ì °°Àº order_id°¡ ÀÖÀ¸¸é false ¹İÈ¯
+		// ìƒˆ ì£¼ë¬¸ì„ ì¶”ê°€
+		// - ì´ë¯¸ ì¡´ì¬ order_idë©´ ì‹¤íŒ¨í•˜ê³  false ë°˜í™˜
 		[[nodiscard]] bool add(const core::Order& order);
 
-		// order_id·Î ÁÖ¹® Á¶È¸(º¹»çº»)
+		// uuidë¡œ ì£¼ë¬¸ ì¡°íšŒ(ë³µì‚¬ë³¸)
 		[[nodiscard]] std::optional<core::Order> get(const std::string_view& order_id) const;
 
-		// ÁÖ¹®À» ÅëÀ¸·Î ±³Ã¼(update)
-		// - Á¸ÀçÇÏ¸é ±³Ã¼ ÈÄ true
-		// - ¾øÀ¸¸é false
+		// ì£¼ë¬¸ì˜ ìƒíƒœë¥¼ êµì²´(update)
+		// - ì„±ê³µí•˜ë©´ êµì²´ í›„ true
+		// - ì—†ìœ¼ë©´ false
 		[[nodiscard]] bool update(const core::Order& order);
 
-		// order_id·Î ÁÖ¹® »èÁ¦
+		// order_idë¡œ ì£¼ë¬¸ ì‚­ì œ
 		[[nodiscard]] bool erase(const std::string_view& order_id);
 
-		// ÀÌ¹Ì order Á¸Àç ½Ã °»½Å, ¾øÀ¸¸é Ãß°¡(½Ç°Å·¡¿ë)
+		// ì´ë¯¸ order ìˆìœ¼ë©´ ë®ì–´ì“°ê³ , ì—†ìœ¼ë©´ ì¶”ê°€(ë©±ë“±ì„±)
 		void upsert(const core::Order& order);
 
-		// Æ¯Á¤ ¸¶ÄÏÀÇ ¿­·ÁÀÖ´Â(New/Open) ÁÖ¹®µé Á¶È¸
+		// íŠ¹ì • ë§ˆì¼“ì— í™œì„±ì¤‘ì¸(New/Open) ì£¼ë¬¸ë“¤ ì¡°íšŒ
 		[[nodiscard]] std::vector<core::Order> getOpenOrdersByMarket(const std::string_view& market) const;
 
-		// ÀüÃ¼ ÁÖ¹® ¼ö
+		// ì „ì²´ ì£¼ë¬¸ ìˆ˜
 		[[nodiscard]] std::size_t size() const;
 
+		// ì™„ë£Œ ì£¼ë¬¸ ì •ë¦¬(ì˜¤ë˜ëœ ì™„ë£Œ ì£¼ë¬¸ì„ ì‚­ì œ)
+		// - ì™„ë£Œ ì£¼ë¬¸ ê°œìˆ˜ë¥¼ ìµœê·¼ max_completed_orders_ê°œ ìœ ì§€í•  ë•Œ
+		// - ë°˜í™˜ê°’: ì‚­ì œëœ ì£¼ë¬¸ ìˆ˜
+		[[nodiscard]] std::size_t cleanup();
+
 	private:
-		// ³»ºÎ ÀúÀå¼Ò : order_id -> Order
+		// ì£¼ë¬¸ ì €ì¥ì†Œ : order_id -> Order
 		std::unordered_map<std::string, core::Order> orders_;
 
-		// µ¿½Ã¼º Á¦¾î¿ë ¹ÂÅØ½º
-		// ÀĞ±â(get/size/list)´Â shared lock, ¾²±â(add/update/erase)´Â unique lock
-		mutable std::shared_mutex mtx_;	// shared_mutex´Â ´Â shared¿Í unique ¸ğµÎ Áö¿ø
+		// ì™„ë£Œ ì£¼ë¬¸ FIFO í (ì˜¤ë˜ëœ ìˆœì„œ ì¶”ì )
+		std::deque<std::string> completed_order_ids_;
+
+		// ë™ì‹œì„± ì œì–´ìš© ë®¤í…ìŠ¤
+		// ì½ê¸°(get/size/list)ëŠ” shared lock, ì“°ê¸°(add/update/erase)ëŠ” unique lock
+		mutable std::shared_mutex mtx_;	// shared_mutexëŠ” ì—¬ëŸ¬ sharedì™€ unique ëª¨ë‘ ì§€ì›
+
+		// ë³´ê´€ ì£¼ë¬¸ ìµœëŒ€ ê°œìˆ˜ ìˆ˜
+		static constexpr std::size_t max_completed_orders_ = 1000;  
 	};
 }

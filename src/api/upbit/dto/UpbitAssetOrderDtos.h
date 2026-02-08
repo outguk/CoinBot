@@ -1,24 +1,24 @@
-#pragma once
+ï»¿#pragma once
 
 #include <string>
 #include <vector>
 #include <optional>
 #include <json.hpp>
 
-// Upbit ³» ÀÚ»ê°ú ÁÖ¹® °ü·Ã JSON µ¥ÀÌÅÍ¸¦ ±×´ë·Î ¹Ş´Â ±¸Á¶Ã¼(Dto) Á¤ÀÇ
+// Upbit ë‚´ ìì‚°ê³¼ ì£¼ë¬¸ ê´€ë ¨ JSON ë°ì´í„°ë¥¼ ê·¸ëŒ€ë¡œ ë°›ëŠ” êµ¬ì¡°ì²´(Dto) ì •ì˜
 
 namespace api::upbit::dto
 {
 	// Asset 
-	// °èÁ¤ ÀÜ°í Á¶È¸
+	// ê³„ì • ì”ê³  ì¡°íšŒ
 	struct AccountDto
 	{
-		std::string			currency;				// Á¶È¸ÇÏ°íÀÚ ÇÏ´Â ÅëÈ­ ÄÚµå
-		std::string			balance;				// ÁÖ¹® °¡´É ¼ö·® ¶Ç´Â ±İ¾×(ÄÚÀÎÀº ¼ö·®, ÅëÈ­´Â ±İ¾×)
-		std::string			locked;					// Ãâ±İÀÌ³ª ÁÖ¹® µî¿¡ Àá°Ü ÀÖ´Â ÀÜ¾×
-		std::string			avg_buy_price;			// ¸Å¼ö Æò±Õ°¡
-		bool				avg_buy_price_modified; // ¸Å¼ö Æò±Õ°¡ ¼öÁ¤ ¿©ºÎ
-		std::string			unit_currency;			// Æò±Õ°¡ ±âÁØ ÅëÈ­ (avg_buy_price°¡ ±âÁØÇÏ´Â ´ÜÀ§)
+		std::string			currency;				// ì¡°íšŒí•˜ê³ ì í•˜ëŠ” í†µí™” ì½”ë“œ
+		std::string			balance;				// ì£¼ë¬¸ ê°€ëŠ¥ ìˆ˜ëŸ‰ ë˜ëŠ” ê¸ˆì•¡(ì½”ì¸ì€ ìˆ˜ëŸ‰, í†µí™”ëŠ” ê¸ˆì•¡)
+		std::string			locked;					// ì¶œê¸ˆì´ë‚˜ ì£¼ë¬¸ ë“±ì— ì ê²¨ ìˆëŠ” ì”ì•¡
+		std::string			avg_buy_price;			// ë§¤ìˆ˜ í‰ê· ê°€
+		bool				avg_buy_price_modified; // ë§¤ìˆ˜ í‰ê· ê°€ ìˆ˜ì • ì—¬ë¶€
+		std::string			unit_currency;			// í‰ê· ê°€ ê¸°ì¤€ í†µí™” (avg_buy_priceê°€ ê¸°ì¤€í•˜ëŠ” ë‹¨ìœ„)
 	};
 
 	inline void from_json(const nlohmann::json& j, AccountDto& o) {
@@ -36,7 +36,7 @@ namespace api::upbit::dto
 	};
 
 	inline void from_json(const nlohmann::json& j, AccountsDto& o) {
-		// j´Â array
+		// jëŠ” array
 		o.account_list = j.get<std::vector<AccountDto>>();
 	}
 
@@ -45,39 +45,39 @@ namespace api::upbit::dto
 	
 
 	// Order 
-	// Order¸¦ À§ÇÑ enum class
+	// Orderë¥¼ ìœ„í•œ enum class
 	enum class Side {
-		bid, // ¸Å¼ö
-		ask  // ¸Åµµ
+		bid, // ë§¤ìˆ˜
+		ask  // ë§¤ë„
 	};
 	enum class OrdType {
 		limit,      // "limit"
-		price,      // "price"  (½ÃÀå°¡ ¸Å¼ö)
-		market,     // "market" (½ÃÀå°¡ ¸Åµµ)
-		best,       // ÃÖÀ¯¸® ÁöÁ¤°¡ °°Àº Å¸ÀÔµé
-		// ÇÊ¿äÇÏ¸é Ãß°¡...
+		price,      // "price"  (ì‹œì¥ê°€ ë§¤ìˆ˜)
+		market,     // "market" (ì‹œì¥ê°€ ë§¤ë„)
+		best,       // ìµœìœ ë¦¬ ì§€ì •ê°€ ê°™ì€ íƒ€ì…ë“¤
+		// í•„ìš”í•˜ë©´ ì¶”ê°€...
 	};
-	enum class OrdCondition										// ÁÖ¹® Ã¼°á Á¶°Ç
+	enum class OrdCondition										// ì£¼ë¬¸ ì²´ê²° ì¡°ê±´
 	{
-		ioc,		// ÁöÁ¤°¡ Á¶°ÇÀ¸·Î Áï½Ã Ã¼°á °¡´ÉÇÑ ¼ö·®¸¸ ºÎºĞ Ã¼°áÇÏ°í, ÀÜ¿© ¼ö·®Àº Ãë¼Ò
-		fok,		// ÁöÁ¤°¡ Á¶°ÇÀ¸·Î ÁÖ¹®·® Àü·® Ã¼°á °¡´ÉÇÒ ¶§¸¸ ÁÖ¹®À» ½ÇÇàÇÏ°í, ¾Æ´Ñ °æ¿ì Àü·® ÁÖ¹® Ãë¼Ò
-		post_only	// ¸ŞÀÌÄ¿(maker)ÁÖ¹®À¸·Î »ı¼ºµÉ ¼ö ÀÖ´Â »óÈ²¿¡¼­¸¸ ÁÖ¹®ÀÌ »ı¼ºµÇ¸ç Å×ÀÌÄ¿(taker) ÁÖ¹®À¸·Î Ã¼°áµÇ´Â °ÍÀ» ¹æÁö
+		ioc,		// ì§€ì •ê°€ ì¡°ê±´ìœ¼ë¡œ ì¦‰ì‹œ ì²´ê²° ê°€ëŠ¥í•œ ìˆ˜ëŸ‰ë§Œ ë¶€ë¶„ ì²´ê²°í•˜ê³ , ì”ì—¬ ìˆ˜ëŸ‰ì€ ì·¨ì†Œ
+		fok,		// ì§€ì •ê°€ ì¡°ê±´ìœ¼ë¡œ ì£¼ë¬¸ëŸ‰ ì „ëŸ‰ ì²´ê²° ê°€ëŠ¥í•  ë•Œë§Œ ì£¼ë¬¸ì„ ì‹¤í–‰í•˜ê³ , ì•„ë‹Œ ê²½ìš° ì „ëŸ‰ ì£¼ë¬¸ ì·¨ì†Œ
+		post_only	// ë©”ì´ì»¤(maker)ì£¼ë¬¸ìœ¼ë¡œ ìƒì„±ë  ìˆ˜ ìˆëŠ” ìƒí™©ì—ì„œë§Œ ì£¼ë¬¸ì´ ìƒì„±ë˜ë©° í…Œì´ì»¤(taker) ì£¼ë¬¸ìœ¼ë¡œ ì²´ê²°ë˜ëŠ” ê²ƒì„ ë°©ì§€
 	};
-	enum class SMP									// ÀÚÀü °Å·¡ Ã¼°á ¹æÁö ¿É¼Ç
+	enum class SMP									// ìì „ ê±°ë˜ ì²´ê²° ë°©ì§€ ì˜µì…˜
 	{
-		cancel_maker,			// ¸ŞÀÌÄ¿ ÁÖ¹®À» Ãë¼Ò	
-		cancel_taker,			// Å×ÀÌÄ¿ ÁÖ¹®À» Ãë¼Ò
-		reduce					// »õ·Î¿î ÁÖ¹® »ı¼º ½Ã ÀÚÀü °Å·¡ Á¶°ÇÀÌ ¼º¸³ÇÏ´Â °æ¿ì ±âÁ¸ ÁÖ¹®°ú ½Å±Ô ÁÖ¹®ÀÇ ÁÖ¹® ¼ö·®À» ÁÙ¿© Ã¼°áÀ» ¹æÁöÇÕ´Ï´Ù. ÀÜ·®ÀÌ 0ÀÎ °æ¿ì ÁÖ¹®À» Ãë¼Ò
+		cancel_maker,			// ë©”ì´ì»¤ ì£¼ë¬¸ì„ ì·¨ì†Œ	
+		cancel_taker,			// í…Œì´ì»¤ ì£¼ë¬¸ì„ ì·¨ì†Œ
+		reduce					// ìƒˆë¡œìš´ ì£¼ë¬¸ ìƒì„± ì‹œ ìì „ ê±°ë˜ ì¡°ê±´ì´ ì„±ë¦½í•˜ëŠ” ê²½ìš° ê¸°ì¡´ ì£¼ë¬¸ê³¼ ì‹ ê·œ ì£¼ë¬¸ì˜ ì£¼ë¬¸ ìˆ˜ëŸ‰ì„ ì¤„ì—¬ ì²´ê²°ì„ ë°©ì§€í•©ë‹ˆë‹¤. ì”ëŸ‰ì´ 0ì¸ ê²½ìš° ì£¼ë¬¸ì„ ì·¨ì†Œ
 	};
 	enum class OrdState
 	{
-		wait,		// Ã¼°á ´ë±â
-		watch,		// ¿¹¾à ÁÖ¹® ´ë±â
-		done,		// Ã¼°á ¿Ï·á
-		cancel		// ÁÖ¹® Ãë¼Ò
+		wait,		// ì²´ê²° ëŒ€ê¸°
+		watch,		// ì˜ˆì•½ ì£¼ë¬¸ ëŒ€ê¸°
+		done,		// ì²´ê²° ì™„ë£Œ
+		cancel		// ì£¼ë¬¸ ì·¨ì†Œ
 	};
-	// --- enum ¹®ÀÚ¿­ ¸ÅÇÎ Ãß°¡ ---
-	// nlohmann::jsonÀÌ "bid"/"ask" °°Àº ¹®ÀÚ¿­À» enumÀ¸·Î º¯È¯ÇÒ ¼ö ÀÖ°Ô ÇØÁØ´Ù.
+	// --- enum ë¬¸ìì—´ ë§¤í•‘ ì¶”ê°€ ---
+	// nlohmann::jsonì´ "bid"/"ask" ê°™ì€ ë¬¸ìì—´ì„ enumìœ¼ë¡œ ë³€í™˜í•  ìˆ˜ ìˆê²Œ í•´ì¤€ë‹¤.
 	NLOHMANN_JSON_SERIALIZE_ENUM(Side, {
 		{Side::bid, "bid"},
 		{Side::ask, "ask"},
@@ -102,55 +102,55 @@ namespace api::upbit::dto
 		{SMP::reduce,       "reduce"},
 	})
 
-	// ÁöÁ¤ÇÑ Æä¾îÀÇ ÁÖ¹® °¡´É Á¤º¸ Á¶È¸
+	// ì§€ì •í•œ í˜ì–´ì˜ ì£¼ë¬¸ ê°€ëŠ¥ ì •ë³´ ì¡°íšŒ
 	struct OrderInfosDto
 	{
 		struct OrderInfoDto
 		{
-			std::string			bid_fee;				// ¸Å¼ö ½Ã Àû¿ë ¼ö¼ö·áÀ²
-			std::string			ask_fee;				// ¸Åµµ ½Ã Àû¿ë ¼ö¼ö·áÀ²
-			std::string			maker_bid_fee;			// ¸Å¼ö maker ÁÖ¹® ¼ö¼ö·áÀ²
-			std::string			maker_ask_fee;			// ¸Åµµ maker ÁÖ¹® ¼ö¼ö·áÀ²
+			std::string			bid_fee;				// ë§¤ìˆ˜ ì‹œ ì ìš© ìˆ˜ìˆ˜ë£Œìœ¨
+			std::string			ask_fee;				// ë§¤ë„ ì‹œ ì ìš© ìˆ˜ìˆ˜ë£Œìœ¨
+			std::string			maker_bid_fee;			// ë§¤ìˆ˜ maker ì£¼ë¬¸ ìˆ˜ìˆ˜ë£Œìœ¨
+			std::string			maker_ask_fee;			// ë§¤ë„ maker ì£¼ë¬¸ ìˆ˜ìˆ˜ë£Œìœ¨
 
 			struct MARKET_OBJECT
 			{
-				std::string		id;						// Æä¾î(°Å·¡½Ö)ÀÇ ÄÚµå
-				std::string		name;					// Æä¾î ÄÚµå ex) BTC/KRW
+				std::string		id;						// í˜ì–´(ê±°ë˜ìŒ)ì˜ ì½”ë“œ
+				std::string		name;					// í˜ì–´ ì½”ë“œ ex) BTC/KRW
 
 				// string enum type
-				std::string		order_sides;			// Áö¿øÇÏ´Â ÁÖ¹® ¹æÇâ (¸Å¼ö/¸Åµµ)
-				std::string		bid_sides;				// Áö¿øÇÏ´Â ¸Å¼ö ÁÖ¹® À¯Çü
-				std::string		ask_sides;				// Áö¿øÇÏ´Â ¸Åµµ ÁÖ¹® À¯Çü
+				std::string		order_sides;			// ì§€ì›í•˜ëŠ” ì£¼ë¬¸ ë°©í–¥ (ë§¤ìˆ˜/ë§¤ë„)
+				std::string		bid_sides;				// ì§€ì›í•˜ëŠ” ë§¤ìˆ˜ ì£¼ë¬¸ ìœ í˜•
+				std::string		ask_sides;				// ì§€ì›í•˜ëŠ” ë§¤ë„ ì£¼ë¬¸ ìœ í˜•
 
-				struct BID_OBJECT						// ¸Å¼ö Á¦¾à Á¶°Ç
+				struct BID_OBJECT						// ë§¤ìˆ˜ ì œì•½ ì¡°ê±´
 				{
-					std::string	currency;				// ÀÚ»ê ±¸¸Å¿¡ »ç¿ëµÇ´Â ÅëÈ­
-					std::string	min_total;				// ¸Å¼ö ½Ã ÃÖ¼Ò ÁÖ¹® ±İ¾× ("5000" == 5000 KRW)
+					std::string	currency;				// ìì‚° êµ¬ë§¤ì— ì‚¬ìš©ë˜ëŠ” í†µí™”
+					std::string	min_total;				// ë§¤ìˆ˜ ì‹œ ìµœì†Œ ì£¼ë¬¸ ê¸ˆì•¡ ("5000" == 5000 KRW)
 				};
-				struct ASK_OBJECT						// ¸Åµµ Á¦¾à Á¶°Ç
+				struct ASK_OBJECT						// ë§¤ë„ ì œì•½ ì¡°ê±´
 				{
-					std::string	currency;				// ¸Åµµ ÀÚ»ê ÅëÈ­
-					std::string	min_total;				// ¸Åµµ ½Ã ÃÖ¼Ò ÁÖ¹® ±İ¾×
+					std::string	currency;				// ë§¤ë„ ìì‚° í†µí™”
+					std::string	min_total;				// ë§¤ë„ ì‹œ ìµœì†Œ ì£¼ë¬¸ ê¸ˆì•¡
 				};
 
-				BID_OBJECT		bid;					// ¸Å¼ö Á¦¾à Á¶°Ç
-				ASK_OBJECT		ask;					// ¸Å¼ö Á¦¾à Á¶°Ç
+				BID_OBJECT		bid;					// ë§¤ìˆ˜ ì œì•½ ì¡°ê±´
+				ASK_OBJECT		ask;					// ë§¤ìˆ˜ ì œì•½ ì¡°ê±´
 
-				std::string		max_total;				// ÃÖ´ë ÁÖ¹® °¡´É ±İ¾×
-				std::string		state;					// Æä¾î ¿î¿µ »óÅÂ (active)
+				std::string		max_total;				// ìµœëŒ€ ì£¼ë¬¸ ê°€ëŠ¥ ê¸ˆì•¡
+				std::string		state;					// í˜ì–´ ìš´ì˜ ìƒíƒœ (active)
 			};
 			MARKET_OBJECT		market;
 
 			struct BID_ACCOUNT_OBJECT
 			{
-				std::string		currency;				// Á¶È¸ÇÏ°íÀÚ ÇÏ´Â ÅëÈ­ ÄÚµå
-				std::string		balance;				// ÁÖ¹® °¡´É ¼ö·® or ±İ¾×
-				std::string		locked;					// Ãâ±İÀÌ³ª ÁÖ¹® µî¿¡ Àá°Ü ÀÖ´Â ÀÜ¾×
-				std::string		avg_buy_price;			// ¸Å¼ö Æò±Õ°¡
-				bool			avg_buy_price_modified; // ¸Å¼ö Æò±Õ°¡ ¼öÁ¤ ¿©ºÎ
-				std::string		unit_currency;			// Æò±Õ°¡ ±âÁØ ÅëÈ­. "avg_buy_price"°¡ ±âÁØÇÏ´Â ´ÜÀ§ (ÇÊ¼ö x)
+				std::string		currency;				// ì¡°íšŒí•˜ê³ ì í•˜ëŠ” í†µí™” ì½”ë“œ
+				std::string		balance;				// ì£¼ë¬¸ ê°€ëŠ¥ ìˆ˜ëŸ‰ or ê¸ˆì•¡
+				std::string		locked;					// ì¶œê¸ˆì´ë‚˜ ì£¼ë¬¸ ë“±ì— ì ê²¨ ìˆëŠ” ì”ì•¡
+				std::string		avg_buy_price;			// ë§¤ìˆ˜ í‰ê· ê°€
+				bool			avg_buy_price_modified; // ë§¤ìˆ˜ í‰ê· ê°€ ìˆ˜ì • ì—¬ë¶€
+				std::string		unit_currency;			// í‰ê· ê°€ ê¸°ì¤€ í†µí™”. "avg_buy_price"ê°€ ê¸°ì¤€í•˜ëŠ” ë‹¨ìœ„ (í•„ìˆ˜ x)
 			};
-			BID_ACCOUNT_OBJECT	bid_account;			// È£°¡ ÀÚ»ê °èÁÂ Á¤º¸
+			BID_ACCOUNT_OBJECT	bid_account;			// í˜¸ê°€ ìì‚° ê³„ì¢Œ ì •ë³´
 
 			struct ASK_ACCOUNT_OBJECT
 			{
@@ -161,135 +161,135 @@ namespace api::upbit::dto
 				bool			avg_buy_price_modified;
 				std::string		unit_currency;
 			};
-			ASK_ACCOUNT_OBJECT	ask_account;			// ±âÁØ ÀÚ»ê °èÁÂ Á¤º¸
+			ASK_ACCOUNT_OBJECT	ask_account;			// ê¸°ì¤€ ìì‚° ê³„ì¢Œ ì •ë³´
 		};
 
 		std::vector<OrderInfoDto> order_info;
 		
 	};
 
-	// ÁÖ¹® »ı¼º POST (Å×½ºÆ®´Â Çü½ÄÀº °°°í url ÇüÅÂ¸¸ ´Ù¸§)
+	// ì£¼ë¬¸ ìƒì„± POST (í…ŒìŠ¤íŠ¸ëŠ” í˜•ì‹ì€ ê°™ê³  url í˜•íƒœë§Œ ë‹¤ë¦„)
 	struct CreateOrderRequestDto
 	{
-		std::string						market;					// ÁÖ¹®À» »ı¼ºÇÏ°íÀÚ ÇÏ´Â ´ë»ó Æä¾î(°Å·¡½Ö)
-		Side							side;					// ÁÖ¹® ¹æÇâ
-		OrdType							ord_type;				// ÁÖ¹® À¯Çü
-		std::string						price;					// ÁÖ¹® ´Ü°¡ or ÃÑ¾×
+		std::string						market;					// ì£¼ë¬¸ì„ ìƒì„±í•˜ê³ ì í•˜ëŠ” ëŒ€ìƒ í˜ì–´(ê±°ë˜ìŒ)
+		Side							side;					// ì£¼ë¬¸ ë°©í–¥
+		OrdType							ord_type;				// ì£¼ë¬¸ ìœ í˜•
+		std::string						price;					// ì£¼ë¬¸ ë‹¨ê°€ or ì´ì•¡
 
-		std::optional<std::string>		volume;					// ÁÖ¹® ¼ö·®
-		std::optional<OrdCondition>		time_in_force;			// ÁÖ¹® Ã¼°á Á¶°Ç
-		std::optional<SMP>				smp_type;				// ÀÚÀü °Å·¡ Ã¼°á ¹æÁö ¿É¼Ç
+		std::optional<std::string>		volume;					// ì£¼ë¬¸ ìˆ˜ëŸ‰
+		std::optional<OrdCondition>		time_in_force;			// ì£¼ë¬¸ ì²´ê²° ì¡°ê±´
+		std::optional<SMP>				smp_type;				// ìì „ ê±°ë˜ ì²´ê²° ë°©ì§€ ì˜µì…˜
 
-		std::string						identifier;				// Å¬¶óÀÌ¾ğÆ® ÁöÁ¤ ÁÖ¹® ½Äº°ÀÚ
+		std::string						identifier;				// í´ë¼ì´ì–¸íŠ¸ ì§€ì • ì£¼ë¬¸ ì‹ë³„ì
 	};
-	// ÁÖ¹® »ı¼º GET
+	// ì£¼ë¬¸ ìƒì„± GET
 	struct CreateOrderResponseDto
 	{
-		std::string						market;					// Æä¾î(°Å·¡½Ö)ÀÇ ÄÚµå
-		std::string						uuid;					// ÁÖ¹®ÀÇ À¯ÀÏ ½Äº°ÀÚ
+		std::string						market;					// í˜ì–´(ê±°ë˜ìŒ)ì˜ ì½”ë“œ
+		std::string						uuid;					// ì£¼ë¬¸ì˜ ìœ ì¼ ì‹ë³„ì
 
-		Side							side;					// ÁÖ¹® ¹æÇâ(¸Å¼ö/¸Åµµ)
-		std::string						ord_type;				// ÁÖ¹® À¯Çü
-		std::optional<std::string>		price;					// ÁÖ¹® ´Ü°¡ ¶Ç´Â ÃÑ¾×
-		std::optional<std::string>		volume;					// ÁÖ¹® ¿äÃ» ¼ö·®
-		OrdState						state;					// ÁÖ¹® »óÅÂ
-		std::string						created_at;				// ÁÖ¹® »ı¼º ½Ã°¢ (KST ±âÁØ)
+		Side							side;					// ì£¼ë¬¸ ë°©í–¥(ë§¤ìˆ˜/ë§¤ë„)
+		std::string						ord_type;				// ì£¼ë¬¸ ìœ í˜•
+		std::optional<std::string>		price;					// ì£¼ë¬¸ ë‹¨ê°€ ë˜ëŠ” ì´ì•¡
+		std::optional<std::string>		volume;					// ì£¼ë¬¸ ìš”ì²­ ìˆ˜ëŸ‰
+		OrdState						state;					// ì£¼ë¬¸ ìƒíƒœ
+		std::string						created_at;				// ì£¼ë¬¸ ìƒì„± ì‹œê° (KST ê¸°ì¤€)
 
-		std::string						remaining_volume;		// Ã¼°á ÈÄ ³²Àº ÁÖ¹® ¾ç
-		std::string						executed_volume;		// Ã¼°áµÈ ¾ç
-		std::string						reserved_fee;			// ¼ö¼ö·á·Î ¿¹¾àµÈ ºñ¿ë
-		std::string						remaining_fee;			// ³²Àº ¼ö¼ö·á
-		std::string						paid_fee;				// »ç¿ëµÈ ¼ö¼ö·á
-		std::string						locked;					// °Å·¡¿¡ »ç¿ë ÁßÀÎ ºñ¿ë
+		std::string						remaining_volume;		// ì²´ê²° í›„ ë‚¨ì€ ì£¼ë¬¸ ì–‘
+		std::string						executed_volume;		// ì²´ê²°ëœ ì–‘
+		std::string						reserved_fee;			// ìˆ˜ìˆ˜ë£Œë¡œ ì˜ˆì•½ëœ ë¹„ìš©
+		std::string						remaining_fee;			// ë‚¨ì€ ìˆ˜ìˆ˜ë£Œ
+		std::string						paid_fee;				// ì‚¬ìš©ëœ ìˆ˜ìˆ˜ë£Œ
+		std::string						locked;					// ê±°ë˜ì— ì‚¬ìš© ì¤‘ì¸ ë¹„ìš©
 
-		std::optional<OrdCondition>		time_in_force;			// ÁÖ¹® Ã¼°á Á¶°Ç
-		std::optional<SMP>				smp_type;				// ÀÚÀü °Å·¡ Ã¼°á ¹æÁö ¿É¼Ç
+		std::optional<OrdCondition>		time_in_force;			// ì£¼ë¬¸ ì²´ê²° ì¡°ê±´
+		std::optional<SMP>				smp_type;				// ìì „ ê±°ë˜ ì²´ê²° ë°©ì§€ ì˜µì…˜
 
-		std::string						prevented_volume;		// ÀÚÀü°Å·¡ ¹æÁö·Î ÀÎÇØ Ãë¼ÒµÈ ¼ö·®
-		std::string						prevented_locked;		// ÀÚÀü°Å·¡ ¹æÁö·Î ÀÎÇØ ÇØÁ¦µÈ ÀÚ»ê
+		std::string						prevented_volume;		// ìì „ê±°ë˜ ë°©ì§€ë¡œ ì¸í•´ ì·¨ì†Œëœ ìˆ˜ëŸ‰
+		std::string						prevented_locked;		// ìì „ê±°ë˜ ë°©ì§€ë¡œ ì¸í•´ í•´ì œëœ ìì‚°
 
-		int								trades_count{ 0 };			// ÇØ´ç ÁÖ¹®¿¡ ´ëÇÑ Ã¼°á °Ç¼ö
-		std::string						identifier;				// Å¬¶óÀÌ¾ğÆ® ÁöÁ¤ ÁÖ¹® ½Äº°ÀÚ
+		int								trades_count{ 0 };			// í•´ë‹¹ ì£¼ë¬¸ì— ëŒ€í•œ ì²´ê²° ê±´ìˆ˜
+		std::string						identifier;				// í´ë¼ì´ì–¸íŠ¸ ì§€ì • ì£¼ë¬¸ ì‹ë³„ì
 	};
 
-	// °³º° ÁÖ¹® Á¶È¸ (Á¶È¸ ½Ã uuid ¶Ç´Â identifier Áß ÇÏ³ª´Â ¹İµå½Ã ÆÄ¶ó¹ÌÅÍ·Î Æ÷ÇÔÇØ¾ß Á¶È¸µÊ
+	// ê°œë³„ ì£¼ë¬¸ ì¡°íšŒ (ì¡°íšŒ ì‹œ uuid ë˜ëŠ” identifier ì¤‘ í•˜ë‚˜ëŠ” ë°˜ë“œì‹œ íŒŒë¼ë¯¸í„°ë¡œ í¬í•¨í•´ì•¼ ì¡°íšŒë¨
 	struct OrderResponseDto
 	{
-		std::string						market;					// Æä¾î(°Å·¡½Ö)ÀÇ ÄÚµå
-		std::string						uuid;					// ÁÖ¹®ÀÇ À¯ÀÏ ½Äº°ÀÚ
+		std::string						market;					// í˜ì–´(ê±°ë˜ìŒ)ì˜ ì½”ë“œ
+		std::string						uuid;					// ì£¼ë¬¸ì˜ ìœ ì¼ ì‹ë³„ì
 
-		Side							side;					// ÁÖ¹® ¹æÇâ(¸Å¼ö/¸Åµµ)
-		std::string						ord_type;				// ÁÖ¹® À¯Çü
-		std::optional<std::string>		price;					// ÁÖ¹® ´Ü°¡ ¶Ç´Â ÃÑ¾×
-		std::optional<std::string>		volume;					// ÁÖ¹® ¿äÃ» ¼ö·®
-		OrdState						state;					// ÁÖ¹® »óÅÂ
-		std::string						created_at;				// ÁÖ¹® »ı¼º ½Ã°¢ (KST ±âÁØ)
+		Side							side;					// ì£¼ë¬¸ ë°©í–¥(ë§¤ìˆ˜/ë§¤ë„)
+		std::string						ord_type;				// ì£¼ë¬¸ ìœ í˜•
+		std::optional<std::string>		price;					// ì£¼ë¬¸ ë‹¨ê°€ ë˜ëŠ” ì´ì•¡
+		std::optional<std::string>		volume;					// ì£¼ë¬¸ ìš”ì²­ ìˆ˜ëŸ‰
+		OrdState						state;					// ì£¼ë¬¸ ìƒíƒœ
+		std::string						created_at;				// ì£¼ë¬¸ ìƒì„± ì‹œê° (KST ê¸°ì¤€)
 
-		std::optional<std::string>		remaining_volume;		// Ã¼°á ÈÄ ³²Àº ÁÖ¹® ¾ç
-		std::string						executed_volume;		// Ã¼°áµÈ ¾ç
-		std::string						reserved_fee;			// ¼ö¼ö·á·Î ¿¹¾àµÈ ºñ¿ë
-		std::string						remaining_fee;			// ³²Àº ¼ö¼ö·á
-		std::string						paid_fee;				// »ç¿ëµÈ ¼ö¼ö·á
-		std::string						locked;					// °Å·¡¿¡ »ç¿ë ÁßÀÎ ºñ¿ë
+		std::optional<std::string>		remaining_volume;		// ì²´ê²° í›„ ë‚¨ì€ ì£¼ë¬¸ ì–‘
+		std::string						executed_volume;		// ì²´ê²°ëœ ì–‘
+		std::string						reserved_fee;			// ìˆ˜ìˆ˜ë£Œë¡œ ì˜ˆì•½ëœ ë¹„ìš©
+		std::string						remaining_fee;			// ë‚¨ì€ ìˆ˜ìˆ˜ë£Œ
+		std::string						paid_fee;				// ì‚¬ìš©ëœ ìˆ˜ìˆ˜ë£Œ
+		std::string						locked;					// ê±°ë˜ì— ì‚¬ìš© ì¤‘ì¸ ë¹„ìš©
 
-		std::optional<OrdCondition>		time_in_force;			// ÁÖ¹® Ã¼°á Á¶°Ç
-		std::optional<SMP>				smp_type;				// ÀÚÀü °Å·¡ Ã¼°á ¹æÁö ¿É¼Ç
+		std::optional<OrdCondition>		time_in_force;			// ì£¼ë¬¸ ì²´ê²° ì¡°ê±´
+		std::optional<SMP>				smp_type;				// ìì „ ê±°ë˜ ì²´ê²° ë°©ì§€ ì˜µì…˜
 
-		std::string						prevented_volume;		// ÀÚÀü°Å·¡ ¹æÁö·Î ÀÎÇØ Ãë¼ÒµÈ ¼ö·®
-		std::optional<std::string>		prevented_locked;		// ÀÚÀü°Å·¡ ¹æÁö·Î ÀÎÇØ ÇØÁ¦µÈ ÀÚ»ê
+		std::string						prevented_volume;		// ìì „ê±°ë˜ ë°©ì§€ë¡œ ì¸í•´ ì·¨ì†Œëœ ìˆ˜ëŸ‰
+		std::optional<std::string>		prevented_locked;		// ìì „ê±°ë˜ ë°©ì§€ë¡œ ì¸í•´ í•´ì œëœ ìì‚°
 
-		int								trades_count{ 0 };			// ÇØ´ç ÁÖ¹®¿¡ ´ëÇÑ Ã¼°á °Ç¼ö
+		int								trades_count{ 0 };			// í•´ë‹¹ ì£¼ë¬¸ì— ëŒ€í•œ ì²´ê²° ê±´ìˆ˜
 
 		struct ArrayOfTrade
 		{
-			std::string					market;					// Æä¾î(°Å·¡½Ö)ÀÇ ÄÚµå
-			std::string					uuid;					// ÁÖ¹®ÀÇ À¯ÀÏ ½Äº°ÀÚ
-			std::string					price;					// Ã¼°á ´Ü°¡
-			std::string					volume;					// Ã¼°á ¼ö·®
-			std::string					funds;					// Ã¼°á ÃÑ¾×
-			std::string					trend;					// Ã¼°á ½Ã¼¼ Èå¸§("up" - ¸Å¼ö¿¡ ÀÇÇÑ Ã¼°á)
-			std::string					created_at;				// ÁÖ¹® »ı¼º ½Ã°¢ (KST ±âÁØ)
-			Side						side;					// ÁÖ¹® ¹æÇâ(¸Å¼ö/¸Åµµ)
+			std::string					market;					// í˜ì–´(ê±°ë˜ìŒ)ì˜ ì½”ë“œ
+			std::string					uuid;					// ì£¼ë¬¸ì˜ ìœ ì¼ ì‹ë³„ì
+			std::string					price;					// ì²´ê²° ë‹¨ê°€
+			std::string					volume;					// ì²´ê²° ìˆ˜ëŸ‰
+			std::string					funds;					// ì²´ê²° ì´ì•¡
+			std::string					trend;					// ì²´ê²° ì‹œì„¸ íë¦„("up" - ë§¤ìˆ˜ì— ì˜í•œ ì²´ê²°)
+			std::string					created_at;				// ì£¼ë¬¸ ìƒì„± ì‹œê° (KST ê¸°ì¤€)
+			Side						side;					// ì£¼ë¬¸ ë°©í–¥(ë§¤ìˆ˜/ë§¤ë„)
 
 		};
-		ArrayOfTrade					trades;					// ÁÖ¹®ÀÇ Ã¼°á ¸ñ·Ï
+		ArrayOfTrade					trades;					// ì£¼ë¬¸ì˜ ì²´ê²° ëª©ë¡
 	};
-	// °³º° ÁÖ¹® ¸ñ·Ï Á¶È¸ (Á¶È¸ ½Ã uuid ¶Ç´Â identifier Áß ÇÏ³ª´Â ¹İµå½Ã ÆÄ¶ó¹ÌÅÍ·Î Æ÷ÇÔÇØ¾ß Á¶È¸µÊ
+	// ê°œë³„ ì£¼ë¬¸ ëª©ë¡ ì¡°íšŒ (ì¡°íšŒ ì‹œ uuid ë˜ëŠ” identifier ì¤‘ í•˜ë‚˜ëŠ” ë°˜ë“œì‹œ íŒŒë¼ë¯¸í„°ë¡œ í¬í•¨í•´ì•¼ ì¡°íšŒë¨
 	struct OrdersResponseDto
 	{
 		std::vector<OrderResponseDto>	orders_response;
 	};
 
-	// Ã¼°á ´ë±â ÁßÀÎ ÁÖ¹® ¸ñ·Ï Á¶È¸ (Á¶È¸ ½Ã state¿Í state[]´Â µ¿½Ã »ç¿ë ºÒ°¡)
+	// ì²´ê²° ëŒ€ê¸° ì¤‘ì¸ ì£¼ë¬¸ ëª©ë¡ ì¡°íšŒ (ì¡°íšŒ ì‹œ stateì™€ state[]ëŠ” ë™ì‹œ ì‚¬ìš© ë¶ˆê°€)
 	struct WaitOrderResponseDto
 	{
-		std::string						market;					// Æä¾î(°Å·¡½Ö)ÀÇ ÄÚµå
-		std::string						uuid;					// ÁÖ¹®ÀÇ À¯ÀÏ ½Äº°ÀÚ
+		std::string						market;					// í˜ì–´(ê±°ë˜ìŒ)ì˜ ì½”ë“œ
+		std::string						uuid;					// ì£¼ë¬¸ì˜ ìœ ì¼ ì‹ë³„ì
 
-		Side							side;					// ÁÖ¹® ¹æÇâ(¸Å¼ö/¸Åµµ)
-		std::string						ord_type;				// ÁÖ¹® À¯Çü
-		std::optional<std::string>		price;					// ÁÖ¹® ´Ü°¡ ¶Ç´Â ÃÑ¾×
-		std::optional<std::string>		volume;					// ÁÖ¹® ¿äÃ» ¼ö·®
-		OrdState						state;					// ÁÖ¹® »óÅÂ
-		std::string						created_at;				// ÁÖ¹® »ı¼º ½Ã°¢ (KST ±âÁØ)
+		Side							side;					// ì£¼ë¬¸ ë°©í–¥(ë§¤ìˆ˜/ë§¤ë„)
+		std::string						ord_type;				// ì£¼ë¬¸ ìœ í˜•
+		std::optional<std::string>		price;					// ì£¼ë¬¸ ë‹¨ê°€ ë˜ëŠ” ì´ì•¡
+		std::optional<std::string>		volume;					// ì£¼ë¬¸ ìš”ì²­ ìˆ˜ëŸ‰
+		OrdState						state;					// ì£¼ë¬¸ ìƒíƒœ
+		std::string						created_at;				// ì£¼ë¬¸ ìƒì„± ì‹œê° (KST ê¸°ì¤€)
 
-		std::string						remaining_volume;		// Ã¼°á ÈÄ ³²Àº ÁÖ¹® ¾ç
-		std::string						executed_volume;		// Ã¼°áµÈ ¾ç
-		std::string						executed_funds;			// ÇöÀç±îÁö Ã¼°áµÈ ±İ¾×
+		std::string						remaining_volume;		// ì²´ê²° í›„ ë‚¨ì€ ì£¼ë¬¸ ì–‘
+		std::string						executed_volume;		// ì²´ê²°ëœ ì–‘
+		std::string						executed_funds;			// í˜„ì¬ê¹Œì§€ ì²´ê²°ëœ ê¸ˆì•¡
 
-		std::string						reserved_fee;			// ¼ö¼ö·á·Î ¿¹¾àµÈ ºñ¿ë
-		std::string						remaining_fee;			// ³²Àº ¼ö¼ö·á
-		std::string						paid_fee;				// »ç¿ëµÈ ¼ö¼ö·á
-		std::string						locked;					// °Å·¡¿¡ »ç¿ë ÁßÀÎ ºñ¿ë
+		std::string						reserved_fee;			// ìˆ˜ìˆ˜ë£Œë¡œ ì˜ˆì•½ëœ ë¹„ìš©
+		std::string						remaining_fee;			// ë‚¨ì€ ìˆ˜ìˆ˜ë£Œ
+		std::string						paid_fee;				// ì‚¬ìš©ëœ ìˆ˜ìˆ˜ë£Œ
+		std::string						locked;					// ê±°ë˜ì— ì‚¬ìš© ì¤‘ì¸ ë¹„ìš©
 
-		std::optional<OrdCondition>		time_in_force;			// ÁÖ¹® Ã¼°á Á¶°Ç
-		std::optional<SMP>				smp_type;				// ÀÚÀü °Å·¡ Ã¼°á ¹æÁö ¿É¼Ç
+		std::optional<OrdCondition>		time_in_force;			// ì£¼ë¬¸ ì²´ê²° ì¡°ê±´
+		std::optional<SMP>				smp_type;				// ìì „ ê±°ë˜ ì²´ê²° ë°©ì§€ ì˜µì…˜
 
-		std::string						prevented_volume;		// ÀÚÀü°Å·¡ ¹æÁö·Î ÀÎÇØ Ãë¼ÒµÈ ¼ö·®
-		std::optional<std::string>		prevented_locked;		// ÀÚÀü°Å·¡ ¹æÁö·Î ÀÎÇØ ÇØÁ¦µÈ ÀÚ»ê
+		std::string						prevented_volume;		// ìì „ê±°ë˜ ë°©ì§€ë¡œ ì¸í•´ ì·¨ì†Œëœ ìˆ˜ëŸ‰
+		std::optional<std::string>		prevented_locked;		// ìì „ê±°ë˜ ë°©ì§€ë¡œ ì¸í•´ í•´ì œëœ ìì‚°
 
-		int								trades_count{ 0 };		// ÇØ´ç ÁÖ¹®¿¡ ´ëÇÑ Ã¼°á °Ç¼ö
-		std::optional<std::string>		identifier;				// ÁÖ¹® »ı¼º½Ã Å¬¶óÀÌ¾ğÆ®°¡ ÁöÁ¤ÇÑ ÁÖ¹® ½Äº°ÀÚ
+		int								trades_count{ 0 };		// í•´ë‹¹ ì£¼ë¬¸ì— ëŒ€í•œ ì²´ê²° ê±´ìˆ˜
+		std::optional<std::string>		identifier;				// ì£¼ë¬¸ ìƒì„±ì‹œ í´ë¼ì´ì–¸íŠ¸ê°€ ì§€ì •í•œ ì£¼ë¬¸ ì‹ë³„ì
 	};
 
 	inline void from_json(const nlohmann::json& j, WaitOrderResponseDto& o)
@@ -300,7 +300,7 @@ namespace api::upbit::dto
 		j.at("side").get_to(o.side);
 		j.at("ord_type").get_to(o.ord_type);
 
-		// optional string: null °¡´É¼º ¹æ¾î
+		// optional string: null ê°€ëŠ¥ì„± ë°©ì–´
 		if (j.contains("price") && !j.at("price").is_null()) j.at("price").get_to(o.price);
 		else o.price.reset();
 
@@ -313,7 +313,7 @@ namespace api::upbit::dto
 		j.at("remaining_volume").get_to(o.remaining_volume);
 		j.at("executed_volume").get_to(o.executed_volume);
 
-		// executed_funds´Â ½ºÆå»ó Á¸Àç(¾øÀ» ¼öµµ ÀÖÀ¸´Ï ¹æ¾î)
+		// executed_fundsëŠ” ìŠ¤í™ìƒ ì¡´ì¬(ì—†ì„ ìˆ˜ë„ ìˆìœ¼ë‹ˆ ë°©ì–´)
 		if (j.contains("executed_funds") && !j.at("executed_funds").is_null())
 			j.at("executed_funds").get_to(o.executed_funds);
 		else
@@ -322,7 +322,7 @@ namespace api::upbit::dto
 		j.at("reserved_fee").get_to(o.reserved_fee);
 		j.at("locked").get_to(o.locked);
 
-		// ¡Ú ´©¶ô º¸¿Ï: remaining_fee / paid_fee
+		// â˜… ëˆ„ë½ ë³´ì™„: remaining_fee / paid_fee
 		if (j.contains("remaining_fee") && !j.at("remaining_fee").is_null())
 			j.at("remaining_fee").get_to(o.remaining_fee);
 		else
@@ -333,7 +333,7 @@ namespace api::upbit::dto
 		else
 			o.paid_fee = "0";
 
-		// ¡Ú ´©¶ô º¸¿Ï: time_in_force / smp_type (optional enum)
+		// â˜… ëˆ„ë½ ë³´ì™„: time_in_force / smp_type (optional enum)
 		if (j.contains("time_in_force") && !j.at("time_in_force").is_null())
 			j.at("time_in_force").get_to(o.time_in_force);
 		else
@@ -344,7 +344,7 @@ namespace api::upbit::dto
 		else
 			o.smp_type.reset();
 
-		// ¡Ú ´©¶ô º¸¿Ï: prevented_* (optional Æ÷ÇÔ)
+		// â˜… ëˆ„ë½ ë³´ì™„: prevented_* (optional í¬í•¨)
 		if (j.contains("prevented_volume") && !j.at("prevented_volume").is_null())
 			j.at("prevented_volume").get_to(o.prevented_volume);
 		else
@@ -367,155 +367,155 @@ namespace api::upbit::dto
 		std::vector<WaitOrderResponseDto>	wait_order_list;
 	};
 	inline void from_json(const nlohmann::json& j, WaitOrdersResponseDto& o) {
-		// j´Â array
+		// jëŠ” array
 		o.wait_order_list = j.get<std::vector<WaitOrderResponseDto>>();
 	}
 
 
 
-	// Á¾·á ÁÖ¹® ¸ñ·Ï Á¶È¸ (Á¶È¸ ½Ã state¿Í state[]´Â µ¿½Ã »ç¿ë ºÒ°¡)
+	// ì¢…ë£Œ ì£¼ë¬¸ ëª©ë¡ ì¡°íšŒ (ì¡°íšŒ ì‹œ stateì™€ state[]ëŠ” ë™ì‹œ ì‚¬ìš© ë¶ˆê°€)
 	struct ClosedOrdersResponseDto
 	{
 		struct ClosedOrderResponseDto
 		{
-			std::string						market;					// Æä¾î(°Å·¡½Ö)ÀÇ ÄÚµå
-			std::string						uuid;					// ÁÖ¹®ÀÇ À¯ÀÏ ½Äº°ÀÚ
+			std::string						market;					// í˜ì–´(ê±°ë˜ìŒ)ì˜ ì½”ë“œ
+			std::string						uuid;					// ì£¼ë¬¸ì˜ ìœ ì¼ ì‹ë³„ì
 
-			Side							side;					// ÁÖ¹® ¹æÇâ(¸Å¼ö/¸Åµµ)
-			std::string						ord_type;				// ÁÖ¹® À¯Çü
-			std::string						price;					// ÁÖ¹® ´Ü°¡ ¶Ç´Â ÃÑ¾×
-			std::string						volume;					// ÁÖ¹® ¿äÃ» ¼ö·®
-			OrdState						state;					// ÁÖ¹® »óÅÂ
-			std::string						created_at;				// ÁÖ¹® »ı¼º ½Ã°¢ (KST ±âÁØ)
+			Side							side;					// ì£¼ë¬¸ ë°©í–¥(ë§¤ìˆ˜/ë§¤ë„)
+			std::string						ord_type;				// ì£¼ë¬¸ ìœ í˜•
+			std::string						price;					// ì£¼ë¬¸ ë‹¨ê°€ ë˜ëŠ” ì´ì•¡
+			std::string						volume;					// ì£¼ë¬¸ ìš”ì²­ ìˆ˜ëŸ‰
+			OrdState						state;					// ì£¼ë¬¸ ìƒíƒœ
+			std::string						created_at;				// ì£¼ë¬¸ ìƒì„± ì‹œê° (KST ê¸°ì¤€)
 
-			std::string						remaining_volume;		// Ã¼°á ÈÄ ³²Àº ÁÖ¹® ¾ç
-			std::string						executed_volume;		// Ã¼°áµÈ ¾ç
-			std::string						executed_funds;			// ÇöÀç±îÁö Ã¼°áµÈ ±İ¾×
+			std::string						remaining_volume;		// ì²´ê²° í›„ ë‚¨ì€ ì£¼ë¬¸ ì–‘
+			std::string						executed_volume;		// ì²´ê²°ëœ ì–‘
+			std::string						executed_funds;			// í˜„ì¬ê¹Œì§€ ì²´ê²°ëœ ê¸ˆì•¡
 
-			std::string						reserved_fee;			// ¼ö¼ö·á·Î ¿¹¾àµÈ ºñ¿ë
-			std::string						remaining_fee;			// ³²Àº ¼ö¼ö·á
-			std::string						paid_fee;				// »ç¿ëµÈ ¼ö¼ö·á
-			std::string						locked;					// °Å·¡¿¡ »ç¿ë ÁßÀÎ ºñ¿ë
+			std::string						reserved_fee;			// ìˆ˜ìˆ˜ë£Œë¡œ ì˜ˆì•½ëœ ë¹„ìš©
+			std::string						remaining_fee;			// ë‚¨ì€ ìˆ˜ìˆ˜ë£Œ
+			std::string						paid_fee;				// ì‚¬ìš©ëœ ìˆ˜ìˆ˜ë£Œ
+			std::string						locked;					// ê±°ë˜ì— ì‚¬ìš© ì¤‘ì¸ ë¹„ìš©
 
-			std::optional<OrdCondition>		time_in_force;			// ÁÖ¹® Ã¼°á Á¶°Ç
+			std::optional<OrdCondition>		time_in_force;			// ì£¼ë¬¸ ì²´ê²° ì¡°ê±´
 
-			std::string						prevented_volume;		// ÀÚÀü°Å·¡ ¹æÁö·Î ÀÎÇØ Ãë¼ÒµÈ ¼ö·®
-			std::string						prevented_locked;		// ÀÚÀü°Å·¡ ¹æÁö·Î ÀÎÇØ ÇØÁ¦µÈ ÀÚ»ê
+			std::string						prevented_volume;		// ìì „ê±°ë˜ ë°©ì§€ë¡œ ì¸í•´ ì·¨ì†Œëœ ìˆ˜ëŸ‰
+			std::string						prevented_locked;		// ìì „ê±°ë˜ ë°©ì§€ë¡œ ì¸í•´ í•´ì œëœ ìì‚°
 
-			int								trades_count{ 0 };			// ÇØ´ç ÁÖ¹®¿¡ ´ëÇÑ Ã¼°á °Ç¼ö
-			std::optional<std::string>		identifier;				// ÁÖ¹® »ı¼º½Ã Å¬¶óÀÌ¾ğÆ®°¡ ÁöÁ¤ÇÑ ÁÖ¹® ½Äº°ÀÚ
+			int								trades_count{ 0 };			// í•´ë‹¹ ì£¼ë¬¸ì— ëŒ€í•œ ì²´ê²° ê±´ìˆ˜
+			std::optional<std::string>		identifier;				// ì£¼ë¬¸ ìƒì„±ì‹œ í´ë¼ì´ì–¸íŠ¸ê°€ ì§€ì •í•œ ì£¼ë¬¸ ì‹ë³„ì
 		};
 		
 		std::vector<ClosedOrderResponseDto>	closed_order_list;
 	};
 
-	// °³º° ÁÖ¹® Ãë¼Ò Á¢¼ö
-		// ÀÌ °æ¿ì ÀÚÁÖ »ç¿ëÇÏ¸é Äõ¸®¿ë Request Dto¸¦ µû·Î ¸¸µéÀÚ
+	// ê°œë³„ ì£¼ë¬¸ ì·¨ì†Œ ì ‘ìˆ˜
+		// ì´ ê²½ìš° ìì£¼ ì‚¬ìš©í•˜ë©´ ì¿¼ë¦¬ìš© Request Dtoë¥¼ ë”°ë¡œ ë§Œë“¤ì
 	struct CancelOrdersResponseDto
 	{
 		struct CancelOrderResponseDto
 		{
-			std::string						market;					// Æä¾î(°Å·¡½Ö)ÀÇ ÄÚµå
-			std::string						uuid;					// ÁÖ¹®ÀÇ À¯ÀÏ ½Äº°ÀÚ
+			std::string						market;					// í˜ì–´(ê±°ë˜ìŒ)ì˜ ì½”ë“œ
+			std::string						uuid;					// ì£¼ë¬¸ì˜ ìœ ì¼ ì‹ë³„ì
 
-			Side							side;					// ÁÖ¹® ¹æÇâ(¸Å¼ö/¸Åµµ)
-			std::string						ord_type;				// ÁÖ¹® À¯Çü
-			std::optional<std::string>		price;					// ÁÖ¹® ´Ü°¡ ¶Ç´Â ÃÑ¾×
-			std::optional<std::string>		volume;					// ÁÖ¹® ¿äÃ» ¼ö·®
-			OrdState						state;					// ÁÖ¹® »óÅÂ
-			std::string						created_at;				// ÁÖ¹® »ı¼º ½Ã°¢ (KST ±âÁØ)
+			Side							side;					// ì£¼ë¬¸ ë°©í–¥(ë§¤ìˆ˜/ë§¤ë„)
+			std::string						ord_type;				// ì£¼ë¬¸ ìœ í˜•
+			std::optional<std::string>		price;					// ì£¼ë¬¸ ë‹¨ê°€ ë˜ëŠ” ì´ì•¡
+			std::optional<std::string>		volume;					// ì£¼ë¬¸ ìš”ì²­ ìˆ˜ëŸ‰
+			OrdState						state;					// ì£¼ë¬¸ ìƒíƒœ
+			std::string						created_at;				// ì£¼ë¬¸ ìƒì„± ì‹œê° (KST ê¸°ì¤€)
 
-			std::string						remaining_volume;		// Ã¼°á ÈÄ ³²Àº ÁÖ¹® ¾ç
-			std::string						executed_volume;		// Ã¼°áµÈ ¾ç
+			std::string						remaining_volume;		// ì²´ê²° í›„ ë‚¨ì€ ì£¼ë¬¸ ì–‘
+			std::string						executed_volume;		// ì²´ê²°ëœ ì–‘
 
-			std::string						reserved_fee;			// ¼ö¼ö·á·Î ¿¹¾àµÈ ºñ¿ë
-			std::string						remaining_fee;			// ³²Àº ¼ö¼ö·á
-			std::string						paid_fee;				// »ç¿ëµÈ ¼ö¼ö·á
-			std::string						locked;					// °Å·¡¿¡ »ç¿ë ÁßÀÎ ºñ¿ë
+			std::string						reserved_fee;			// ìˆ˜ìˆ˜ë£Œë¡œ ì˜ˆì•½ëœ ë¹„ìš©
+			std::string						remaining_fee;			// ë‚¨ì€ ìˆ˜ìˆ˜ë£Œ
+			std::string						paid_fee;				// ì‚¬ìš©ëœ ìˆ˜ìˆ˜ë£Œ
+			std::string						locked;					// ê±°ë˜ì— ì‚¬ìš© ì¤‘ì¸ ë¹„ìš©
 
-			std::optional<OrdCondition>		time_in_force;			// ÁÖ¹® Ã¼°á Á¶°Ç
+			std::optional<OrdCondition>		time_in_force;			// ì£¼ë¬¸ ì²´ê²° ì¡°ê±´
 
-			std::string						prevented_volume;		// ÀÚÀü°Å·¡ ¹æÁö·Î ÀÎÇØ Ãë¼ÒµÈ ¼ö·®
-			std::string						prevented_locked;		// ÀÚÀü°Å·¡ ¹æÁö·Î ÀÎÇØ ÇØÁ¦µÈ ÀÚ»ê
+			std::string						prevented_volume;		// ìì „ê±°ë˜ ë°©ì§€ë¡œ ì¸í•´ ì·¨ì†Œëœ ìˆ˜ëŸ‰
+			std::string						prevented_locked;		// ìì „ê±°ë˜ ë°©ì§€ë¡œ ì¸í•´ í•´ì œëœ ìì‚°
 
-			int								trades_count{ 0 };			// ÇØ´ç ÁÖ¹®¿¡ ´ëÇÑ Ã¼°á °Ç¼ö
-			std::optional<std::string>		identifier;				// ÁÖ¹® »ı¼º½Ã Å¬¶óÀÌ¾ğÆ®°¡ ÁöÁ¤ÇÑ ÁÖ¹® ½Äº°ÀÚ
+			int								trades_count{ 0 };			// í•´ë‹¹ ì£¼ë¬¸ì— ëŒ€í•œ ì²´ê²° ê±´ìˆ˜
+			std::optional<std::string>		identifier;				// ì£¼ë¬¸ ìƒì„±ì‹œ í´ë¼ì´ì–¸íŠ¸ê°€ ì§€ì •í•œ ì£¼ë¬¸ ì‹ë³„ì
 		};
 
 		std::vector<CancelOrderResponseDto>		cancel_order_list;
 	};
-	// ÁÖ¹® ¸ñ·Ï Ãë¼Ò Á¢¼ö (ÇÑ ¹ø¿¡ ÃÖ´ë 20°³) + ÀÏ°ı Ãë¼Òµµ Ã³¸®µÊ
+	// ì£¼ë¬¸ ëª©ë¡ ì·¨ì†Œ ì ‘ìˆ˜ (í•œ ë²ˆì— ìµœëŒ€ 20ê°œ) + ì¼ê´„ ì·¨ì†Œë„ ì²˜ë¦¬ë¨
 	struct CancelOrderListResponseDto
 	{
 		struct CancelledOrderDto
 		{
-			std::string              uuid;       // ÁÖ¹® À¯ÀÏ ½Äº°ÀÚ
+			std::string              uuid;       // ì£¼ë¬¸ ìœ ì¼ ì‹ë³„ì
 			std::string              market;     // "KRW-BTC"
-			std::optional<std::string> identifier; // ÁÖ¹® »ı¼º ½Ã ÁöÁ¤ÇÑ ½Äº°ÀÚ(¾øÀ» ¼öµµ ÀÖÀ½)
+			std::optional<std::string> identifier; // ì£¼ë¬¸ ìƒì„± ì‹œ ì§€ì •í•œ ì‹ë³„ì(ì—†ì„ ìˆ˜ë„ ìˆìŒ)
 		};
 		struct CancelOrdersSuccessDto
 		{
-			int                               count{ 0 };	// ¼º°øÀûÀ¸·Î Ãë¼ÒµÈ ÁÖ¹® ¼ö
-			std::vector<CancelledOrderDto>    orders;		// Ãë¼ÒµÈ ÁÖ¹® ¸ñ·Ï
+			int                               count{ 0 };	// ì„±ê³µì ìœ¼ë¡œ ì·¨ì†Œëœ ì£¼ë¬¸ ìˆ˜
+			std::vector<CancelledOrderDto>    orders;		// ì·¨ì†Œëœ ì£¼ë¬¸ ëª©ë¡
 		};
 		struct CancelOrdersFailedDto
 		{
-			int                               count{ 0 };	// Ãë¼Ò ½ÇÆĞÇÑ ÁÖ¹® ¼ö
-			std::vector<CancelledOrderDto>    orders;		// Ãë¼Ò ½ÇÆĞÇÑ ÁÖ¹® ¸ñ·Ï
+			int                               count{ 0 };	// ì·¨ì†Œ ì‹¤íŒ¨í•œ ì£¼ë¬¸ ìˆ˜
+			std::vector<CancelledOrderDto>    orders;		// ì·¨ì†Œ ì‹¤íŒ¨í•œ ì£¼ë¬¸ ëª©ë¡
 		};
 
 		CancelOrdersSuccessDto		success;
 		CancelOrdersFailedDto		failed;
 	};
 
-	// Ãë¼Ò ÈÄ ÀçÁÖ¹® POST
+	// ì·¨ì†Œ í›„ ì¬ì£¼ë¬¸ POST
 	struct CancelAndOrderRequestDto
 	{
-		std::optional<std::string>		prev_order_uuid;			// Ãë¼ÒÇÏ°íÀÚ ÇÏ´Â ÁÖ¹®ÀÇ À¯ÀÏ½Äº°ÀÚ(UUID)
-		std::optional<std::string>		prev_order_identifier;		// Ãë¼ÒÇÏ°íÀÚ ÇÏ´Â ÁÖ¹®ÀÇ À¯ÀÏ½Äº°ÀÚ(UUID)
+		std::optional<std::string>		prev_order_uuid;			// ì·¨ì†Œí•˜ê³ ì í•˜ëŠ” ì£¼ë¬¸ì˜ ìœ ì¼ì‹ë³„ì(UUID)
+		std::optional<std::string>		prev_order_identifier;		// ì·¨ì†Œí•˜ê³ ì í•˜ëŠ” ì£¼ë¬¸ì˜ ìœ ì¼ì‹ë³„ì(UUID)
 
-		OrdType							new_ord_type;				// ½Å±Ô ÁÖ¹®ÀÇ ÁÖ¹® À¯Çü
-		std::optional<std::string>		new_volume;					// ½Å±Ô ÁÖ¹® ¿äÃ» ¼ö·®
-		std::optional<std::string>		price;						// ½Å±Ô ÁÖ¹® ´Ü°¡ ¶Ç´Â ÃÑ¾×
+		OrdType							new_ord_type;				// ì‹ ê·œ ì£¼ë¬¸ì˜ ì£¼ë¬¸ ìœ í˜•
+		std::optional<std::string>		new_volume;					// ì‹ ê·œ ì£¼ë¬¸ ìš”ì²­ ìˆ˜ëŸ‰
+		std::optional<std::string>		price;						// ì‹ ê·œ ì£¼ë¬¸ ë‹¨ê°€ ë˜ëŠ” ì´ì•¡
 
-		std::optional<OrdCondition>		new_time_in_force;			// ½Å±Ô ÁÖ¹® Ã¼°á Á¶°Ç
-		std::optional<SMP>				new_smp_type;				// ½Å±Ô ÀÚÀü °Å·¡ Ã¼°á ¹æÁö ¿É¼Ç
+		std::optional<OrdCondition>		new_time_in_force;			// ì‹ ê·œ ì£¼ë¬¸ ì²´ê²° ì¡°ê±´
+		std::optional<SMP>				new_smp_type;				// ì‹ ê·œ ìì „ ê±°ë˜ ì²´ê²° ë°©ì§€ ì˜µì…˜
 
 
-		std::optional<std::string>		identifier;					// ½Å±Ô ÁÖ¹® »ı¼º½Ã Å¬¶óÀÌ¾ğÆ®°¡ ÁöÁ¤ÇÑ ÁÖ¹® ½Äº°ÀÚ
+		std::optional<std::string>		identifier;					// ì‹ ê·œ ì£¼ë¬¸ ìƒì„±ì‹œ í´ë¼ì´ì–¸íŠ¸ê°€ ì§€ì •í•œ ì£¼ë¬¸ ì‹ë³„ì
 	};
-	// Ãë¼Ò ÈÄ ÀçÁÖ¹® GET
+	// ì·¨ì†Œ í›„ ì¬ì£¼ë¬¸ GET
 	struct CancelAndOrderResponseDto
 	{
-		std::string						market;					// Æä¾î(°Å·¡½Ö)ÀÇ ÄÚµå
-		std::string						uuid;					// ÁÖ¹®ÀÇ À¯ÀÏ ½Äº°ÀÚ
+		std::string						market;					// í˜ì–´(ê±°ë˜ìŒ)ì˜ ì½”ë“œ
+		std::string						uuid;					// ì£¼ë¬¸ì˜ ìœ ì¼ ì‹ë³„ì
 
-		Side							side;					// ÁÖ¹® ¹æÇâ(¸Å¼ö/¸Åµµ)
-		std::string						ord_type;				// ÁÖ¹® À¯Çü
-		std::optional<std::string>		price;					// ÁÖ¹® ´Ü°¡ ¶Ç´Â ÃÑ¾×
-		std::optional<std::string>		volume;					// ÁÖ¹® ¿äÃ» ¼ö·®
-		OrdState						state;					// ÁÖ¹® »óÅÂ
-		std::string						created_at;				// ÁÖ¹® »ı¼º ½Ã°¢ (KST ±âÁØ)
+		Side							side;					// ì£¼ë¬¸ ë°©í–¥(ë§¤ìˆ˜/ë§¤ë„)
+		std::string						ord_type;				// ì£¼ë¬¸ ìœ í˜•
+		std::optional<std::string>		price;					// ì£¼ë¬¸ ë‹¨ê°€ ë˜ëŠ” ì´ì•¡
+		std::optional<std::string>		volume;					// ì£¼ë¬¸ ìš”ì²­ ìˆ˜ëŸ‰
+		OrdState						state;					// ì£¼ë¬¸ ìƒíƒœ
+		std::string						created_at;				// ì£¼ë¬¸ ìƒì„± ì‹œê° (KST ê¸°ì¤€)
 
-		std::string						remaining_volume;		// Ã¼°á ÈÄ ³²Àº ÁÖ¹® ¾ç
-		std::string						executed_volume;		// Ã¼°áµÈ ¾ç
+		std::string						remaining_volume;		// ì²´ê²° í›„ ë‚¨ì€ ì£¼ë¬¸ ì–‘
+		std::string						executed_volume;		// ì²´ê²°ëœ ì–‘
 
-		std::string						reserved_fee;			// ¼ö¼ö·á·Î ¿¹¾àµÈ ºñ¿ë
-		std::string						remaining_fee;			// ³²Àº ¼ö¼ö·á
-		std::string						paid_fee;				// »ç¿ëµÈ ¼ö¼ö·á
-		std::string						locked;					// °Å·¡¿¡ »ç¿ë ÁßÀÎ ºñ¿ë
+		std::string						reserved_fee;			// ìˆ˜ìˆ˜ë£Œë¡œ ì˜ˆì•½ëœ ë¹„ìš©
+		std::string						remaining_fee;			// ë‚¨ì€ ìˆ˜ìˆ˜ë£Œ
+		std::string						paid_fee;				// ì‚¬ìš©ëœ ìˆ˜ìˆ˜ë£Œ
+		std::string						locked;					// ê±°ë˜ì— ì‚¬ìš© ì¤‘ì¸ ë¹„ìš©
 
-		std::optional<OrdCondition>		time_in_force;			// ÁÖ¹® Ã¼°á Á¶°Ç
-		std::optional<SMP>				smp_type;				// ÀÚÀü °Å·¡ Ã¼°á ¹æÁö ¿É¼Ç
+		std::optional<OrdCondition>		time_in_force;			// ì£¼ë¬¸ ì²´ê²° ì¡°ê±´
+		std::optional<SMP>				smp_type;				// ìì „ ê±°ë˜ ì²´ê²° ë°©ì§€ ì˜µì…˜
 
-		std::string						prevented_volume;		// ÀÚÀü°Å·¡ ¹æÁö·Î ÀÎÇØ Ãë¼ÒµÈ ¼ö·®
-		std::string						prevented_locked;		// ÀÚÀü°Å·¡ ¹æÁö·Î ÀÎÇØ ÇØÁ¦µÈ ÀÚ»ê
+		std::string						prevented_volume;		// ìì „ê±°ë˜ ë°©ì§€ë¡œ ì¸í•´ ì·¨ì†Œëœ ìˆ˜ëŸ‰
+		std::string						prevented_locked;		// ìì „ê±°ë˜ ë°©ì§€ë¡œ ì¸í•´ í•´ì œëœ ìì‚°
 
-		int								trades_count{ 0 };		// ÇØ´ç ÁÖ¹®¿¡ ´ëÇÑ Ã¼°á °Ç¼ö
-		std::optional<std::string>		identifier;				// ÁÖ¹® »ı¼º½Ã Å¬¶óÀÌ¾ğÆ®°¡ ÁöÁ¤ÇÑ ÁÖ¹® ½Äº°ÀÚ
+		int								trades_count{ 0 };		// í•´ë‹¹ ì£¼ë¬¸ì— ëŒ€í•œ ì²´ê²° ê±´ìˆ˜
+		std::optional<std::string>		identifier;				// ì£¼ë¬¸ ìƒì„±ì‹œ í´ë¼ì´ì–¸íŠ¸ê°€ ì§€ì •í•œ ì£¼ë¬¸ ì‹ë³„ì
 
-		// ´Ù¸¥ Á¡
-		std::string						new_uuid;				// ½Å±Ô ÁÖ¹®ÀÇ À¯ÀÏ ½Äº°ÀÚ
-		std::optional<std::string>		new_identifier;			// ½Å±Ô ÁÖ¹® »ı¼º½Ã Å¬¶óÀÌ¾ğÆ®°¡ ÁöÁ¤ÇÑ ÁÖ¹® ½Äº°ÀÚ
+		// ë‹¤ë¥¸ ì 
+		std::string						new_uuid;				// ì‹ ê·œ ì£¼ë¬¸ì˜ ìœ ì¼ ì‹ë³„ì
+		std::optional<std::string>		new_identifier;			// ì‹ ê·œ ì£¼ë¬¸ ìƒì„±ì‹œ í´ë¼ì´ì–¸íŠ¸ê°€ ì§€ì •í•œ ì£¼ë¬¸ ì‹ë³„ì
 	};
 }

@@ -1,4 +1,4 @@
-// core/domain/Instrument.h
+ï»¿// core/domain/Instrument.h
 #pragma once
 
 #include <string>
@@ -6,16 +6,16 @@
 namespace core 
 {
 	
-	// Á¾¸ñ Á¤º¸
+	// ì¢…ëª© ì •ë³´
 	struct MarketInfo
 	{
-		std::string			 market;			// ½ÃÀå ÄÚµå (¿¹: "KRW-BTC", "NASDAQ")
+		std::string			 market;			// ì‹œì¥ ì½”ë“œ (ì˜ˆ: "KRW-BTC", "NASDAQ")
 
-		// °Å·¡ ÅëÈ­¿¡ ´ëÇÑ Á¤º¸
-		std::string			ko_name;	// ÇÑ±Û¸í
-		std::string			en_name;	// ¿µ¹®¸í
+		// ê±°ë˜ í†µí™”ì— ëŒ€í•œ ì •ë³´
+		std::string			ko_name;	// í•œê¸€ëª…
+		std::string			en_name;	// ì˜ë¬¸ëª…
 
-		bool				is_warning = false;		// À¯ÀÇ Á¾¸ñ ¿©ºÎ
+		bool				is_warning = false;		// ìœ ì˜ ì¢…ëª© ì—¬ë¶€
 	};
 
 }

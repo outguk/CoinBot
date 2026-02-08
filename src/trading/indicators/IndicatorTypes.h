@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include <cstddef>
 #include <optional>
@@ -6,22 +6,22 @@
 
 namespace trading {
 
-    // ÁöÇ¥ °øÅë "ÁØºñ »óÅÂ + °ª" Ç¥Çö
-    // - optional<T>¸¸ ½áµµ µÇÁö¸¸, ready »óÅÂ¸¦ ¸í½ÃÀûÀ¸·Î ³²±â¸é µğ¹ö±ë/Å×½ºÆ®°¡ ÆíÇØÁü
+    // ì§€í‘œ ê³µí†µ "ì¤€ë¹„ ìƒíƒœ + ê°’" í‘œí˜„
+    // - optional<T>ë§Œ ì¨ë„ ë˜ì§€ë§Œ, ready ìƒíƒœë¥¼ ëª…ì‹œì ìœ¼ë¡œ ë‚¨ê¸°ë©´ ë””ë²„ê¹…/í…ŒìŠ¤íŠ¸ê°€ í¸í•´ì§
     template <typename T>
     struct Value final {
         static_assert(std::is_arithmetic_v<T> || std::is_trivially_copyable_v<T>,
             "Indicator Value<T> is intended for arithmetic/trivially copyable types.");
 
         bool ready{ false };
-        T v{};      // SMA - ´Ü¼øÀÌµ¿Æò±Õ °á°ú, RSI - RSI°ª, º¯µ¿¼º¼öÄ¡ µîµî ÁöÇ¥ °è»ê°ª
+        T v{};      // SMA - ë‹¨ìˆœì´ë™í‰ê·  ê²°ê³¼, RSI - RSIê°’, ë³€ë™ì„±ìˆ˜ì¹˜ ë“±ë“± ì§€í‘œ ê³„ì‚°ê°’
 
         [[nodiscard]] constexpr std::optional<T> asOptional() const noexcept {
             return ready ? std::optional<T>(v) : std::nullopt;
         }
     };
 
-    // (¼±ÅÃ) Rolling window ÁöÇ¥µéÀÌ °øÅëÀ¸·Î ¾²±â ÁÁÀº À¯Æ¿
+    // (ì„ íƒ) Rolling window ì§€í‘œë“¤ì´ ê³µí†µìœ¼ë¡œ ì“°ê¸° ì¢‹ì€ ìœ í‹¸
     [[nodiscard]] constexpr bool isWindowReady(std::size_t count, std::size_t window) noexcept {
         return window > 0 && count >= window;
     }

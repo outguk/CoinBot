@@ -1,32 +1,32 @@
-#pragma once
+ï»¿#pragma once
 #include <chrono>
 #include <cstddef>
 
 
 /*
 * RetryPolicy.h
-* Àç½Ãµµ Á¤Ã¥À» µ¥ÀÌÅÍ·Î ºĞ¸®
-* 429, 5xx µî ¡°ÀÏ½ÃÀû ¿À·ù¡±¿¡ ´ëÇÑ Àç½Ãµµ/¹é¿ÀÇÁ ·êÀ» ÇÑ °÷¿¡¼­ Á¤ÀÇ
+* ì¬ì‹œë„ ì •ì±…ì„ ë°ì´í„°ë¡œ ë¶„ë¦¬
+* 429, 5xx ë“± â€œì¼ì‹œì  ì˜¤ë¥˜â€ì— ëŒ€í•œ ì¬ì‹œë„/ë°±ì˜¤í”„ ë£°ì„ í•œ ê³³ì—ì„œ ì •ì˜
 */
 
 namespace api::rest
 {
 
-	// Àç½Ãµµ Á¤Ã¥À» "ÄÚµå"°¡ ¾Æ´Ñ "µ¥ÀÌÅÍ"·Î ºĞ¸®
-	// - RestClinet°¡ ÀÌ Á¤Ã¥À» º¸°í µ¿ÀÛÇÏµµ·Ï
+	// ì¬ì‹œë„ ì •ì±…ì„ "ì½”ë“œ"ê°€ ì•„ë‹Œ "ë°ì´í„°"ë¡œ ë¶„ë¦¬
+	// - RestClinetê°€ ì´ ì •ì±…ì„ ë³´ê³  ë™ì‘í•˜ë„ë¡
 	struct RetryPolicy
 	{
-		std::size_t					max_attempts{ 3 };	// ÃÑ ½Ãµµ È½¼ö
-		std::chrono::milliseconds	base_delay{ 200 };	// Ã¹ ´ë±â½Ã°£
-		double				backoff_multiplier{ 2.0 };	// Áö¼ö ¹é¿ÀÇÁ ¹è¼ö (¿äÃ»ÀÌ ½ÇÆĞ ½Ã Àç½Ãµµ »çÀÌ ½Ã°£À» Á¡Á¡ ´Ã¸²)
+		std::size_t					max_attempts{ 3 };	// ì´ ì‹œë„ íšŸìˆ˜
+		std::chrono::milliseconds	base_delay{ 200 };	// ì²« ëŒ€ê¸°ì‹œê°„
+		double				backoff_multiplier{ 2.0 };	// ì§€ìˆ˜ ë°±ì˜¤í”„ ë°°ìˆ˜ (ìš”ì²­ì´ ì‹¤íŒ¨ ì‹œ ì¬ì‹œë„ ì‚¬ì´ ì‹œê°„ì„ ì ì  ëŠ˜ë¦¼)
 
-		// status ±â¹İ Àç½Ãµµ ¿É¼Ç
-		bool				retry_on_429{ true };		// ¿äÃ»ÀÌ ³Ê¹« ¸¹À½
-		bool				retry_on_5xx{ true };		// 500~599 ¼­¹ö ¿À·ù
+		// status ê¸°ë°˜ ì¬ì‹œë„ ì˜µì…˜
+		bool				retry_on_429{ true };		// ìš”ì²­ì´ ë„ˆë¬´ ë§ìŒ
+		bool				retry_on_5xx{ true };		// 500~599 ì„œë²„ ì˜¤ë¥˜
 
-		// ³×Æ®¿öÅ© ¿À·ù Àç½Ãµµ ¹üÀ§
+		// ë„¤íŠ¸ì›Œí¬ ì˜¤ë¥˜ ì¬ì‹œë„ ë²”ìœ„
 		bool retry_on_timeout{ true };          // timed out
-		bool retry_on_connect_fail{ true };     // connect reset, connection refused µî
-		bool retry_on_read_write_fail{ true };  // transient read/write ½ÇÆĞ
+		bool retry_on_connect_fail{ true };     // connect reset, connection refused ë“±
+		bool retry_on_read_write_fail{ true };  // transient read/write ì‹¤íŒ¨
 	};
 }

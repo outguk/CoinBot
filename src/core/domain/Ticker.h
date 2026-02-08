@@ -1,4 +1,4 @@
-// core/domain/Ticker.h
+ï»¿// core/domain/Ticker.h
 #pragma once
 
 #include <chrono>
@@ -8,35 +8,35 @@
 namespace core {
 
     /*
-	* ½Ç½Ã°£ Á¾¸ñ Á¤º¸ (Ticker)
-	* ÃßÈÄ Ãß°¡·Î Á¤º¸ º¸¿Ï ¿¹Á¤
+	* ì‹¤ì‹œê°„ ì¢…ëª© ì •ë³´ (Ticker)
+	* ì¶”í›„ ì¶”ê°€ë¡œ ì •ë³´ ë³´ì™„ ì˜ˆì •
     * 
-    * - Á¶È¸ ¿äÃ»ÇÑ ½ÃÁ¡ÀÇ Á¤º¸
-    * - ÇØ´ç º¯µ¿ ÁöÇ¥µéÀº ÀüÀÏ Á¾°¡¸¦ ±âÁØ
+    * - ì¡°íšŒ ìš”ì²­í•œ ì‹œì ì˜ ì •ë³´
+    * - í•´ë‹¹ ë³€ë™ ì§€í‘œë“¤ì€ ì „ì¼ ì¢…ê°€ë¥¼ ê¸°ì¤€
     */
 
     struct Ticker {
-        std::string         market;                         // Á¾¸ñ Á¤º¸
+        std::string         market;                         // ì¢…ëª© ì •ë³´
 
-        // °¡°İ
-        Price				ticker_opening_price;			// ÇØ´ç Æä¾îÀÇ ½Ã°¡
-        Price				ticker_high_price;				// ÇØ´ç Æä¾îÀÇ °í°¡
-        Price				ticker_low_price;				// ÇØ´ç Æä¾îÀÇ Àú°¡
-        Price				ticker_trade_price;			    // ÇØ´ç Æä¾îÀÇ Á¾°¡(ÃÖÁ¾ Ã¼°á°¡)
+        // ê°€ê²©
+        Price				ticker_opening_price;			// í•´ë‹¹ í˜ì–´ì˜ ì‹œê°€
+        Price				ticker_high_price;				// í•´ë‹¹ í˜ì–´ì˜ ê³ ê°€
+        Price				ticker_low_price;				// í•´ë‹¹ í˜ì–´ì˜ ì €ê°€
+        Price				ticker_trade_price;			    // í•´ë‹¹ í˜ì–´ì˜ ì¢…ê°€(ìµœì¢… ì²´ê²°ê°€)
 
-        Price				prev_closing_price;		        // ÀüÀÏ Á¾°¡ (UTC0½Ã ±âÁØ)
-        int					trade_timestamp;		        // Ã¼°á ½Ã°¢ÀÇ ¹Ğ¸®ÃÊ´ÜÀ§ Å¸ÀÓ½ºÅÆÇÁ
+        Price				prev_closing_price;		        // ì „ì¼ ì¢…ê°€ (UTC0ì‹œ ê¸°ì¤€)
+        std::int64_t		trade_timestamp;		        // ì²´ê²° ì‹œê°ì˜ ë°€ë¦¬ì´ˆë‹¨ìœ„ íƒ€ì„ìŠ¤íƒ¬í”„
 
-        double				change_price;	                // ºÎÈ£ ÀÖ´Â °¡°İ º¯È­ (change_price¿Í µ¿ÀÏÇÏÁö¸¸ ºÎÈ£ Á¸Àç)
-        double				change_rate;		            // ºÎÈ£ ÀÖ´Â °¡°İ º¯È­À² (change_rate¿Í µ¿ÀÏÇÏÁö¸¸ ºÎÈ£ Á¸Àç)
+        double				change_price;	                // ë¶€í˜¸ ìˆëŠ” ê°€ê²© ë³€í™” (change_priceì™€ ë™ì¼í•˜ì§€ë§Œ ë¶€í˜¸ ì¡´ì¬)
+        double				change_rate;		            // ë¶€í˜¸ ìˆëŠ” ê°€ê²© ë³€í™”ìœ¨ (change_rateì™€ ë™ì¼í•˜ì§€ë§Œ ë¶€í˜¸ ì¡´ì¬)
 
-        // °Å·¡·®
-        Volume				trade_volume;			        // ÇØ´ç Æä¾îÀÇ ÃÖ±Ù °Å·¡·®
-        Volume				acc_trade_volume;		        // ÇØ´ç Æä¾îÀÇ ´©Àû °Å·¡·® (UTC 0½ÃºÎÅÍ ´©Àû)
-        Volume				acc_trade_volume_24h;	        // ÇØ´ç Æä¾îÀÇ 24½Ã°£ ´©Àû °Å·¡·®
+        // ê±°ë˜ëŸ‰
+        Volume				trade_volume;			        // í•´ë‹¹ í˜ì–´ì˜ ìµœê·¼ ê±°ë˜ëŸ‰
+        Volume				acc_trade_volume;		        // í•´ë‹¹ í˜ì–´ì˜ ëˆ„ì  ê±°ë˜ëŸ‰ (UTC 0ì‹œë¶€í„° ëˆ„ì )
+        Volume				acc_trade_volume_24h;	        // í•´ë‹¹ í˜ì–´ì˜ 24ì‹œê°„ ëˆ„ì  ê±°ë˜ëŸ‰
 
 
-        std::chrono::system_clock::time_point timestamp; // Á¤º¸°¡ µé¾î¿Â ½Ã°¢
+        std::chrono::system_clock::time_point timestamp; // ì •ë³´ê°€ ë“¤ì–´ì˜¨ ì‹œê°
     };
 
 } // namespace core

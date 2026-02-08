@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include <string_view>
 #include <atomic>
@@ -9,16 +9,16 @@
 
 namespace app {
 
-    // WS raw(myOrder) -> Å¸ÀÔ °Ë»ç -> ¿£ÁøÀÌ Ã³¸®ÇÒ BlockingQueue¿¡ push
+    // WS raw(myOrder) -> íƒ€ì… ê²€ì‚¬ -> ì—”ì§„ì´ ì²˜ë¦¬í•  BlockingQueueì— push
     class MyOrderEventBridge {
     public:
         using PrivateQueue = core::BlockingQueue<engine::input::EngineInput>;
 
-        explicit MyOrderEventBridge(PrivateQueue& q, std::atomic<bool>& needs_resync) 
+        explicit MyOrderEventBridge(PrivateQueue& q) 
             : private_q_(q) {}
 
-        // msg°¡ myOrder°¡ ¾Æ´Ï¸é false(¹«½Ã).
-        // myOrder ¸Ş½ÃÁöÀÌ¸é ÆÄ½Ì/Ã³¸® °á°ú¸¦ true/false·Î ¹İÈ¯.
+        // msgê°€ myOrderê°€ ì•„ë‹ˆë©´ false(ë¬´ì‹œ).
+        // myOrder ë©”ì‹œì§€ì´ë©´ íŒŒì‹±/ì²˜ë¦¬ ê²°ê³¼ë¥¼ true/falseë¡œ ë°˜í™˜.
         [[nodiscard]] bool onWsMessage(std::string_view msg);
 
         //static bool isTerminalStatus(core::OrderStatus s) noexcept { return isTerminal(s); }
@@ -26,8 +26,8 @@ namespace app {
     private:
         PrivateQueue& private_q_;
 
-        // JSON ÆÄ½Ì ¾øÀÌ "type":"myOrder" ÇÊµå¸¸ °¡º±°Ô °Ë»ç
-        static bool isMyOrderMessage(std::string_view msg);
+        // JSON íŒŒì‹± ì—†ì´ "type":"myOrder" í•„ë“œë§Œ ê°€ë³ê²Œ ê²€ì‚¬
+        static bool isMyOrderMessage(std::string_view msg) noexcept;
         static std::string_view trimLeft(std::string_view s) noexcept;
         /*static bool isTerminal(core::OrderStatus s) noexcept;*/
     };

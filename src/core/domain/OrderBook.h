@@ -1,4 +1,4 @@
-// core/domain/OrderBook.h
+ï»¿// core/domain/OrderBook.h
 #pragma once
 
 #include <string>
@@ -9,32 +9,32 @@
 namespace core {
 
     /*
-    * ½Ç½Ã°£ È£°¡ Á¤º¸(¸Å¼ö/¸Åµµ ´ë±â ÁÖ¹®)
+    * ì‹¤ì‹œê°„ í˜¸ê°€ ì •ë³´(ë§¤ìˆ˜/ë§¤ë„ ëŒ€ê¸° ì£¼ë¬¸)
     */
 
-	// °³º° È£°¡ ·¹º§ ±¸Á¶Ã¼(È£°¡ ÇÏ³ªÀÇ Á¤º¸)
+	// ê°œë³„ í˜¸ê°€ ë ˆë²¨ êµ¬ì¡°ì²´(í˜¸ê°€ í•˜ë‚˜ì˜ ì •ë³´)
     struct OrderbookLevel
 	{
-		// ¸Åµµ
-		Price	ask_price;		// ¸Åµµ È£°¡
-		Volume	ask_size;		// ¸Åµµ ÀÜ·®
+		// ë§¤ë„
+		Price	ask_price;		// ë§¤ë„ í˜¸ê°€
+		Volume	ask_size;		// ë§¤ë„ ì”ëŸ‰
 
-		// ¸Å¼ö
-		Price	bid_price;		// ¸Å¼ö È£°¡
-		Volume	bid_size;		// ¸Å¼ö ÀÜ·®
+		// ë§¤ìˆ˜
+		Price	bid_price;		// ë§¤ìˆ˜ í˜¸ê°€
+		Volume	bid_size;		// ë§¤ìˆ˜ ì”ëŸ‰
     };
 
-	// ¿©·¯ °³ÀÇ OrderBookLevelÀ» Æ÷ÇÔÇÏ´Â È£°¡ Á¤º¸ ±¸Á¶Ã¼
+	// ì—¬ëŸ¬ ê°œì˜ OrderBookLevelì„ í¬í•¨í•˜ëŠ” í˜¸ê°€ ì •ë³´ êµ¬ì¡°ì²´
     struct Orderbook {
-		std::string					market;			// Á¾¸ñ Á¤º¸
-		std::int64_t				timestamp;		// Á¶È¸ ¿äÃ» ½Ã°¢ÀÇ Å¸ÀÓ½ºÅÆÇÁ(ms)
+		std::string					market;			// ì¢…ëª© ì •ë³´
+		std::int64_t				timestamp;		// ì¡°íšŒ ìš”ì²­ ì‹œê°ì˜ íƒ€ì„ìŠ¤íƒ¬í”„(ms)
 
-		// ¸Å¼ö / ¸Åµµ ÀÜ·®
-		Volume						total_ask_size;	// ÀüÃ¼ ¸Åµµ ÀÜ·®
-		Volume						total_bid_size;	// ÀüÃ¼ ¸Å¼ö ÀÜ·®
+		// ë§¤ìˆ˜ / ë§¤ë„ ì”ëŸ‰
+		Volume						total_ask_size;	// ì „ì²´ ë§¤ë„ ì”ëŸ‰
+		Volume						total_bid_size;	// ì „ì²´ ë§¤ìˆ˜ ì”ëŸ‰
 
-        std::vector<OrderbookLevel> top_levels;     // °¢ È£°¡´Ü °¡°İ¡¤ÀÜ·® (»óÀ§ 5´Ü°è¸¸)
-		std::optional<double> price_unit;			// level=0ÀÌ¸é ¹ÌÁöÁ¤/±âº» ´ÜÀ§·Î º¸Åë Ã³¸®
+        std::vector<OrderbookLevel> top_levels;     // ê° í˜¸ê°€ë‹¨ ê°€ê²©Â·ì”ëŸ‰ (ìƒìœ„ 5ë‹¨ê³„ë§Œ)
+		std::optional<double> price_unit;			// level=0ì´ë©´ ë¯¸ì§€ì •/ê¸°ë³¸ ë‹¨ìœ„ë¡œ ë³´í†µ ì²˜ë¦¬
     };
 
 } // namespace core

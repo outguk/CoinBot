@@ -1,34 +1,34 @@
-#pragma once
+ï»¿#pragma once
 
 #include <cstddef>
 #include <optional>
 
 #include "IndicatorTypes.h"     // trading::Value<T>
-#include "core/domain/Candle.h" // core::Candle (close_price »ç¿ë)
+#include "core/domain/Candle.h" // core::Candle (close_price ì‚¬ìš©)
 
 namespace trading::indicators
 {
 	/*
 		Wilder RSI
 
-		ÇÙ½É ¾ÆÀÌµğ¾î
-		1) seed(ÃÊ±â°ª) ±¸°£(length°³ º¯È­·®)À» ¸ÕÀú ¸ğÀº´Ù.
-		   - gainSum = ¾çÀÇ º¯È­·® ÇÕ
-		   - lossSum = À½ÀÇ º¯È­·®(Àı´ë°ª) ÇÕ
-		   - seed ¿Ï·á ½Ã:
+		í•µì‹¬ ì•„ì´ë””ì–´
+		1) seed(ì´ˆê¸°ê°’) êµ¬ê°„(lengthê°œ ë³€í™”ëŸ‰)ì„ ë¨¼ì € ëª¨ì€ë‹¤.
+		   - gainSum = ì–‘ì˜ ë³€í™”ëŸ‰ í•©
+		   - lossSum = ìŒì˜ ë³€í™”ëŸ‰(ì ˆëŒ€ê°’) í•©
+		   - seed ì™„ë£Œ ì‹œ:
 			 avgGain = gainSum / length
 			 avgLoss = lossSum / length
 
-		2) seed ÀÌÈÄºÎÅÍ´Â Wilder smoothing(ÀÌÀü Æò±ÕÀ» ÀÌ¿ëÇØ °»½Å) Àû¿ë
-		   avgGain = (avgGain*(length-1) + gain) / length (¿À¸¥ ±¸°£ÀÇ Æò±Õ°ª)
-		   avgLoss = (avgLoss*(length-1) + loss) / length (³»¸° ±¸°£ÀÇ Æò±Õ°ª)
+		2) seed ì´í›„ë¶€í„°ëŠ” Wilder smoothing(ì´ì „ í‰ê· ì„ ì´ìš©í•´ ê°±ì‹ ) ì ìš©
+		   avgGain = (avgGain*(length-1) + gain) / length (ì˜¤ë¥¸ êµ¬ê°„ì˜ í‰ê· ê°’)
+		   avgLoss = (avgLoss*(length-1) + loss) / length (ë‚´ë¦° êµ¬ê°„ì˜ í‰ê· ê°’)
 
-		3) RSI °è»ê
+		3) RSI ê³„ì‚°
 		   RS  = avgGain / avgLoss
 		   RSI = 100 - 100/(1+RS)
 
-		ÁÖÀÇÁ¡(°æ°è°ª)
-		- avgLoss == 0 && avgGain == 0 : º¯È­°¡ ÀüÇô ¾øÀ¸¹Ç·Î RSI=50À¸·Î µĞ´Ù(°ü·ÊÀûÀ¸·Î Áß¸³)
+		ì£¼ì˜ì (ê²½ê³„ê°’)
+		- avgLoss == 0 && avgGain == 0 : ë³€í™”ê°€ ì „í˜€ ì—†ìœ¼ë¯€ë¡œ RSI=50ìœ¼ë¡œ ë‘”ë‹¤(ê´€ë¡€ì ìœ¼ë¡œ ì¤‘ë¦½)
 		- avgLoss == 0 && avgGain  > 0 : RSI=100
 		- avgGain == 0 && avgLoss  > 0 : RSI=0
 	*/
@@ -38,19 +38,19 @@ namespace trading::indicators
 		RsiWilder() = default;
 		explicit RsiWilder(std::size_t length) { reset(length); }
 
-		// length º¯°æ + ³»ºÎ »óÅÂ ÃÊ±âÈ­
+		// length ë³€ê²½ + ë‚´ë¶€ ìƒíƒœ ì´ˆê¸°í™”
 		void reset(std::size_t length);
 
-		// length´Â À¯ÁöÇÏ°í, ´©Àû »óÅÂ¸¸ ÃÊ±âÈ­
+		// lengthëŠ” ìœ ì§€í•˜ê³ , ëˆ„ì  ìƒíƒœë§Œ ì´ˆê¸°í™”
 		void clear() noexcept;
 
-		// °¡°İ(º¸Åë close)À» ÇÑ Æ½/ÇÑ Äµµé¸¶´Ù ¾÷µ¥ÀÌÆ®
+		// ê°€ê²©(ë³´í†µ close)ì„ í•œ í‹±/í•œ ìº”ë“¤ë§ˆë‹¤ ì—…ë°ì´íŠ¸
 		trading::Value<double> update(double close_price);
 
-		// Candle ÀÔ·Â ¹öÀü(Á¾°¡ »ç¿ë)
+		// Candle ì…ë ¥ ë²„ì „(ì¢…ê°€ ì‚¬ìš©)
 		trading::Value<double> update(const core::Candle& c);
 
-		// ÇöÀç RSI °ª(ready Æ÷ÇÔ)À» Á¶È¸ (update¸¦ È£ÃâÇÏÁö ¾Ê¾Æµµ ÇöÀç »óÅÂ È®ÀÎ °¡´É)
+		// í˜„ì¬ RSI ê°’(ready í¬í•¨)ì„ ì¡°íšŒ (updateë¥¼ í˜¸ì¶œí•˜ì§€ ì•Šì•„ë„ í˜„ì¬ ìƒíƒœ í™•ì¸ ê°€ëŠ¥)
 		[[nodiscard]] trading::Value<double> value() const noexcept;
 
 		[[nodiscard]] std::size_t length() const noexcept { return length_; }
@@ -59,21 +59,21 @@ namespace trading::indicators
 		[[nodiscard]] static double computeRsi(double avg_gain, double avg_loss) noexcept;
 
 	private:
-		std::size_t length_{ 0 };
+		std::size_t length_{ 0 };	// ì„¤ì •í•  RSI ê¸°ê°„(14ë©´ 14ê°œ ê¸°ë°˜ìœ¼ë¡œ RSI ì¸¡ì •)
 
-		// Á÷Àü °¡°İ(º¯È­·® °è»ê¿ë). Ã¹ °ª µé¾î¿À±â Àü±îÁö´Â ¾øÀ½.
+		// ì§ì „ ê°€ê²©(ë³€í™”ëŸ‰ ê³„ì‚°ìš©). ì²« ê°’ ë“¤ì–´ì˜¤ê¸° ì „ê¹Œì§€ëŠ” ì—†ìŒ.
 		std::optional<double> prev_price_{};
 
-		// seed ´Ü°è¿¡¼­ length°³ÀÇ º¯È­·®À» ¸ğÀ¸±â À§ÇÑ Ä«¿îÅÍ/´©ÀûÇÕ
-		std::size_t seed_count_{ 0 }; // Áö±İ±îÁö ´©ÀûÇÑ "º¯È­·®(delta)" °³¼ö
-		double seed_gain_sum_{ 0.0 };
-		double seed_loss_sum_{ 0.0 };
+		// seed ë‹¨ê³„ì—ì„œ lengthê°œì˜ ë³€í™”ëŸ‰ì„ ëª¨ìœ¼ê¸° ìœ„í•œ ì¹´ìš´í„°/ëˆ„ì í•©
+		std::size_t seed_count_{ 0 }; // ì§€ê¸ˆê¹Œì§€ ëˆ„ì í•œ "ë³€í™”ëŸ‰(delta)" ê°œìˆ˜
+		double seed_gain_sum_{ 0.0 }; // ë³€í™”ëŸ‰ì´ +ì¸ í¬ê¸°ë§Œ length ê°œ ë§Œí¼ ëª¨ì€ë‹¤
+		double seed_loss_sum_{ 0.0 }; // ë³€í™”ëŸ‰ì´ -ì¸ í¬ê¸°ë§Œ length ê°œ ë§Œí¼ ëª¨ì€ë‹¤
 
-		// Wilder smoothing¿¡ »ç¿ëµÇ´Â »óÅÂ°ª
+		// Wilder smoothingì— ì‚¬ìš©ë˜ëŠ” ìƒíƒœê°’ seedë¥¼ lengthë¡œ ë‚˜ëˆ„ì–´ ì´ˆê¸° ê¸°ì¤€ì„ ì„ ë§Œë“ ë‹¤
 		double avg_gain_{ 0.0 };
 		double avg_loss_{ 0.0 };
 
-		// ¸¶Áö¸·À¸·Î °è»êµÈ RSI(readyÀÏ ¶§ À¯È¿)
+		// ë§ˆì§€ë§‰ìœ¼ë¡œ ê³„ì‚°ëœ RSI(readyì¼ ë•Œ ìœ íš¨)
 		trading::Value<double> last_{};
 	};
 } // namespace trading::indicators

@@ -1,77 +1,77 @@
-#pragma once
+ï»¿#pragma once
 
 #include <string>
 #include <vector>
 #include <optional>
 
-// Upbit Ãâ±İ °ü·Ã JSON µ¥ÀÌÅÍ¸¦ ±×´ë·Î ¹Ş´Â ±¸Á¶Ã¼(Dto) Á¤ÀÇ
+// Upbit ì¶œê¸ˆ ê´€ë ¨ JSON ë°ì´í„°ë¥¼ ê·¸ëŒ€ë¡œ ë°›ëŠ” êµ¬ì¡°ì²´(Dto) ì •ì˜
 
 namespace api::upbit
 {
 	// Withdrawal
 
-	// Ãâ±İ °¡´É Á¤º¸ Á¶È¸
+	// ì¶œê¸ˆ ê°€ëŠ¥ ì •ë³´ ì¡°íšŒ
 	struct WithdrawalPossibleResponseDto
 	{
 		struct Security_Level
 		{
-			int					security_level;				// º¸¾È µî±Ş
-			int					fee_level;					// ¼ö¼ö·á µî±Ş
-			bool				email_verified;				// ÀÌ¸ŞÀÏ ÀÎÁõ ¿©ºÎ
-			bool				identity_auth_verified;		// ½Ç¸í ÀÎÁõ ¿©ºÎ
-			bool				bank_account_verified;		// °èÁÂ ÀÎÁõ ¿©ºÎ
-			bool				two_factor_auth_verified;	// 2FA È°¼ºÈ­ ¿©ºÎ
-			bool				locked;						// °èÁ¤ º¸È£ »óÅÂ
-			bool				wallet_locked;				// Ãâ±İ º¸È£ »óÅÂ
+			int					security_level;				// ë³´ì•ˆ ë“±ê¸‰
+			int					fee_level;					// ìˆ˜ìˆ˜ë£Œ ë“±ê¸‰
+			bool				email_verified;				// ì´ë©”ì¼ ì¸ì¦ ì—¬ë¶€
+			bool				identity_auth_verified;		// ì‹¤ëª… ì¸ì¦ ì—¬ë¶€
+			bool				bank_account_verified;		// ê³„ì¢Œ ì¸ì¦ ì—¬ë¶€
+			bool				two_factor_auth_verified;	// 2FA í™œì„±í™” ì—¬ë¶€
+			bool				locked;						// ê³„ì • ë³´í˜¸ ìƒíƒœ
+			bool				wallet_locked;				// ì¶œê¸ˆ ë³´í˜¸ ìƒíƒœ
 		};
 		struct Currency_Info
 		{
-			std::string					code;				// ÅëÈ­ ÄÚµå
-			std::string					withdraw_fee;		// Ãâ±İ ¼ö¼ö·á
-			bool						is_coin;			// µğÁöÅĞ ÀÚ»ê ¿©ºÎ
-			std::string					wallet_state;		// ÀÚ»êº° ÀÔÃâ±İ Áö¿ø ÀÌ·Â ¿©ºÎ
-			std::vector<std::string>	wallet_support;		// ÇØ´ç ÅëÈ­ÀÇ ÀÔÃâ±İ °¡´É ¿©ºÎ
+			std::string					code;				// í†µí™” ì½”ë“œ
+			std::string					withdraw_fee;		// ì¶œê¸ˆ ìˆ˜ìˆ˜ë£Œ
+			bool						is_coin;			// ë””ì§€í„¸ ìì‚° ì—¬ë¶€
+			std::string					wallet_state;		// ìì‚°ë³„ ì…ì¶œê¸ˆ ì§€ì› ì´ë ¥ ì—¬ë¶€
+			std::vector<std::string>	wallet_support;		// í•´ë‹¹ í†µí™”ì˜ ì…ì¶œê¸ˆ ê°€ëŠ¥ ì—¬ë¶€
 		};
 
 		Security_Level		member_level;
 		Currency_Info		currency;
 	};
 
-	// °èÁ¤¿¡ µî·ÏµÈ Ãâ±İ Çã¿ë ÁÖ¼Ò ¸ñ·Ï Á¶È¸
+	// ê³„ì •ì— ë“±ë¡ëœ ì¶œê¸ˆ í—ˆìš© ì£¼ì†Œ ëª©ë¡ ì¡°íšŒ
 	struct WithdrawalAllowedAddrListResponseDto
 	{
 		struct WithdrawalAllowedAddr
 		{
-			std::string			currency;			// Ãâ±İÇÏ°íÀÚ ÇÏ´Â µğÁöÅĞ ÀÚ»êÀÇ ÅëÈ­ ÄÚµå
-			std::string			net_type;			// Ãâ±İ ³×Æ®¿öÅ© À¯Çü("ETH", "TRX")
-			std::string			network_name;		// Ãâ±İ ³×Æ®¿öÅ© ÀÌ¸§
-			std::string			withdraw_address;	// µğÁöÅĞ ÀÚ»ê Ãâ±İ ½Ã ¼ö½Å ÁÖ¼Ò(µî·ÏµÈ ÁÖ¼Ò¸¸ »ç¿ë °¡´É)
-			std::string			withdraw_address;	// µğÁöÅĞ ÀÚ»ê Ãâ±İ ½Ã ¼ö½Å ÁÖ¼Ò(µî·ÏµÈ ÁÖ¼Ò¸¸ »ç¿ë °¡´É)
+			std::string			currency;			// ì¶œê¸ˆí•˜ê³ ì í•˜ëŠ” ë””ì§€í„¸ ìì‚°ì˜ í†µí™” ì½”ë“œ
+			std::string			net_type;			// ì¶œê¸ˆ ë„¤íŠ¸ì›Œí¬ ìœ í˜•("ETH", "TRX")
+			std::string			network_name;		// ì¶œê¸ˆ ë„¤íŠ¸ì›Œí¬ ì´ë¦„
+			std::string			withdraw_address;	// ë””ì§€í„¸ ìì‚° ì¶œê¸ˆ ì‹œ ìˆ˜ì‹  ì£¼ì†Œ(ë“±ë¡ëœ ì£¼ì†Œë§Œ ì‚¬ìš© ê°€ëŠ¥)
+			std::string			withdraw_address;	// ë””ì§€í„¸ ìì‚° ì¶œê¸ˆ ì‹œ ìˆ˜ì‹  ì£¼ì†Œ(ë“±ë¡ëœ ì£¼ì†Œë§Œ ì‚¬ìš© ê°€ëŠ¥)
 
-			std::optional<std::string>		secondary_address;			// 2Â÷ Ãâ±İ ÁÖ¼Ò (ÀÏºÎ µğÁöÅĞ ÀÚ»ê¿ë)
-			std::optional<std::string>		beneficiary_name;			// ¼öÃë Áö°© ¼ÒÀ¯ÁÖ¸í, °³ÀÎÀÌ¸é null
-			std::optional<std::string>		beneficiary_company_name;	// Ãâ±İ ¹ŞÀ» ¹ıÀÎ ¸í, °³ÀÎÀÌ¸é null
-			std::optional<std::string>		beneficiary_type;			// °èÁ¤ÁÖ Å¸ÀÔ (°³ÀÎ, ¹ıÀÎ)
-			std::optional<std::string>		exchange_name;				// Ãâ±İ Çã¿ë ÁÖ¼Ò°¡ µî·ÏµÈ °Å·¡¼Ò¸í (¹ÙÀÌ³½½º, ¹ÙÀÌºñÆ®)
-			std::optional<std::string>		wallet_type;				// °³ÀÎ Áö°© Á¾·ù.
+			std::optional<std::string>		secondary_address;			// 2ì°¨ ì¶œê¸ˆ ì£¼ì†Œ (ì¼ë¶€ ë””ì§€í„¸ ìì‚°ìš©)
+			std::optional<std::string>		beneficiary_name;			// ìˆ˜ì·¨ ì§€ê°‘ ì†Œìœ ì£¼ëª…, ê°œì¸ì´ë©´ null
+			std::optional<std::string>		beneficiary_company_name;	// ì¶œê¸ˆ ë°›ì„ ë²•ì¸ ëª…, ê°œì¸ì´ë©´ null
+			std::optional<std::string>		beneficiary_type;			// ê³„ì •ì£¼ íƒ€ì… (ê°œì¸, ë²•ì¸)
+			std::optional<std::string>		exchange_name;				// ì¶œê¸ˆ í—ˆìš© ì£¼ì†Œê°€ ë“±ë¡ëœ ê±°ë˜ì†Œëª… (ë°”ì´ë‚¸ìŠ¤, ë°”ì´ë¹„íŠ¸)
+			std::optional<std::string>		wallet_type;				// ê°œì¸ ì§€ê°‘ ì¢…ë¥˜.
 		};
 
 		std::vector<WithdrawalAllowedAddr>	addr_list;
 	};
 
-	// µğÁöÅĞ ÀÚ»ê Ãâ±İ ¿äÃ» POST
+	// ë””ì§€í„¸ ìì‚° ì¶œê¸ˆ ìš”ì²­ POST
 	struct WithdrawalRequestDto
 	{
-		std::string			currency;		// Ãâ±İÇÏ°íÀÚ ÇÏ´Â µğÁöÅĞ ÀÚ»êÀÇ ÅëÈ­ ÄÚµå
-		std::string			net_type;		// Ãâ±İ ³×Æ®¿öÅ© À¯Çü("ETH", "TRX")                                                              
-		std::string			amount;			// Ãâ±İÇÏ°íÀÚ ÇÏ´Â ÀÚ»êÀÇ ¼ö·®
-		std::string			address;		// µğÁöÅĞ ÀÚ»ê Ãâ±İ ½Ã ¼ö½Å ÁÖ¼Ò
+		std::string			currency;		// ì¶œê¸ˆí•˜ê³ ì í•˜ëŠ” ë””ì§€í„¸ ìì‚°ì˜ í†µí™” ì½”ë“œ
+		std::string			net_type;		// ì¶œê¸ˆ ë„¤íŠ¸ì›Œí¬ ìœ í˜•("ETH", "TRX")                                                              
+		std::string			amount;			// ì¶œê¸ˆí•˜ê³ ì í•˜ëŠ” ìì‚°ì˜ ìˆ˜ëŸ‰
+		std::string			address;		// ë””ì§€í„¸ ìì‚° ì¶œê¸ˆ ì‹œ ìˆ˜ì‹  ì£¼ì†Œ
 
-		std::vector<std::string>	secondary_address;	// µğÁöÅĞ ÀÚ»ê Ãâ±İ ½Ã ¼ö½Å ÁÖ¼Ò
-		std::vector<std::string>	transaction_type;	// Ãâ±İ À¯Çü (ÀÏ¹İ, ¹Ù·Î)
+		std::vector<std::string>	secondary_address;	// ë””ì§€í„¸ ìì‚° ì¶œê¸ˆ ì‹œ ìˆ˜ì‹  ì£¼ì†Œ
+		std::vector<std::string>	transaction_type;	// ì¶œê¸ˆ ìœ í˜• (ì¼ë°˜, ë°”ë¡œ)
 
 	};
-	// µğÁöÅĞ ÀÚ»ê Ãâ±İ ¿äÃ» GET
+	// ë””ì§€í„¸ ìì‚° ì¶œê¸ˆ ìš”ì²­ GET
 	struct WithdrawalResponseDto
 	{
 

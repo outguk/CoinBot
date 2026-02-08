@@ -1,16 +1,16 @@
-#pragma once
+ï»¿#pragma once
 #include <optional>
 #include <string>
 
 namespace api::auth {
 
-    // Upbit REST ÀÎÁõ ÅäÅ« »ı¼º±â(HS256 JWT)
+    // Upbit REST ì¸ì¦ í† í° ìƒì„±ê¸°(HS256 JWT)
     class UpbitJwtSigner {
     public:
         UpbitJwtSigner(std::string accessKey, std::string secretKey);
 
-        // query_string: "market=KRW-BTC&state=wait" °°Àº ¿ø¹® (Á¤È®È÷ ÀÌ ¹®ÀÚ¿­·Î sha512)
-        // ¾øÀ¸¸é query_hash ¾øÀÌ ÅäÅ« »ı¼º
+        // query_string: "market=KRW-BTC&state=wait" ê°™ì€ ì›ë¬¸ (ì •í™•íˆ ì´ ë¬¸ìì—´ë¡œ sha512)
+        // ì—†ìœ¼ë©´ query_hash ì—†ì´ í† í° ìƒì„±
         std::string makeBearerToken(std::optional<std::string> query_string = std::nullopt) const;
 
     private:

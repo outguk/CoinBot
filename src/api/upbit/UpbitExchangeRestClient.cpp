@@ -1,4 +1,4 @@
-#include "UpbitExchangeRestClient.h"
+ï»¿#include "UpbitExchangeRestClient.h"
 
 #include <json.hpp>
 #include <sstream>
@@ -12,13 +12,13 @@
 /*
 * UpbitExchangeRestClient.cpp
 *
-* Private(ÀÎÁõ ÇÊ¿ä) Upbit REST ¿£µåÆ÷ÀÎÆ®¸¦ "µµ¸ŞÀÎ °üÁ¡" ÇÔ¼ö·Î Á¦°øÇÑ´Ù.
+* Private(ì¸ì¦ í•„ìš”) Upbit REST ì—”ë“œí¬ì¸íŠ¸ë¥¼ "ë„ë©”ì¸ ê´€ì " í•¨ìˆ˜ë¡œ ì œê³µí•œë‹¤.
 *
-* Ã¥ÀÓ ºĞ¸®
-* - RestClient   : ³×Æ®¿öÅ©/TLS/timeout/retry + RestError Ç¥ÁØÈ­
-* - DTO          : Upbit JSON ±¸Á¶¸¦ ±×´ë·Î Ç¥Çö(from_json)
-* - Mapper       : DTO -> core::Account (µµ¸ŞÀÎ ¿À¿° ¹æÁö)
-* - ÀÌ ÆÄÀÏ      : (1) ¿äÃ» ±¸¼º (2) Authorization(JWT) Çì´õ Ãß°¡ (3) status/parse ¿À·ù¸¦ RestError·Î º¯È¯
+* ì±…ì„ ë¶„ë¦¬
+* - RestClient   : ë„¤íŠ¸ì›Œí¬/TLS/timeout/retry + RestError í‘œì¤€í™”
+* - DTO          : Upbit JSON êµ¬ì¡°ë¥¼ ê·¸ëŒ€ë¡œ í‘œí˜„(from_json)
+* - Mapper       : DTO -> core::Account (ë„ë©”ì¸ ì˜¤ì—¼ ë°©ì§€)
+* - ì´ íŒŒì¼      : (1) ìš”ì²­ êµ¬ì„± (2) Authorization(JWT) í—¤ë” ì¶”ê°€ (3) status/parse ì˜¤ë¥˜ë¥¼ RestErrorë¡œ ë³€í™˜
 */
 
 namespace api::rest {
@@ -55,8 +55,8 @@ namespace api::rest {
         // --------------------------------------
         struct QueryStrings
         {
-            std::string encoded;
-            std::string hash;
+            std::string encoded; // HTTP ìš”ì²­ URLì— ë¶™ì¼ ìš©ë„ (URL ì¸ì½”ë”© ì ìš©)
+            std::string hash; // JWTì˜ query_hashë¥¼ ë§Œë“¤ ì…ë ¥ ë¬¸ìì—´ ìš©ë„ (ì¸ì½”ë”© ê²°ê³¼ë¥¼ ë‹¤ì‹œ percent-decode í•´ì„œ â€œì¸ì½”ë”©ë˜ì§€ ì•Šì€ í˜•íƒœâ€ë¡œ ë§ì¶¤)
         };
 
         inline std::string urlEncode(std::string_view s)
@@ -97,20 +97,20 @@ namespace api::rest {
 
 
         // --------------------------------------
-        // Upbit JWT query_hash °è»ê¿ë ¹®ÀÚ¿­ Ç¥ÁØÈ­
+        // Upbit JWT query_hash ê³„ì‚°ìš© ë¬¸ìì—´ í‘œì¤€í™”
         //
-        // UpbitÀÇ ÀÎÁõÀº JWT ¾È¿¡ query_hash(= ÆÄ¶ó¹ÌÅÍ ¹®ÀÚ¿­ SHA512)¸¦ ³Ö´Â´Ù.
-        // ÀÌ¶§ Upbit ¿¹Á¦´Â ´ëÃ¼·Î ¾Æ·¡ Èå¸§À» µû¸¥´Ù.
-        //   - urlencode(params) ÈÄ unquote(...) ¶Ç´Â
-        //   - URLSearchParams(...).toString() ÈÄ decodeURIComponent(...)
+        // Upbitì˜ ì¸ì¦ì€ JWT ì•ˆì— query_hash(= íŒŒë¼ë¯¸í„° ë¬¸ìì—´ SHA512)ë¥¼ ë„£ëŠ”ë‹¤.
+        // ì´ë•Œ Upbit ì˜ˆì œëŠ” ëŒ€ì²´ë¡œ ì•„ë˜ íë¦„ì„ ë”°ë¥¸ë‹¤.
+        //   - urlencode(params) í›„ unquote(...) ë˜ëŠ”
+        //   - URLSearchParams(...).toString() í›„ decodeURIComponent(...)
         //
-        // Áï, "Àü¼Û¿ëÀ¸·Î ÀÎÄÚµùµÈ ¹®ÀÚ¿­"À» ±×´ë·Î ÇØ½ÃÇÏÁö ¾Ê°í,
-        // "ÀÎÄÚµùµÈ ¹®ÀÚ¿­À» ´Ù½Ã percent-decodeÇÑ ¹®ÀÚ¿­"À» ÇØ½Ã ÀÔ·ÂÀ¸·Î »ç¿ëÇÑ´Ù.
+        // ì¦‰, "ì „ì†¡ìš©ìœ¼ë¡œ ì¸ì½”ë”©ëœ ë¬¸ìì—´"ì„ ê·¸ëŒ€ë¡œ í•´ì‹œí•˜ì§€ ì•Šê³ ,
+        // "ì¸ì½”ë”©ëœ ë¬¸ìì—´ì„ ë‹¤ì‹œ percent-decodeí•œ ë¬¸ìì—´"ì„ í•´ì‹œ ì…ë ¥ìœ¼ë¡œ ì‚¬ìš©í•œë‹¤.
         //
-        // ÀÌÀ¯:
-        // - identifierÃ³·³ ':' µî Æ¯¼ö¹®ÀÚ°¡ ÀÖÀ» ¶§,
-        //   Àü¼Û ¹®ÀÚ¿­(¿¹: %3A)°ú ¼­¹ö°¡ Àç±¸¼ºÇÏ´Â ÆÄ¶ó¹ÌÅÍ ¹®ÀÚ¿­(¿¹: :)ÀÇ
-        //   Ç¥ÇöÀÌ ´Ş¶óÁú ¼ö ÀÖ¾î invalid_query_payload(401)°¡ ¹ß»ıÇÒ ¼ö ÀÖ´Ù.
+        // ì´ìœ :
+        // - identifierì²˜ëŸ¼ ':' ë“± íŠ¹ìˆ˜ë¬¸ìê°€ ìˆì„ ë•Œ,
+        //   ì „ì†¡ ë¬¸ìì—´(ì˜ˆ: %3A)ê³¼ ì„œë²„ê°€ ì¬êµ¬ì„±í•˜ëŠ” íŒŒë¼ë¯¸í„° ë¬¸ìì—´(ì˜ˆ: :)ì˜
+        //   í‘œí˜„ì´ ë‹¬ë¼ì§ˆ ìˆ˜ ìˆì–´ invalid_query_payload(401)ê°€ ë°œìƒí•  ìˆ˜ ìˆë‹¤.
         // --------------------------------------
         inline int fromHex_(char c) noexcept
         {
@@ -122,8 +122,8 @@ namespace api::rest {
 
         inline std::string percentDecodeForHash(std::string_view s)
         {
-            // ÁÖÀÇ: '+' -> °ø¹é º¯È¯Àº ÇÏÁö ¾Ê´Â´Ù.
-            //       (¿ì¸® urlEncode´Â °ø¹éµµ %20À¸·Î º¸³»¸ç, '+'¸¦ ¸¸µéÁö ¾Ê´Â´Ù)
+            // ì£¼ì˜: '+' -> ê³µë°± ë³€í™˜ì€ í•˜ì§€ ì•ŠëŠ”ë‹¤.
+            //       (ìš°ë¦¬ urlEncodeëŠ” ê³µë°±ë„ %20ìœ¼ë¡œ ë³´ë‚´ë©°, '+'ë¥¼ ë§Œë“¤ì§€ ì•ŠëŠ”ë‹¤)
             std::string out;
             out.reserve(s.size());
 
@@ -158,7 +158,7 @@ namespace api::rest {
                 appendQueryParam(qs.encoded, kv.first, kv.second);
             }
 
-            // query_hash´Â "µğÄÚµùµÈ ÇüÅÂ"¸¦ ÀÔ·ÂÀ¸·Î »ç¿ë
+            // query_hashëŠ” "ë””ì½”ë”©ëœ í˜•íƒœ"ë¥¼ ì…ë ¥ìœ¼ë¡œ ì‚¬ìš©
             qs.hash = percentDecodeForHash(qs.encoded);
             return qs;
         }
@@ -180,27 +180,27 @@ namespace api::rest {
             return "market"; // market sell by volume
         }
 
-        // ¸Åµµ ½Ã ¹İ¿Ã¸²À» ³»¸²À¸·Î ¹æÁöÇÏ°í 8ÀÚ¸® ¼Ò¼ö¸¦ ±âÁØÀ¸·Î º¯°æ
+        // ë§¤ë„ ì‹œ ë°˜ì˜¬ë¦¼ì„ ë‚´ë¦¼ìœ¼ë¡œ ë°©ì§€í•˜ê³  8ìë¦¬ ì†Œìˆ˜ë¥¼ ê¸°ì¤€ìœ¼ë¡œ ë³€ê²½
         inline std::string formatDecimalFloor(double v, int decimals)
         {
             if (decimals < 0) decimals = 0;
 
             const double scale = std::pow(10.0, static_cast<double>(decimals));
-            // "³»¸²"À¸·Î ÀÜ°í ÃÊ°ú¸¦ ¿øÃµ Â÷´Ü (¹İ¿Ã¸² ±İÁö)
+            // "ë‚´ë¦¼"ìœ¼ë¡œ ì”ê³  ì´ˆê³¼ë¥¼ ì›ì²œ ì°¨ë‹¨ (ë°˜ì˜¬ë¦¼ ê¸ˆì§€)
             const double floored = std::floor(v * scale) / scale;
 
             std::ostringstream oss;
             oss.setf(std::ios::fixed);
             oss << std::setprecision(decimals) << floored;
 
-            // ºÒÇÊ¿äÇÑ trailing zero Á¦°Å(¼±ÅÃ)
+            // ë¶ˆí•„ìš”í•œ trailing zero ì œê±°(ì„ íƒ)
             std::string s = oss.str();
             if (s.find('.') != std::string::npos)
             {
                 while (!s.empty() && s.back() == '0') s.pop_back();
                 if (!s.empty() && s.back() == '.') s.pop_back();
             }
-            // "0"ÀÌ³ª "" ¹æÁö
+            // "0"ì´ë‚˜ "" ë°©ì§€
             if (s.empty()) s = "0";
             return s;
         }
@@ -211,26 +211,26 @@ namespace api::rest {
     }
 
     std::variant<core::Account, api::rest::RestError> UpbitExchangeRestClient::getMyAccount() {
-        // Upbit: GET /v1/accounts (query ¾øÀ½)
+        // Upbit: GET /v1/accounts (query ì—†ìŒ)
         api::rest::HttpRequest req;
         req.host = "api.upbit.com";
         req.port = "443";
         req.method = api::rest::HttpMethod::Get;
         req.target = "/v1/accounts";
 
-        // Accept´Â ¸í½ÃÇÏ´Â ÆíÀÌ ¾ÈÀü
+        // AcceptëŠ” ëª…ì‹œí•˜ëŠ” í¸ì´ ì•ˆì „
         req.headers.emplace("Accept", "application/json");
 
-        // ÀÎÁõ Çì´õ: Authorization: Bearer <jwt>
-        // query_stringÀÌ ¾øÀ¸¹Ç·Î nullopt
+        // ì¸ì¦ í—¤ë”: Authorization: Bearer <jwt>
+        // query_stringì´ ì—†ìœ¼ë¯€ë¡œ nullopt
         req.headers.emplace("Authorization", signer_.makeBearerToken(std::nullopt));
 
-        // 1) ÀÎÇÁ¶ó È£Ãâ
+        // 1) ì¸í”„ë¼ í˜¸ì¶œ
         auto r = rest_.perform(req);
         if (std::holds_alternative<api::rest::RestError>(r))
             return std::get<api::rest::RestError>(r);
 
-        // 2) status È®ÀÎ
+        // 2) status í™•ì¸
         const auto& resp = std::get<api::rest::HttpResponse>(r);
         if (!isSuccessStatus(resp.status))
             return makeHttpStatusError(resp.status, "Upbit GET /v1/accounts", resp.body);
@@ -246,8 +246,8 @@ namespace api::rest {
 
         api::upbit::dto::AccountsDto dto;
         try {
-            // DTO´Â Upbit JSON ±¸Á¶¸¦ ±×´ë·Î ´ã´Â´Ù.
-            // (´ëºÎºĞ /v1/accounts ´Â "¹è¿­"À» ¹İÈ¯ÇÏ¹Ç·Î AccountsDto ³»ºÎ¿¡¼­ ±× ¹è¿­À» °¨½Ñ ÇüÅÂ·Î ¼³°èÇßÀ» °Í)
+            // DTOëŠ” Upbit JSON êµ¬ì¡°ë¥¼ ê·¸ëŒ€ë¡œ ë‹´ëŠ”ë‹¤.
+            // (ëŒ€ë¶€ë¶„ /v1/accounts ëŠ” "ë°°ì—´"ì„ ë°˜í™˜í•˜ë¯€ë¡œ AccountsDto ë‚´ë¶€ì—ì„œ ê·¸ ë°°ì—´ì„ ê°ì‹¼ í˜•íƒœë¡œ ì„¤ê³„í–ˆì„ ê²ƒ)
             dto = j.get<api::upbit::dto::AccountsDto>();
         }
         catch (const std::exception& ex) {
@@ -259,18 +259,18 @@ namespace api::rest {
             return api::upbit::mappers::toDomain(dto);
         }
         catch (const std::exception& ex) {
-            // mapper¿¡¼­ ¿¹¿Ü¸¦ ´øÁú ÀÏÀº Àû°Ô(= stod ½ÇÆĞ µîÀ» ³»ºÎ¿¡¼­ Ã³¸®) ¼³°èÇÏ´Â °Ô ÁÁÁö¸¸,
-            // ¾ÈÀü¸ÁÀ¸·Î ÇÑ ¹ø °¨½Ñ´Ù.
+            // mapperì—ì„œ ì˜ˆì™¸ë¥¼ ë˜ì§ˆ ì¼ì€ ì ê²Œ(= stod ì‹¤íŒ¨ ë“±ì„ ë‚´ë¶€ì—ì„œ ì²˜ë¦¬) ì„¤ê³„í•˜ëŠ” ê²Œ ì¢‹ì§€ë§Œ,
+            // ì•ˆì „ë§ìœ¼ë¡œ í•œ ë²ˆ ê°ì‹¼ë‹¤.
             return makeParseError(resp.status, "Upbit GET /v1/accounts (Mapper)", ex.what(), resp.body);
         }
     }
 
-    // Ãß°¡: GET /v1/orders/open?market=KRW-BTC
+    // ì¶”ê°€: GET /v1/orders/open?market=KRW-BTC
     std::variant<std::vector<core::Order>, api::rest::RestError>
         UpbitExchangeRestClient::getOpenOrders(std::string_view market)
     {
-        // query string (JWT¿¡ Æ÷ÇÔµÇ¾î¾ß ÇÏ¹Ç·Î ¹®ÀÚ¿­·Î ¸¸µç´Ù)
-        // HTTP Àü¼Û¿ë(encoded)°ú JWT ÇØ½Ã ÀÔ·Â(hash)À» ºĞ¸®ÇØ¼­ ¸¸µç´Ù
+        // query string (JWTì— í¬í•¨ë˜ì–´ì•¼ í•˜ë¯€ë¡œ ë¬¸ìì—´ë¡œ ë§Œë“ ë‹¤)
+        // HTTP ì „ì†¡ìš©(encoded)ê³¼ JWT í•´ì‹œ ì…ë ¥(hash)ì„ ë¶„ë¦¬í•´ì„œ ë§Œë“ ë‹¤
         const auto qs = makeQueryStrings({ {"market", market} });
 
         api::rest::HttpRequest req;
@@ -300,32 +300,32 @@ namespace api::rest {
 
         api::upbit::dto::WaitOrdersResponseDto dtoList;
         try {
-            // ÀÀ´äÀº array ¡æ WaitOrdersResponseDto.from_jsonÀÌ array¸¦ vector·Î ÀĞ´Â´Ù.
+            // ì‘ë‹µì€ array â†’ WaitOrdersResponseDto.from_jsonì´ arrayë¥¼ vectorë¡œ ì½ëŠ”ë‹¤.
             dtoList = j.get<api::upbit::dto::WaitOrdersResponseDto>();
         }
         catch (const std::exception& ex) {
             return makeParseError(resp.status, "Upbit GET /v1/orders/open (DTO)", ex.what(), resp.body);
         }
 
-        // DTO -> core::Order (µµ¸ŞÀÎ ¿À¿° ¹æÁö)
+        // DTO -> core::Order (ë„ë©”ì¸ ì˜¤ì—¼ ë°©ì§€)
         return api::upbit::mapper::toDomain(dtoList);
     }
 
-    // DELETE /v1/order?uuid=... ¶Ç´Â identifier=...
+    // DELETE /v1/order?uuid=... ë˜ëŠ” identifier=...
     std::variant<bool, api::rest::RestError>
         UpbitExchangeRestClient::cancelOrder(const std::optional<std::string>& uuid,
             const std::optional<std::string>& identifier)
     {
-        // Upbit: uuid ¶Ç´Â identifier Áß ÇÏ³ª´Â ÇÊ¼ö
+        // Upbit: uuid ë˜ëŠ” identifier ì¤‘ í•˜ë‚˜ëŠ” í•„ìˆ˜
         if (!uuid.has_value() && !identifier.has_value()) {
             RestError e{};
-            e.code = RestErrorCode::InvaildArgiment;
+            e.code = RestErrorCode::InvalidArgument;
             e.http_status = 0;
             e.message = "cancelOrder requires uuid or identifier";
             return e;
         }
 
-        // query »ı¼º: uuid ¿ì¼±, ¾øÀ¸¸é identifier
+        // query ìƒì„±: uuid ìš°ì„ , ì—†ìœ¼ë©´ identifier
         QueryStrings qs;
         if (uuid.has_value()) {
             qs = makeQueryStrings({ {"uuid", *uuid} });
@@ -337,7 +337,7 @@ namespace api::rest {
         req.host = "api.upbit.com";
         req.port = "443";
         req.method = api::rest::HttpMethod::Delete;
-        // Àü¼ÛÀº encoded ¹®ÀÚ¿­·Î URLÀ» ¸¸µç´Ù
+        // ì „ì†¡ì€ encoded ë¬¸ìì—´ë¡œ URLì„ ë§Œë“ ë‹¤
         req.target = std::string("/v1/order?") + qs.encoded;
 
         req.headers.emplace("Accept", "application/json");
@@ -351,34 +351,34 @@ namespace api::rest {
         if (!isSuccessStatus(resp.status))
             return makeHttpStatusError(resp.status, "Upbit DELETE /v1/order", resp.body);
 
-        // ÄÉÀÌ½º A¿¡¼­´Â ¡°Ãë¼Ò ¼º°ø ¿©ºÎ¡±¸¸ ÀÖÀ¸¸é ÃæºĞ
+        // ì¼€ì´ìŠ¤ Aì—ì„œëŠ” â€œì·¨ì†Œ ì„±ê³µ ì—¬ë¶€â€ë§Œ ìˆìœ¼ë©´ ì¶©ë¶„
         return true;
     }
 
     // POST /v1/orders
-    // - OrderRequest(domain) -> Upbit ÁÖ¹® »ı¼º ¿äÃ»À¸·Î º¯È¯
-    // - JWT´Â query_hash°¡ ÇÊ¿äÇÏ´Ù.
-    //   Àü¼ÛÀº encoded ¹®ÀÚ¿­·Î, query_hash´Â percent-decodeµÈ ¹®ÀÚ¿­·Î °è»êÇÑ´Ù.
+    // - OrderRequest(domain) -> Upbit ì£¼ë¬¸ ìƒì„± ìš”ì²­ìœ¼ë¡œ ë³€í™˜
+    // - JWTëŠ” query_hashê°€ í•„ìš”í•˜ë‹¤.
+    //   ì „ì†¡ì€ encoded ë¬¸ìì—´ë¡œ, query_hashëŠ” percent-decodeëœ ë¬¸ìì—´ë¡œ ê³„ì‚°í•œë‹¤.
     std::variant<std::string, api::rest::RestError>
         UpbitExchangeRestClient::postOrder(const core::OrderRequest& reqIn)
     {
-        // ÄÉÀÌ½º C: ½ÇÁ¦·Î POST°¡ ¾Æ¿¹ ½ÇÇàµÇÁö ¾Ê¾Ò´ÂÁö È®ÀÎ(ÀÌ ·Î±× ³ªÅ¸³ª¸é ½ÇÇàµÈ°Å
+        // ì¼€ì´ìŠ¤ C: ì‹¤ì œë¡œ POSTê°€ ì•„ì˜ˆ ì‹¤í–‰ë˜ì§€ ì•Šì•˜ëŠ”ì§€ í™•ì¸(ì´ ë¡œê·¸ ë‚˜íƒ€ë‚˜ë©´ ì‹¤í–‰ëœê±°
         std::cout << "[REST][postOrder] ENTER market=" << reqIn.market
             << " type=" << static_cast<int>(reqIn.type)
             //<< " ident=" << reqIn.identifier
             << "\n";
 
-        // 0) ÀÔ·Â °ËÁõ (½Ç°Å·¡¿¡¼­ °¡Àå Ãë¾àÇÑ ºÎºĞÀÌ ÀÔ·Â °ª ¿À·ù·Î ÀÎÇÑ BadRequest)
+        // 0) ì…ë ¥ ê²€ì¦ (ì‹¤ê±°ë˜ì—ì„œ ê°€ì¥ ì·¨ì•½í•œ ë¶€ë¶„ì´ ì…ë ¥ ê°’ ì˜¤ë¥˜ë¡œ ì¸í•œ BadRequest)
         if (reqIn.market.empty())
         {
             RestError e{};
-            e.code = RestErrorCode::InvaildArgiment;
+            e.code = RestErrorCode::InvalidArgument;
             e.http_status = 0;
             e.message = "postOrder: market is empty";
             return e;
         }
 
-        // 1) Upbit ÆÄ¶ó¹ÌÅÍ »ı¼º (Ç×»ó °°Àº ¼ø¼­·Î ³Ö¾î¼­ query_hash°¡ °°Àº °ªÀ¸·Î °è»êµÇ°Ô ÇÔ)
+        // 1) Upbit íŒŒë¼ë¯¸í„° ìƒì„± (í•­ìƒ ê°™ì€ ìˆœì„œë¡œ ë„£ì–´ì„œ query_hashê°€ ê°™ì€ ê°’ìœ¼ë¡œ ê³„ì‚°ë˜ê²Œ í•¨)
         const std::string side = toUpbitSide(reqIn.position);
         const std::string ordType = toUpbitOrdType(reqIn);
 
@@ -389,13 +389,13 @@ namespace api::rest {
         appendQueryParam(q, "side", side);
         appendQueryParam(q, "ord_type", ordType);
 
-        // identifier(client_order_id)´Â ¼±ÅÃ. »ç¿ë ½Ã ´ÙÀ½ °ÍµéÀ» °¡´ÉÇÏ°Ô ÇØÁØ´Ù.
-        // - WS ³» ÁÖ¹®/Ã¼°á ÀÌº¥Æ®¸¦ Àü·«°ú ¸ÅÄª
-        // - Àç½ÃÀÛ ÈÄ º¹±¸(StartupRecovery) ½Ã º¸Á¶ Å°·Î »ç¿ë
+        // identifier(client_order_id)ëŠ” ì„ íƒ. ì‚¬ìš© ì‹œ ë‹¤ìŒ ê²ƒë“¤ì„ ê°€ëŠ¥í•˜ê²Œ í•´ì¤€ë‹¤.
+        // - WS ë‚´ ì£¼ë¬¸/ì²´ê²° ì´ë²¤íŠ¸ë¥¼ ì „ëµê³¼ ë§¤ì¹­
+        // - ì¬ì‹œì‘ í›„ ë³µêµ¬(StartupRecovery) ì‹œ ë³´ì¡° í‚¤ë¡œ ì‚¬ìš©
         if (!reqIn.identifier.empty())
             appendQueryParam(q, "identifier", reqIn.identifier);
 
-        // 2) ÁÖ¹® Å¸ÀÔ º° ÇÊ¼ö ÇÊµå
+        // 2) ì£¼ë¬¸ íƒ€ì… ë³„ í•„ìˆ˜ í•„ë“œ
         // - limit  : price + volume
         // - price  : (market buy) price=KRW amount, volume omitted
         // - market : (market sell) volume=coin amount, price omitted
@@ -404,7 +404,7 @@ namespace api::rest {
             if (!reqIn.price.has_value())
             {
                 RestError e{};
-                e.code = RestErrorCode::InvaildArgiment;
+                e.code = RestErrorCode::InvalidArgument;
                 e.http_status = 0;
                 e.message = "postOrder: limit order requires price";
                 return e;
@@ -413,7 +413,7 @@ namespace api::rest {
             if (!std::holds_alternative<core::VolumeSize>(reqIn.size))
             {
                 RestError e{};
-                e.code = RestErrorCode::InvaildArgiment;
+                e.code = RestErrorCode::InvalidArgument;
                 e.http_status = 0;
                 e.message = "postOrder: limit order requires VolumeSize";
                 return e;
@@ -423,7 +423,7 @@ namespace api::rest {
             if (vol <= 0.0)
             {
                 RestError e{};
-                e.code = RestErrorCode::InvaildArgiment;
+                e.code = RestErrorCode::InvalidArgument;
                 e.http_status = 0;
                 e.message = "postOrder: limit volume must be > 0";
                 return e;
@@ -438,7 +438,7 @@ namespace api::rest {
             if (!std::holds_alternative<core::AmountSize>(reqIn.size))
             {
                 RestError e{};
-                e.code = RestErrorCode::InvaildArgiment;
+                e.code = RestErrorCode::InvalidArgument;
                 e.http_status = 0;
                 e.message = "postOrder: ord_type=price requires AmountSize";
                 return e;
@@ -448,7 +448,7 @@ namespace api::rest {
             if (amount <= 0.0)
             {
                 RestError e{};
-                e.code = RestErrorCode::InvaildArgiment;
+                e.code = RestErrorCode::InvalidArgument;
                 e.http_status = 0;
                 e.message = "postOrder: amount must be > 0";
                 return e;
@@ -462,7 +462,7 @@ namespace api::rest {
             if (!std::holds_alternative<core::VolumeSize>(reqIn.size))
             {
                 RestError e{};
-                e.code = RestErrorCode::InvaildArgiment;
+                e.code = RestErrorCode::InvalidArgument;
                 e.http_status = 0;
                 e.message = "postOrder: ord_type=market requires VolumeSize";
                 return e;
@@ -472,7 +472,7 @@ namespace api::rest {
             if (vol <= 0.0)
             {
                 RestError e{};
-                e.code = RestErrorCode::InvaildArgiment;
+                e.code = RestErrorCode::InvalidArgument;
                 e.http_status = 0;
                 e.message = "postOrder: volume must be > 0";
                 return e;
@@ -490,16 +490,16 @@ namespace api::rest {
 
         http.headers.emplace("Accept", "application/json");
         http.headers.emplace("Content-Type", "application/x-www-form-urlencoded");
-        // JWT query_hash´Â "percent-decodeµÈ query_string"À» ÀÔ·ÂÀ¸·Î »ç¿ëÇØ¾ß ÇÑ´Ù.
-        // (Upbit ¿¹Á¦ÀÇ unquote(urlencode(params)) / decodeURIComponent(...) Èå¸§)
+        // JWT query_hashëŠ” "percent-decodeëœ query_string"ì„ ì…ë ¥ìœ¼ë¡œ ì‚¬ìš©í•´ì•¼ í•œë‹¤.
+        // (Upbit ì˜ˆì œì˜ unquote(urlencode(params)) / decodeURIComponent(...) íë¦„)
         const std::string q_hash = percentDecodeForHash(q);
         http.headers.emplace("Authorization", signer_.makeBearerToken(q_hash));
 
-        // Upbit´Â POST ÆÄ¶ó¹ÌÅÍ¸¦ body·Î ¹Ş´Â´Ù.
-        // (query_hash°¡ body ÆÄ¶ó¹ÌÅÍ¿Í µ¿ÀÏÇØ¾ß ÇÏ¹Ç·Î, q¸¦ ±×´ë·Î body·Î ³Ö´Â´Ù.)
+        // UpbitëŠ” POST íŒŒë¼ë¯¸í„°ë¥¼ bodyë¡œ ë°›ëŠ”ë‹¤.
+        // (query_hashê°€ body íŒŒë¼ë¯¸í„°ì™€ ë™ì¼í•´ì•¼ í•˜ë¯€ë¡œ, që¥¼ ê·¸ëŒ€ë¡œ bodyë¡œ ë„£ëŠ”ë‹¤.)
         http.body = q;
 
-        // ¿äÃ»ÀÌ ¾î¶² ord_type/size·Î ¸¸µé¾îÁ³´ÂÁö È®ÀÎ
+        // ìš”ì²­ì´ ì–´ë–¤ ord_type/sizeë¡œ ë§Œë“¤ì–´ì¡ŒëŠ”ì§€ í™•ì¸
         std::cout << "[UpbitExchangeRestClient][postOrder] REQ target=" << http.target
             << " body=" << http.body
             << "\n";
@@ -531,8 +531,8 @@ namespace api::rest {
         }
 
 
-        // 4) ÃÖ¼ÒÇÑÀÇ ÇÊµå¸¸ ÆÄ½ÌÇØ¼­ domain order·Î ¹İÈ¯
-        // - engine/order store¿¡¼­´Â id(uuid), market, status Á¤µµ¸¸ ÀÖ¾îµµ ÃßÀûÀÌ °¡´É
+        // 4) ìµœì†Œí•œì˜ í•„ë“œë§Œ íŒŒì‹±í•´ì„œ domain orderë¡œ ë°˜í™˜
+        // - engine/order storeì—ì„œëŠ” id(uuid), market, status ì •ë„ë§Œ ìˆì–´ë„ ì¶”ì ì´ ê°€ëŠ¥
         nlohmann::json j;
         try {
             j = nlohmann::json::parse(resp.body);

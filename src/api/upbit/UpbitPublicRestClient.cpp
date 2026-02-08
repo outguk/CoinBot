@@ -1,30 +1,30 @@
-#include <algorithm>
+ï»¿#include <algorithm>
 #include <json.hpp>
 
 #include "../src/api/upbit/UpbitPublicRestClient.h"
 
 /*
 * UpbitPublicRestClient.cpp
-* JSON ÆÄ½Ì °¡´É ¿©ºÎ ÆÇ´Ü
-* DTO ¡æ Domain º¯È¯
-* status ÀÇ¹Ì ÇØ¼® (2xx vs others)
+* JSON íŒŒì‹± ê°€ëŠ¥ ì—¬ë¶€ íŒë‹¨
+* DTO â†’ Domain ë³€í™˜
+* status ì˜ë¯¸ í•´ì„ (2xx vs others)
 */
 
 namespace api::upbit
 {
 	namespace
 	{
-		// ÆÄ½Ì ¿¡·¯¿Í status ¼º°ø ¿©ºÎ´Â UpbitPublicRestClient¿¡¼­ °ü¸®
+		// íŒŒì‹± ì—ëŸ¬ì™€ status ì„±ê³µ ì—¬ë¶€ëŠ” UpbitPublicRestClientì—ì„œ ê´€ë¦¬
 		inline bool isSuccessStatus(int status) noexcept { return (status >= 200 && status <= 299); }
 
-		// ³Ê¹« ±ä ¿¡·¯¸¦ ¹ŞÀ» °æ¿ì Àß¶ó¼­ ¹Ş±â À§ÇÑ snippet
+		// ë„ˆë¬´ ê¸´ ì—ëŸ¬ë¥¼ ë°›ì„ ê²½ìš° ì˜ë¼ì„œ ë°›ê¸° ìœ„í•œ snippet
 		inline std::string bodySnippet(const std::string& body, std::size_t maxLen = 256)
 		{
 			if (body.size() <= maxLen) return body;
 			return body.substr(0, maxLen);
 		}
 
-		// ¿©·¯ Æä¾î½ÖÀ» °Ë»öÇÒ ¶§ , ±âÁØÀ¸·Î vector¸¦ ³ª´©±â À§ÇÑ ÇÔ¼ö
+		// ì—¬ëŸ¬ í˜ì–´ìŒì„ ê²€ìƒ‰í•  ë•Œ , ê¸°ì¤€ìœ¼ë¡œ vectorë¥¼ ë‚˜ëˆ„ê¸° ìœ„í•œ í•¨ìˆ˜
 		inline std::string joinMarkets(const std::vector<std::string>& markets)
 		{
 			std::ostringstream oss;
@@ -37,7 +37,7 @@ namespace api::upbit
 			return oss.str();
 		}
 
-		// °øÅë: HttpResponse -> RestError (»óÅÂ ÄÚµå ½ÇÆĞ ½Ã)
+		// ê³µí†µ: HttpResponse -> RestError (ìƒíƒœ ì½”ë“œ ì‹¤íŒ¨ ì‹œ)
 		inline api::rest::RestError makeHttpStatusError(
 			int status,
 			const std::string& where,
@@ -52,7 +52,7 @@ namespace api::upbit
 			return e;
 		}
 
-		// °øÅë: JSON ÆÄ½Ì/DTO º¯È¯ ½ÇÆĞ -> RestError
+		// ê³µí†µ: JSON íŒŒì‹±/DTO ë³€í™˜ ì‹¤íŒ¨ -> RestError
 		inline api::rest::RestError makeParseError(
 			int status,
 			const std::string& where,
@@ -70,26 +70,26 @@ namespace api::upbit
 		}
 	}
 
-	// ¸¶ÄÏ Á¤º¸ ºÎ¸£±â
+	// ë§ˆì¼“ ì •ë³´ ë¶€ë¥´ê¸°
 	std::variant < std::vector<core::MarketInfo>, api::rest::RestError> 
 		UpbitPublicRestClient::getMarkets(bool isDetails) const
 	{
-		// 1) ¿äÃ» ±¸¼º (Upbit ±ÔÄ¢¸¸ Ã¥ÀÓÀ» °¡Áü)
+		// 1) ìš”ì²­ êµ¬ì„± (Upbit ê·œì¹™ë§Œ ì±…ì„ì„ ê°€ì§)
 		api::rest::HttpRequest req;
 		req.host = "api.upbit.com";
 		req.port = "443";
 		req.method = api::rest::HttpMethod::Get;
-		// ¿©±â ¿À·ù ÁÖÀÇ
+		// ì—¬ê¸° ì˜¤ë¥˜ ì£¼ì˜
 		req.target = std::string("/v1/market/all?is_details=") + (isDetails ? "true" : "false");
 
-		// RestClient°¡ Host/User-Agent¸¦ ¼¼ÆÃÇÏ´õ¶óµµ Accept´Â ¸íÈ®È÷ ÁÖ´Â°Ô ¾ÈÀü (¹º¼Ö?)
-		// Accept´Â ¿äÃ» Çì´õ(Request Header), ¡°ÀÌ ¿äÃ»Àº JSON Çü½ÄÀÇ ÀÀ´äÀ» ±â´ëÇÑ´Ù¡± ´Â ¶æ
+		// RestClientê°€ Host/User-Agentë¥¼ ì„¸íŒ…í•˜ë”ë¼ë„ AcceptëŠ” ëª…í™•íˆ ì£¼ëŠ”ê²Œ ì•ˆì „ (ë­”ì†”?)
+		// AcceptëŠ” ìš”ì²­ í—¤ë”(Request Header), â€œì´ ìš”ì²­ì€ JSON í˜•ì‹ì˜ ì‘ë‹µì„ ê¸°ëŒ€í•œë‹¤â€ ëŠ” ëœ»
 		req.headers.emplace("Accept", "application/json");
 
-		// 2) ÀÎÇÁ¶ó È£Ãâ (retry/timeout/SSL/¿¡·¯Ç¥ÁØÈ­´Â RestClient°¡ Àü´ã)
+		// 2) ì¸í”„ë¼ í˜¸ì¶œ (retry/timeout/SSL/ì—ëŸ¬í‘œì¤€í™”ëŠ” RestClientê°€ ì „ë‹´)
 		auto r = rest_.perform(req);
 
-		// Áßº¹Àº ¾Æ´ÑÁö À¯ÀÇ
+		// ì¤‘ë³µì€ ì•„ë‹Œì§€ ìœ ì˜
 		if (std::holds_alternative<api::rest::RestError>(r))
 		{
 			return std::get<api::rest::RestError>(r);
@@ -97,15 +97,15 @@ namespace api::upbit
 
 		const auto& resp = std::get <api::rest::HttpResponse>(r);
 
-		// 3) status ÇØ¼® (ÀÇ¹Ì ÆÇ´Ü - Àç½Ãµµ ÆÇ´Ü°ú´Â ´Ù¸§)
+		// 3) status í•´ì„ (ì˜ë¯¸ íŒë‹¨ - ì¬ì‹œë„ íŒë‹¨ê³¼ëŠ” ë‹¤ë¦„)
 		if (!isSuccessStatus(resp.status))
 		{
 			return makeHttpStatusError(resp.status, "Upbit GET /v1/market/all", resp.body);
 		}
 
-		// 4) JSON -> DTO (ÆÄ½Ì ¿¹¿Ü¸¦ RestError·Î ½Â°İ)
+		// 4) JSON -> DTO (íŒŒì‹± ì˜ˆì™¸ë¥¼ RestErrorë¡œ ìŠ¹ê²©)
 		nlohmann::json j;
-		try		// JSON µ¥ÀÌÅÍ¸¦ °¡Á®¿À±â
+		try		// JSON ë°ì´í„°ë¥¼ ê°€ì ¸ì˜¤ê¸°
 		{
 			j = nlohmann::json::parse(resp.body);
 		}
@@ -115,7 +115,7 @@ namespace api::upbit
 		}
 
 		std::vector<api::upbit::dto::MarketDto> dtos;
-		try		// JSON -> DTO ÆÄ½Ì
+		try		// JSON -> DTO íŒŒì‹±
 		{
 			dtos = j.get < std::vector<api::upbit::dto::MarketDto>>();
 		}
@@ -124,7 +124,7 @@ namespace api::upbit
 			return makeParseError(resp.status, "Upbit GET /v1/market/all (DTO)", ex.what(), resp.body);
 		}
 
-		// 5) DTO -> Domain (ÇÊ¿äÇÑ ÇÊµå¸¸ ¼±ÅÃ °¡´É)
+		// 5) DTO -> Domain (í•„ìš”í•œ í•„ë“œë§Œ ì„ íƒ ê°€ëŠ¥)
 		std::vector<core::MarketInfo> out;
 		out.reserve(dtos.size());
 		for (const auto& d : dtos)
@@ -135,7 +135,7 @@ namespace api::upbit
 		return out;
 	}
 
-	// ÇöÀç°¡ Á¤º¸ ºÎ¸£±â
+	// í˜„ì¬ê°€ ì •ë³´ ë¶€ë¥´ê¸°
 	std::variant<std::vector<core::Ticker>, api::rest::RestError>
 		UpbitPublicRestClient::getTickers(const std::vector<std::string>& markets) const
 	{
@@ -178,7 +178,7 @@ namespace api::upbit
 		return out;
 	}
 
-	// Äµµé Á¤º¸ ºÎ¸£±â
+	// ìº”ë“¤ ì •ë³´ ë¶€ë¥´ê¸°
 	std::variant<std::vector<core::Candle>, api::rest::RestError>
 		UpbitPublicRestClient::getCandlesMinutes(const std::string& market,
 			int unit,
@@ -231,7 +231,7 @@ namespace api::upbit
 		return out;
 	}
 
-	// È£°¡Ã¢ Á¤º¸ ºÎ¸£±â
+	// í˜¸ê°€ì°½ ì •ë³´ ë¶€ë¥´ê¸°
 	std::variant<std::vector<core::Orderbook>, api::rest::RestError>
 		UpbitPublicRestClient::getOrderbooks(const std::vector<std::string>& markets,
 			std::optional<std::string> level,
@@ -245,7 +245,7 @@ namespace api::upbit
 		std::ostringstream target;
 		target << "/v1/orderbook?markets=" + joinMarkets(markets);
 
-		// level: string (¹®¼­ ±âÁØ)
+		// level: string (ë¬¸ì„œ ê¸°ì¤€)
 		if (level && !level->empty())
 			target << "&level=" << *level;
 

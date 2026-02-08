@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include <string>
 #include <string_view>
@@ -21,7 +21,7 @@ namespace api::upbit::mapper
 		if (sv.empty()) return fallback;
 
 #if defined(__cpp_lib_to_chars) && (__cpp_lib_to_chars >= 201611L)
-		// ÀÏºÎ Ç¥ÁØ ¶óÀÌºê·¯¸®¿¡¼­ double from_chars Áö¿øÀÌ ¹Ì¿ÏÀÏ ¼ö ÀÖ¾î Æú¹éÀ» µĞ´Ù.
+		// ì¼ë¶€ í‘œì¤€ ë¼ì´ë¸ŒëŸ¬ë¦¬ì—ì„œ double from_chars ì§€ì›ì´ ë¯¸ì™„ì¼ ìˆ˜ ìˆì–´ í´ë°±ì„ ë‘”ë‹¤.
 		double out{};
 		auto res = std::from_chars(sv.data(), sv.data() + sv.size(), out);
 		if (res.ec == std::errc() && res.ptr == sv.data() + sv.size())
@@ -58,7 +58,7 @@ namespace api::upbit::mapper
 
 	inline core::OrderType toDomainOrderType(std::string_view ord_type) noexcept
 	{
-		// µµ¸ŞÀÎ ÃÖ¼Ò ±¸ºĞ: limit vs (±× ¿Ü) market
+		// ë„ë©”ì¸ ìµœì†Œ êµ¬ë¶„: limit vs (ê·¸ ì™¸) market
 		if (ord_type == "limit") return core::OrderType::Limit;
 		return core::OrderType::Market;
 	}
@@ -68,8 +68,8 @@ namespace api::upbit::mapper
 		using St = api::upbit::dto::OrdState;
 		switch (st)
 		{
-		case St::wait:   return core::OrderStatus::Open;     // ¹ÌÃ¼°á ´ë±â
-		case St::watch:  return core::OrderStatus::Pending;  // ¿¹¾à´ë±â
+		case St::wait:   return core::OrderStatus::Open;     // ë¯¸ì²´ê²° ëŒ€ê¸°
+		case St::watch:  return core::OrderStatus::Pending;  // ì˜ˆì•½ëŒ€ê¸°
 		case St::done:   return core::OrderStatus::Filled;
 		case St::cancel: return core::OrderStatus::Canceled;
 		default:         return core::OrderStatus::Pending;
@@ -93,19 +93,19 @@ namespace api::upbit::mapper
 
 		o.created_at = dto.created_at;
 
-		// ¿äÃ»°ª
+		// ìš”ì²­ê°’
 		o.price = parseOptDouble(dto.price);
 		o.volume = parseOptDouble(dto.volume);
 
-		// ºÎºĞ Ã¼°á/ÀÜ¿©
+		// ë¶€ë¶„ ì²´ê²°/ì”ì—¬
 		o.executed_volume = parseDoubleOr(dto.executed_volume, 0.0);
 		o.remaining_volume = parseDoubleOr(dto.remaining_volume, 0.0);
 		o.trades_count = dto.trades_count;
 
-		// ´©Àû Ã¼°á ±İ¾×
+		// ëˆ„ì  ì²´ê²° ê¸ˆì•¡
 		o.executed_funds = parseDoubleOr(dto.executed_funds, 0.0);
 
-		// ¼ö¼ö·á/Àá±İ
+		// ìˆ˜ìˆ˜ë£Œ/ì ê¸ˆ
 		o.reserved_fee = parseDoubleOr(dto.reserved_fee, 0.0);
 		o.remaining_fee = parseDoubleOr(dto.remaining_fee, 0.0);
 		o.paid_fee = parseDoubleOr(dto.paid_fee, 0.0);

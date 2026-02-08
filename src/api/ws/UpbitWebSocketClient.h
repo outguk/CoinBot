@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include <boost/asio.hpp>
 #include <boost/asio/ssl.hpp>
@@ -28,48 +28,49 @@ namespace api::ws
 	namespace websocket = beast::websocket;
 	namespace http = beast::http;
 
-	// ÀÌ Å¬·¡½ºÀÇ ¿ªÇÒ
-	// - ¾÷ºñÆ® WebSocket ¼­¹ö¿¡ TLS·Î ¿¬°á
-	// - Äµµé µ¥ÀÌÅÍ ±¸µ¶ ¸Ş½ÃÁö¸¦ Àü¼Û
-	// - ¼­¹ö¿¡¼­ ¿À´Â raw JSON ¹®ÀÚ¿­À» ¼ö½Å
-	// (Àü·«/µµ¸ŞÀÎ ÆÄ½ÌÀº ¿©±â¼­ ÇÏÁö ¾ÊÀ½
-	// ÃßÈÄ ºñµ¿±â ¹æ½ÄÀ¸·Î ¿©·¯ ¸¶ÄÏÀ» °ü¸®ÇÏµµ·Ï º¯°æ
+	// ì´ í´ë˜ìŠ¤ì˜ ì—­í• 
+	// - ì—…ë¹„íŠ¸ WebSocket ì„œë²„ì— TLSë¡œ ì—°ê²°
+	// - ìº”ë“¤ ë°ì´í„° êµ¬ë… ë©”ì‹œì§€ë¥¼ ì „ì†¡
+	// - ì„œë²„ì—ì„œ ì˜¤ëŠ” raw JSON ë¬¸ìì—´ì„ ìˆ˜ì‹ 
+	// (ì „ëµ/ë„ë©”ì¸ íŒŒì‹±ì€ ì—¬ê¸°ì„œ í•˜ì§€ ì•ŠìŒ
+	// ì¶”í›„ ë¹„ë™ê¸° ë°©ì‹ìœ¼ë¡œ ì—¬ëŸ¬ ë§ˆì¼“ì„ ê´€ë¦¬í•˜ë„ë¡ ë³€ê²½
 	class UpbitWebSocketClient final
 	{
 	public:
 		// WebSocket stream type alias
 		using WsStream = websocket::stream<beast::ssl_stream<beast::tcp_stream>>;
 		/* 
-		* Handler´Â ¡°UpbitWebSocketClient°¡ ÀÚ±â Ã¥ÀÓÀ» ³¡³½ µÚ, ´ÙÀ½ Ã¥ÀÓÀÚ¿¡°Ô µ¥ÀÌÅÍ¸¦ ³Ñ°ÜÁÖ´Â Ãâ±¸¡±´Ù.
+		* HandlerëŠ” â€œUpbitWebSocketClientê°€ ìê¸° ì±…ì„ì„ ëë‚¸ ë’¤, ë‹¤ìŒ ì±…ì„ìì—ê²Œ ë°ì´í„°ë¥¼ ë„˜ê²¨ì£¼ëŠ” ì¶œêµ¬â€ë‹¤.
 		*/
-		// WS¿¡¼­ ¹ŞÀº ¿øº» JSON ¹®ÀÚ¿­ ±×´ë·Î Àü´Ş
+		// WSì—ì„œ ë°›ì€ ì›ë³¸ JSON ë¬¸ìì—´ ê·¸ëŒ€ë¡œ ì „ë‹¬ 
+		// string_viewë¥¼ ë°›ì•„ì„œ, í•¨ìˆ˜ë¥¼ ë‹´ëŠ” íƒ€ì…ì˜ ë³„ëª…ì„ MessageHandlerë¡œ ì„¤ì •
 		using MessageHandler = std::function<void(std::string_view)>; // raw json text
 
-		// io_context: ³×Æ®¿öÅ© ÀÌº¥Æ® ·çÇÁ
-		// ssl_ctx   : TLS ÀÎÁõ/¾ÏÈ£È­ ¼³Á¤
+		// io_context: ë„¤íŠ¸ì›Œí¬ ì´ë²¤íŠ¸ ë£¨í”„
+		// ssl_ctx   : TLS ì¸ì¦/ì•”í˜¸í™” ì„¤ì •
 		UpbitWebSocketClient(boost::asio::io_context& ioc,
 			boost::asio::ssl::context& ssl_ctx);
 
 		
-		// 1) WebSocket ¿¬°á
+		// 1) WebSocket ì—°ê²°
 		// - DNS resolve
-		// - TCP ¿¬°á
+		// - TCP ì—°ê²°
 		// - TLS Handshake
 		// - WebSocket Handshake
 		void connectPublic(const std::string& host,
 			const std::string& port,
 			const std::string& target);
 
-		// 1-2) WebSocket ¿¬°á (PRIVATE)
-		// - myOrder / myAsset Ã³·³ ÀÎÁõÀÌ ÇÊ¿äÇÑ Ã¤³ÎÀº /private ¿£µåÆ÷ÀÎÆ® »ç¿ë
-		// - JWT ÅäÅ«À» Authorization: Bearer <token> À¸·Î WS ÇÚµå¼ÎÀÌÅ© ¿äÃ»¿¡ Æ÷ÇÔ
+		// 1-2) WebSocket ì—°ê²° (PRIVATE)
+		// - myOrder / myAsset ì²˜ëŸ¼ ì¸ì¦ì´ í•„ìš”í•œ ì±„ë„ì€ /private ì—”ë“œí¬ì¸íŠ¸ ì‚¬ìš©
+		// - JWT í† í°ì„ Authorization: Bearer <token> ìœ¼ë¡œ WS í•¸ë“œì…°ì´í¬ ìš”ì²­ì— í¬í•¨
 		void connectPrivate(const std::string& host,
 			const std::string& port,
 			const std::string& target,
 			const std::string& bearer_jwt);
 
 
-		// 2) Äµµé ±¸µ¶ ¿äÃ» Àü¼Û
+		// 2) ìº”ë“¤ êµ¬ë… ìš”ì²­ ì „ì†¡
 		// - markets: ["KRW-BTC", "KRW-ETH"]
 		// - unit   : "candle.1s", "candle.1m" ...
 		// - format : DEFAULT / SIMPLE_LIST
@@ -79,30 +80,31 @@ namespace api::ws
 			bool is_only_realtime = false,
 			const std::string& format = "DEFAULT");
 
-		// 2-2) ³» ÁÖ¹® ¹× Ã¼°á(myOrder) ±¸µ¶ ¿äÃ»
+		// 2-2) ë‚´ ì£¼ë¬¸ ë° ì²´ê²°(myOrder) êµ¬ë… ìš”ì²­
 		// - markets(codes): ["KRW-BTC", "KRW-ETH"]
 		// - format: DEFAULT / SIMPLE
-		// - is_only_realtime: true ±ÇÀå(½Ç½Ã°£ ½ºÆ®¸²¸¸)
+		// - is_only_realtime: true ê¶Œì¥(ì‹¤ì‹œê°„ ìŠ¤íŠ¸ë¦¼ë§Œ)
 		void subscribeMyOrder(const std::vector<std::string>& markets,
 			bool is_only_realtime = true,
 			const std::string& format = "DEFAULT");
 
-		// 3) ¸Ş½ÃÁö ¼ö½Å ·çÇÁ
-		// - ¼­¹ö°¡ º¸³»´Â µ¥ÀÌÅÍ¸¦ °è¼Ó ÀĞ´Â´Ù
-		// - ¿¬°á À¯Áö È®ÀÎ¿ë
+		// 3) ë©”ì‹œì§€ ìˆ˜ì‹  ë£¨í”„
+		// - ì„œë²„ê°€ ë³´ë‚´ëŠ” ë°ì´í„°ë¥¼ ê³„ì† ì½ëŠ”ë‹¤
+		// - ì—°ê²° ìœ ì§€ í™•ì¸ìš©
 		void runReadLoop();
 
-		// Á¤»óÀûÀÎ Á¾·á(Ä¿¸Çµå Å¥)
+		// ì •ìƒì ì¸ ì¢…ë£Œ(ì»¤ë§¨ë“œ í)
 		void close();
 
-		// ¼ö½Å Äİ¹é(¼±ÅÃ) - ¿ÜºÎ¿¡¼­ ¸Ş½ÃÁö Ã³¸® ·ÎÁ÷À» ÁÖÀÔ
+		// ìˆ˜ì‹  ì½œë°±(ì„ íƒ) - ì™¸ë¶€ì—ì„œ ë©”ì‹œì§€ ì²˜ë¦¬ ë¡œì§ì„ ì£¼ì…
+		// MessageHandlerëŠ” í•¨ìˆ˜ë¥¼ ë‹´ì„ ìˆ˜ ìˆê¸°ì— ëŒë‹¤ í•¨ìˆ˜ë¥¼ ë„£ìœ¼ë©´ on_msgì— í•¨ìˆ˜ê°€ ë‹´ê¸´ë‹¤
 		void setMessageHandler(MessageHandler cb);
 
 	private:
 		// ---- Command queue ----
 		struct CmdConnect {
 			std::string host, port, target;
-			std::optional<std::string> bearer_jwt; // nulloptÀÌ¸é public
+			std::optional<std::string> bearer_jwt; // nulloptì´ë©´ public
 		};
 		struct CmdSubCandles {
 			std::string type;
@@ -122,7 +124,7 @@ namespace api::ws
 
 		void pushCommand(Command c);
 
-		// ws_ »ı¼º/Á¤¸®
+		// ws_ ìƒì„±/ì •ë¦¬
 		void resetStream();
 
 		// thread-safe send
@@ -131,21 +133,21 @@ namespace api::ws
 		bool reconnectOnce();
 		void resubscribeAll();
 
-		// ´ÙÀ½ Àç¿¬°á sleep ½Ã°£À» °è»ê(Áö¼ö backoff + jitter)
+		// ë‹¤ìŒ ì¬ì—°ê²° sleep ì‹œê°„ì„ ê³„ì‚°(ì§€ìˆ˜ backoff + jitter)
 		std::chrono::milliseconds computeReconnectDelay_();
 
-		// ³»ºÎ °øÅë ¿¬°á ·çÆ¾: resolve->tcp->tls->ws handshake
-		// - private ¸ğµå¸é handshake ¿äÃ»¿¡ Authorization Çì´õ¸¦ »ğÀÔÇÑ´Ù.
+		// ë‚´ë¶€ ê³µí†µ ì—°ê²° ë£¨í‹´: resolve->tcp->tls->ws handshake
+		// - private ëª¨ë“œë©´ handshake ìš”ì²­ì— Authorization í—¤ë”ë¥¼ ì‚½ì…í•œë‹¤.
 		void connectImpl(const std::string& host,
 			const std::string& port,
 			const std::string& target,
 			std::optional<std::string> bearer_jwt);
 
-		// ¾÷ºñÆ® ±¸µ¶ ¿äÃ»¿¡ µé¾î°¥ ticket(±¸µ¶ ¿äÃ» ¹­À½ÀÇ ½Äº°ÀÚ(ID)) °ª »ı¼º
-		// (¿äÃ» ½Äº°¿ë, ¿ÏÀüÇÑ UUIDÀÏ ÇÊ¿ä´Â ¾øÀ½)
+		// ì—…ë¹„íŠ¸ êµ¬ë… ìš”ì²­ì— ë“¤ì–´ê°ˆ ticket(êµ¬ë… ìš”ì²­ ë¬¶ìŒì˜ ì‹ë³„ì(ID)) ê°’ ìƒì„±
+		// (ìš”ì²­ ì‹ë³„ìš©, ì™„ì „í•œ UUIDì¼ í•„ìš”ëŠ” ì—†ìŒ)
 		static std::string makeTicket();
 
-		// ¾÷ºñÆ® WebSocket "Äµµé ±¸µ¶" JSON ÇÁ·¹ÀÓ »ı¼º
+		// ì—…ë¹„íŠ¸ WebSocket "ìº”ë“¤ êµ¬ë…" JSON í”„ë ˆì„ ìƒì„±
 		static std::string buildCandleSubJsonFrame(
 			const std::string& ticket,
 			const std::string& type,
@@ -164,44 +166,44 @@ namespace api::ws
 
 	private:
 
-		boost::asio::io_context& ioc_;			// ³×Æ®¿öÅ© ÀÌº¥Æ® ·çÇÁ
-		boost::asio::ssl::context& ssl_ctx_;	// TLS ¼³Á¤ ÄÁÅØ½ºÆ®
+		boost::asio::io_context& ioc_;			// ë„¤íŠ¸ì›Œí¬ ì´ë²¤íŠ¸ ë£¨í”„
+		boost::asio::ssl::context& ssl_ctx_;	// TLS ì„¤ì • ì»¨í…ìŠ¤íŠ¸
 
-		tcp::resolver resolver_;				// DNS ¡æ IP º¯È¯
+		tcp::resolver resolver_;				// DNS â†’ IP ë³€í™˜
 
-		// WebSocket(TLS À§¿¡¼­ µ¿ÀÛ)
-		// Àç¿¬°áÀ» À§ÇØ "streamÀ» »õ·Î »ı¼º"ÇÒ ¼ö ÀÖ¾î¾ß ÇØ¼­ Æ÷ÀÎÅÍ·Î º¸°ü
+		// WebSocket(TLS ìœ„ì—ì„œ ë™ì‘)
+		// ì¬ì—°ê²°ì„ ìœ„í•´ "streamì„ ìƒˆë¡œ ìƒì„±"í•  ìˆ˜ ìˆì–´ì•¼ í•´ì„œ í¬ì¸í„°ë¡œ ë³´ê´€
 		std::unique_ptr<WsStream> ws_;
 
-		// stop ÇÃ·¡±× (close Ä¿¸Çµå·Î¸¸ Á¦¾î)
+		// stop í”Œë˜ê·¸ (close ì»¤ë§¨ë“œë¡œë§Œ ì œì–´)
 		std::atomic<bool> stop_{ false };
 
-		// ping ÁÖ±â / Àç¿¬°á backoff
-		std::chrono::seconds ping_interval_{ 20 };
+		// ping ì£¼ê¸° / ì¬ì—°ê²° backoff
+		std::chrono::seconds ping_interval_{ 25 };
 		std::chrono::milliseconds reconnect_min_backoff_{ 800 };
 		std::chrono::milliseconds reconnect_max_backoff_{ 30'000 };
-		double reconnect_jitter_ratio_{ 0.20 };                       // ¡¾20% Èçµé¸²
+		double reconnect_jitter_ratio_{ 0.20 };                       // Â±20% í”ë“¤ë¦¼
 
-		std::uint32_t reconnect_failures_{ 0 };                       // ¿¬¼Ó ½ÇÆĞ È½¼ö (¼º°ø ½Ã 0À¸·Î reset)
+		std::uint32_t reconnect_failures_{ 0 };                       // ì—°ì† ì‹¤íŒ¨ íšŸìˆ˜ (ì„±ê³µ ì‹œ 0ìœ¼ë¡œ reset)
 
-		// ¿¬°á Á¤º¸ ÀúÀå (Àç¿¬°á ´ëºñ)
+		// ì—°ê²° ì •ë³´ ì €ì¥ (ì¬ì—°ê²° ëŒ€ë¹„)
 		std::string host_;
 		std::string port_;
 		std::string target_;
 
-		// PRIVATE Ã¤³Î Á¢¼Ó ½Ã »ç¿ë(¾øÀ¸¸é PUBLIC Á¢¼Ó)
+		// PRIVATE ì±„ë„ ì ‘ì† ì‹œ ì‚¬ìš©(ì—†ìœ¼ë©´ PUBLIC ì ‘ì†)
 		std::optional<std::string> bearer_jwt_;
 
-		// Àç¿¬°á ÈÄ Àç±¸µ¶À» À§ÇØ ¸¶Áö¸· subscribe frame ÀúÀå
-		// key ¿¹: "candle.1m", "myOrder"
+		// ì¬ì—°ê²° í›„ ì¬êµ¬ë…ì„ ìœ„í•´ ë§ˆì§€ë§‰ subscribe frame ì €ì¥
+		// key ì˜ˆ: "candle.1m", "myOrder"
 		std::unordered_map<std::string, std::string> last_sub_frames_;
 
-		// Ä¿¸Çµå Å¥
+		// ì»¤ë§¨ë“œ í
 		std::mutex cmd_mu_;
-		std::condition_variable cmd_cv_;
+		std::condition_variable cmd_cv_; // í˜„ì¬ëŠ” ì‚¬ìš©í•˜ì§€ ì•ŠëŠ”ë° ë¹„ë™ê¸°ë¡œ ë„˜ì–´ê°€ë©° ì‚¬ìš©í•  ê²ƒ
 		std::deque<Command> cmd_q_;
 
-		// ¼ö½Å Äİ¹é(´Ù½Ã ³Ñ°ÜÁÖ±â)
+		// ìˆ˜ì‹  ì½œë°±(ë‹¤ì‹œ ë„˜ê²¨ì£¼ê¸°)
 		MessageHandler on_msg_;
 	};
 }

@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include <cstdint>
 #include <optional>
@@ -17,40 +17,40 @@
 namespace trading::strategies {
 
     /*
-        RSI Mean Reversion (°üÁ¡ A)
-        - market_ ´Â »ı¼º ½Ã °íÁ¤ (´ÜÀÏ Á¾¸ñ Àü¿ë ÀÎ½ºÅÏ½º)
-        - »óÅÂ ¸Ó½Å È®Á¤:
-            Flat(¹Ìº¸À¯) -> PendingEntry(¸Å¼ö ÁÖ¹® ³Ö°í ´ë±â) -> InPosition(º¸À¯ Áß)
-            InPosition -> PendingExit(¸Åµµ ÁÖ¹® ³Ö°í ´ë±â) -> Flat
-        - entry(ÁøÀÔ°¡)/stop(¼ÕÀı°¡)/target(ÀÍÀı°¡) Àº Ã¼°á ½ÃÁ¡(onFill)¿¡¼­ È®Á¤
-        - SMA´Â ÃßÈÄ Ãß°¡ÇÏÀÚ
+        RSI Mean Reversion (ê´€ì  A)
+        - market_ ëŠ” ìƒì„± ì‹œ ê³ ì • (ë‹¨ì¼ ì¢…ëª© ì „ìš© ì¸ìŠ¤í„´ìŠ¤)
+        - ìƒíƒœ ë¨¸ì‹  í™•ì •:
+            Flat(ë¯¸ë³´ìœ ) -> PendingEntry(ë§¤ìˆ˜ ì£¼ë¬¸ ë„£ê³  ëŒ€ê¸°) -> InPosition(ë³´ìœ  ì¤‘)
+            InPosition -> PendingExit(ë§¤ë„ ì£¼ë¬¸ ë„£ê³  ëŒ€ê¸°) -> Flat
+        - entry(ì§„ì…ê°€)/stop(ì†ì ˆê°€)/target(ìµì ˆê°€) ì€ ì²´ê²° ì‹œì (onFill)ì—ì„œ í™•ì •
+        - SMAëŠ” ì¶”í›„ ì¶”ê°€í•˜ì
     */
     class RsiMeanReversionStrategy final {
     public:
-        // Àü·« ÆÄ¶ó¹ÌÅÍ(¡°¼ıÀÚ Æ©´×¡±Àº ÀÌ ±¸Á¶Ã¼¿¡¼­¸¸)
+        // ì „ëµ íŒŒë¼ë¯¸í„°(â€œìˆ«ì íŠœë‹â€ì€ ì´ êµ¬ì¡°ì²´ì—ì„œë§Œ)
         struct Params final {
             // RSI
             std::size_t rsiLength{ 3 };
             double oversold{ 80 };
             double overbought{ 70 };
             
-            // SMA Ãß°¡
+            // SMA ì¶”ê°€
             int smaLength{ 20 };
             double smaBand{ 0.0 };
 
-            // Ãß¼¼ °­µµ(trendStrength) °è»ê¿ë: close[N]
+            // ì¶”ì„¸ ê°•ë„(trendStrength) ê³„ì‚°ìš©: close[N]
             // trendStrength = abs(close - closeN) / closeN
             std::size_t trendLookWindow{ 3 };
-            double maxTrendStrength{ 1 }; // 3% ÀÌ»ó ÇÑ ¹æÇâÀ¸·Î ¹ú¾îÁ³À¸¸é ¡°Ãß¼¼ °­ÇÔ ¡æ Æò±ÕÈ¸±Í ºÎÀûÇÕ¡± °°Àº ÇÊÅÍ
+            double maxTrendStrength{ 1 }; // 3% ì´ìƒ í•œ ë°©í–¥ìœ¼ë¡œ ë²Œì–´ì¡Œìœ¼ë©´ â€œì¶”ì„¸ ê°•í•¨ â†’ í‰ê· íšŒê·€ ë¶€ì í•©â€ ê°™ì€ í•„í„°
 
-            // º¯µ¿¼º(ÃÖ±Ù ¼öÀÍ·ü Ç¥ÁØÆíÂ÷)
+            // ë³€ë™ì„±(ìµœê·¼ ìˆ˜ìµë¥  í‘œì¤€í¸ì°¨)
             std::size_t volatilityWindow{ 3 };
-            double minVolatility{ 0 };    // 1% ÀÌ»óÀÌ¸é °Å·¡ÇÏ±â Àû´ç
+            double minVolatility{ 0 };    // 1% ì´ìƒì´ë©´ ê±°ë˜í•˜ê¸° ì ë‹¹
 
-            // Æ÷Áö¼Ç/¸®½ºÅ©
-            double riskPercent{ 10.0 };       // ¸Å¼ö¿¡ »ç¿ëÇÒ KRW ºñÀ²(°èÁÂÀÇ krw_available ±âÁØ)
-            double stopLossPct{ 1.0 };        // ÁøÀÔ°¡ ´ëºñ ¼ÕÀı %
-            double profitTargetPct{ 1 };    // ÁøÀÔ°¡ ´ëºñ ÀÍÀı %
+            // í¬ì§€ì…˜/ë¦¬ìŠ¤í¬
+            double riskPercent{ 10.0 };       // ë§¤ìˆ˜ì— ì‚¬ìš©í•  KRW ë¹„ìœ¨(ê³„ì¢Œì˜ krw_available ê¸°ì¤€)
+            double stopLossPct{ 1.0 };        // ì§„ì…ê°€ ëŒ€ë¹„ ì†ì ˆ %
+            double profitTargetPct{ 1 };    // ì§„ì…ê°€ ëŒ€ë¹„ ìµì ˆ %
         };
 
         enum class State : std::uint8_t {
@@ -75,79 +75,82 @@ namespace trading::strategies {
 
         // (2) last snapshot getter (public)
     public:
-        // Å×½ºÆ®¿ë, ÇöÀç »ç¿ëx
+        // í…ŒìŠ¤íŠ¸ìš©, í˜„ì¬ ì‚¬ìš©x
         [[nodiscard]] const Snapshot& lastSnapshot() const noexcept { return last_snapshot_; }
 
-        // ¸ŞÀÎ ÁøÀÔÁ¡: ¡°ºÀ 1°³¡± µé¾î¿À¸é, ÁÖ¹® ÀÇµµ°¡ ÀÖÀ¸¸é Decision::submit ¹İÈ¯
+        // ë©”ì¸ ì§„ì…ì : â€œë´‰ 1ê°œâ€ ë“¤ì–´ì˜¤ë©´, ì£¼ë¬¸ ì˜ë„ê°€ ìˆìœ¼ë©´ Decision::submit ë°˜í™˜
         [[nodiscard]] Decision onCandle(const core::Candle& c, const AccountSnapshot& account);
 
-        // Ã¼°á ÀÌº¥Æ®(ºÎºĞ/º¹¼ö Ã¼°á ´©Àû)
+        // ì²´ê²° ì´ë²¤íŠ¸(ë¶€ë¶„/ë³µìˆ˜ ì²´ê²° ëˆ„ì )
         void onFill(const FillEvent& fill);
 
-        // ÁÖ¹® »óÅÂ ÀÌº¥Æ®(ÃÖÁ¾ È®Á¤/·Ñ¹é ±âÁØ)
+        // ì£¼ë¬¸ ìƒíƒœ ì´ë²¤íŠ¸(ìµœì¢… í™•ì •/ë¡¤ë°± ê¸°ì¤€)
         void onOrderUpdate(const trading::OrderStatusEvent& ev);
 
-        // [ÇÊ¼ö] ¿£Áø submit(=ÁÖ¹® POST) ½ÇÆĞ ½Ã, Pending »óÅÂ Áï½Ã ·Ñ¹é(WS ÀÌº¥Æ®°¡ Àı´ë ¿ÀÁö ¾ÊÀ½)
+        // [í•„ìˆ˜] ì—”ì§„ submit(=ì£¼ë¬¸ POST) ì‹¤íŒ¨ ì‹œ, Pending ìƒíƒœ ì¦‰ì‹œ ë¡¤ë°±(WS ì´ë²¤íŠ¸ê°€ ì ˆëŒ€ ì˜¤ì§€ ì•ŠìŒ)
         void onSubmitFailed();
 
-        // - ¹ÌÃ¼°á ÁÖ¹®Àº »óÀ§(¾Û/¿£Áø)¿¡¼­ ÀüºÎ Ãë¼Ò ÈÄ È£Ãâ(ÇÁ·Î±×·¥ ½ÃÀÛ ½Ã ÀÛµ¿)
+        // - ë¯¸ì²´ê²° ì£¼ë¬¸ì€ ìƒìœ„(ì•±/ì—”ì§„)ì—ì„œ ì „ë¶€ ì·¨ì†Œ í›„ í˜¸ì¶œ(í”„ë¡œê·¸ë¨ ì‹œì‘ ì‹œ ì‘ë™)
         void syncOnStart(const trading::PositionSnapshot& pos);
 
-        // Å×½ºÆ®/¸®¼Â
+        // í…ŒìŠ¤íŠ¸/ë¦¬ì…‹
         void reset();
 
     private:
-        // 1) ÁöÇ¥ ¾÷µ¥ÀÌÆ® + ÇÊÅÍ °è»êÀ» ÇÑ ¹ø¿¡ ³¡³»´Â ´Ü°è
+        // 1) ì§€í‘œ ì—…ë°ì´íŠ¸ + í•„í„° ê³„ì‚°ì„ í•œ ë²ˆì— ëë‚´ëŠ” ë‹¨ê³„
         [[nodiscard]] Snapshot buildSnapshot(const core::Candle& c);
 
-        // 2) ½º³À¼¦À» º¸°í ¡°ÁøÀÔ ÁÖ¹® ÀÇµµ¡±¸¦ ¸¸µéÁö °áÁ¤
+        // 2) ìŠ¤ëƒ…ìƒ·ì„ ë³´ê³  â€œì§„ì… ì£¼ë¬¸ ì˜ë„â€ë¥¼ ë§Œë“¤ì§€ ê²°ì •
         [[nodiscard]] Decision maybeEnter(const Snapshot& s, const AccountSnapshot& account);
 
-        // 3) ½º³À¼¦À» º¸°í ¡°Ã»»ê ÁÖ¹® ÀÇµµ¡±¸¦ ¸¸µéÁö °áÁ¤
+        // 3) ìŠ¤ëƒ…ìƒ·ì„ ë³´ê³  â€œì²­ì‚° ì£¼ë¬¸ ì˜ë„â€ë¥¼ ë§Œë“¤ì§€ ê²°ì •
         [[nodiscard]] Decision maybeExit(const Snapshot& s, const AccountSnapshot& account);
 
-        // client_order_id »ı¼º (Àü·« ³»ºÎ ½ÃÄö½º)
+        // client_order_id ìƒì„± (ì „ëµ ë‚´ë¶€ ì‹œí€€ìŠ¤)
         [[nodiscard]] std::string makeIdentifier(std::string_view tag);
 
-        // ÁÖ¹® »ı¼º ÇïÆÛ(½ÃÀå°¡ ¸Å¼ö/¸Åµµ), (Àü·« ÀÇµµ ¡æ ¿£Áø Á¦Ãâ¿ë)
+        // ì£¼ë¬¸ ìƒì„± í—¬í¼(ì‹œì¥ê°€ ë§¤ìˆ˜/ë§¤ë„), (ì „ëµ ì˜ë„ â†’ ì—”ì§„ ì œì¶œìš©)
         [[nodiscard]] core::OrderRequest makeMarketBuyByAmount(double krw_amount, std::string_view tag);
         [[nodiscard]] core::OrderRequest makeMarketSellByVolume(double volume, std::string_view tag);
 
-        // stop/target °è»ê(Ã¼°á°¡ ±âÁØ)
+        // stop/target ê³„ì‚°(ì²´ê²°ê°€ ê¸°ì¤€)
         void setStopsFromEntry(double entry);
+        // ì§„ì… ì‹œ ì†ì ˆ, ìµì ˆê°€ í™•ì¸ìš© ë¡œê·¸ í•¨ìˆ˜
+        void logEntryConfirmed_(std::string_view reason, double entry);
+
 
     private:
         std::string market_;
         Params params_{};
 
-        // »óÅÂ + ÁÖ¹® ÃßÀû
+        // ìƒíƒœ + ì£¼ë¬¸ ì¶”ì 
         State state_{ State::Flat };
         std::optional<std::string> pending_client_id_{};
 
-        // ºÎºĞ Ã¼°á ´©Àû¿ë
-        double pending_filled_volume_{ 0.0 }; // ¥Ò filled_volume Áö±İ±îÁö Ã¼°áµÈ ¼ö·®
-        double pending_cost_sum_{ 0.0 };      // ¥Ò (fill_price * filled_volume) Áö±İ±îÁö Ã¼°áµÈ ÃÑ ºñ¿ë
-        double pending_last_price_{ 0.0 };    // Á¢¼öµÈ ÁÖ¹®¿¡¼­ °¡Àå ¸¶Áö¸· Ã¼°á °¡°İ(filled_volumeÀÌ 0À¸·Î ¿Ã ¶§ Æú¹é)
+        // ë¶€ë¶„ ì²´ê²° ëˆ„ì ìš©
+        double pending_filled_volume_{ 0.0 }; // Î£ filled_volume ì§€ê¸ˆê¹Œì§€ ì²´ê²°ëœ ìˆ˜ëŸ‰
+        double pending_cost_sum_{ 0.0 };      // Î£ (fill_price * filled_volume) ì§€ê¸ˆê¹Œì§€ ì²´ê²°ëœ ì´ ë¹„ìš©
+        double pending_last_price_{ 0.0 };    // ì ‘ìˆ˜ëœ ì£¼ë¬¸ì—ì„œ ê°€ì¥ ë§ˆì§€ë§‰ ì²´ê²° ê°€ê²©(filled_volumeì´ 0ìœ¼ë¡œ ì˜¬ ë•Œ í´ë°±)
 
 
-        // Æ÷Áö¼Ç Á¤º¸(È®Á¤Àº onFill¿¡¼­)
+        // í¬ì§€ì…˜ ì •ë³´(í™•ì •ì€ onFillì—ì„œ)
         std::optional<double> entry_price_{};
         std::optional<double> stop_price_{};
         std::optional<double> target_price_{};
 
-        // ÁöÇ¥µé
+        // ì§€í‘œë“¤
         trading::indicators::RsiWilder rsi_{};
         //trading::indicators::Sma sma_{};
         trading::indicators::ClosePriceWindow closeN_{};
         trading::indicators::ChangeVolatilityIndicator vol_{};
 
-        // client_order_id ½ÃÄö½º
+        // client_order_id ì‹œí€€ìŠ¤
         std::uint64_t seq_{ 0 };
 
-        // ¸¶Áö¸· ½º³À¼¦ ÀúÀå¿ë ¸â¹ö (private)
+        // ë§ˆì§€ë§‰ ìŠ¤ëƒ…ìƒ· ì €ì¥ìš© ë©¤ë²„ (private)
         Snapshot last_snapshot_{};
 
-        // °°Àº 1ºĞ ÄµµéÀÌ ¿©·¯ ¹ø(¾÷µ¥ÀÌÆ® ÇüÅÂ·Î) µé¾î¿À´Â °æ¿ì Áßº¹ ´©Àû ¹æÁö¿ë
+        // ê°™ì€ 1ë¶„ ìº”ë“¤ì´ ì—¬ëŸ¬ ë²ˆ(ì—…ë°ì´íŠ¸ í˜•íƒœë¡œ) ë“¤ì–´ì˜¤ëŠ” ê²½ìš° ì¤‘ë³µ ëˆ„ì  ë°©ì§€ìš©
         std::optional<std::string> last_candle_ts_{};
     };
 

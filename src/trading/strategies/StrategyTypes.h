@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 
 #include <cstdint>
@@ -14,29 +14,29 @@
 
 namespace trading {
 
-    // ½Ç°Å·¡/µ¥¸ğ °øÅëÀ¸·Î Àü·«ÀÌ "ÀÇ»ç°áÁ¤"¿¡ ÇÊ¿äÇÑ ÃÖ¼Ò °èÁÂ ½º³À¼¦
-    // - Çö¹°(Long-only) ±âÁØ: ¸Å¼ö´Â KRW, ¸Åµµ(Ã»»ê)´Â º¸À¯ ÄÚÀÎ ¼ö·®ÀÌ ÇÙ½É
+    // ì‹¤ê±°ë˜/ë°ëª¨ ê³µí†µìœ¼ë¡œ ì „ëµì´ "ì˜ì‚¬ê²°ì •"ì— í•„ìš”í•œ ìµœì†Œ ê³„ì¢Œ ìŠ¤ëƒ…ìƒ·
+    // - í˜„ë¬¼(Long-only) ê¸°ì¤€: ë§¤ìˆ˜ëŠ” KRW, ë§¤ë„(ì²­ì‚°)ëŠ” ë³´ìœ  ì½”ì¸ ìˆ˜ëŸ‰ì´ í•µì‹¬
     struct AccountSnapshot final {
-        double krw_available{ 0.0 };   // ÁÖ¹® °¡´É KRW
-        double coin_available{ 0.0 }; // ÇØ´ç marketÀÇ º¸À¯ ÄÚÀÎ ¼ö·®(Ã»»ê¿¡ »ç¿ë)
+        double krw_available{ 0.0 };   // ì£¼ë¬¸ ê°€ëŠ¥ KRW
+        double coin_available{ 0.0 }; // í•´ë‹¹ marketì˜ ë³´ìœ  ì½”ì¸ ìˆ˜ëŸ‰(ì²­ì‚°ì— ì‚¬ìš©)
 
         [[nodiscard]] constexpr bool canBuy() const noexcept { return krw_available > 0.0; }
         [[nodiscard]] constexpr bool canSell() const noexcept { return coin_available > 0.0; }
     };
 
     
-    // ÄÉÀÌ½º A(Æ÷Áö¼Ç¸¸ º¹±¸)¿ë ÃÖ¼Ò Å¸ÀÔ
-    // - ¹ÌÃ¼°á ÁÖ¹®Àº ½ÃÀÛ ·çÆ¾¿¡¼­ ÀüºÎ Ãë¼ÒÇÏ´Â Á¤Ã¥ÀÌ¹Ç·Î,
-    //  ¡°¹ÌÃ¼°á º¹±¸¿ë µ¥ÀÌÅÍ(OpenOrderSnapshot µî)¡±´Â ¿©±â¼­ ´Ù·çÁö ¾Ê´Â´Ù.
+    // ì¼€ì´ìŠ¤ A(í¬ì§€ì…˜ë§Œ ë³µêµ¬)ìš© ìµœì†Œ íƒ€ì…
+    // - ë¯¸ì²´ê²° ì£¼ë¬¸ì€ ì‹œì‘ ë£¨í‹´ì—ì„œ ì „ë¶€ ì·¨ì†Œí•˜ëŠ” ì •ì±…ì´ë¯€ë¡œ,
+    //  â€œë¯¸ì²´ê²° ë³µêµ¬ìš© ë°ì´í„°(OpenOrderSnapshot ë“±)â€ëŠ” ì—¬ê¸°ì„œ ë‹¤ë£¨ì§€ ì•ŠëŠ”ë‹¤.
     struct PositionSnapshot final {
-        double coin{ 0.0 };              // ÇØ´ç ¸¶ÄÏ º¸À¯ ¼ö·®
-        double avg_entry_price{ 0.0 };   // Æò±Õ ¸Å¼ö°¡(¾ø°Å³ª ½Å·Ú ºÒ°¡¸é 0)
+        double coin{ 0.0 };              // í•´ë‹¹ ë§ˆì¼“ ë³´ìœ  ìˆ˜ëŸ‰
+        double avg_entry_price{ 0.0 };   // í‰ê·  ë§¤ìˆ˜ê°€(ì—†ê±°ë‚˜ ì‹ ë¢° ë¶ˆê°€ë©´ 0)
         [[nodiscard]] constexpr bool hasPosition() const noexcept { return coin > 0.0; }
     };
 
-    // Ã¼°á ÀÌº¥Æ®(Àü·«ÀÌ entryPrice È®Á¤ / pending ÇØÁ¦¿¡ »ç¿ë / 
-    // ÀÌ Ã¼°áÀÌ ³»°¡ ³½ ÁÖ¹®ÀÎÁö? ÁøÀÔÀÎÁö? Ã»»êÀÎÁö? / ÀÌÁ¦ ´ÙÀ½ Äµµé¿¡¼­ ¾î¶² ÆÇ´ÜÀ» ÇØ¾ß ÇÏ´ÂÁö ? )
-    // - identifier·Î Àü·«ÀÌ "³»°¡ ³½ ÁÖ¹®"ÀÎÁö ¸ÅÄª
+    // ì²´ê²° ì´ë²¤íŠ¸(ì „ëµì´ entryPrice í™•ì • / pending í•´ì œì— ì‚¬ìš© / 
+    // ì´ ì²´ê²°ì´ ë‚´ê°€ ë‚¸ ì£¼ë¬¸ì¸ì§€? ì§„ì…ì¸ì§€? ì²­ì‚°ì¸ì§€? / ì´ì œ ë‹¤ìŒ ìº”ë“¤ì—ì„œ ì–´ë–¤ íŒë‹¨ì„ í•´ì•¼ í•˜ëŠ”ì§€ ? )
+    // - identifierë¡œ ì „ëµì´ "ë‚´ê°€ ë‚¸ ì£¼ë¬¸"ì¸ì§€ ë§¤ì¹­
     struct FillEvent final {
         std::string identifier;
         core::OrderPosition position{ core::OrderPosition::BID };
@@ -59,17 +59,17 @@ namespace trading {
             : identifier(std::move(cid)), position(pos), fill_price(price), filled_volume(vol) {
         }
     };
-    // ÁÖ¹® »óÅÂ ÀÌº¥Æ®(½Ç°Å·¡ ÇÊ¼ö)
-    // - FillEvent´Â "ºÎºĞ Ã¼°á"·Î ¿©·¯ ¹ø ¿Ã ¼ö ÀÖ°í, ±× ÀÚÃ¼·Î "¿ÏÀü Ã¼°á"À» º¸ÀåÇÏÁö ¾Ê´Â´Ù.
-    // - µû¶ó¼­ Pending ÇØÁ¦ / ·Ñ¹é(Ãë¼Ò¡¤°ÅÀı) / ÃÖÁ¾ È®Á¤(Filled)Àº OrderStatusEvent¸¦ ±âÁØÀ¸·Î Ã³¸®ÇÏ´Â °Ô ¾ÈÀüÇÏ´Ù.
-    // - client_order_id·Î Àü·«ÀÌ "³»°¡ ³½ ÁÖ¹®"ÀÎÁö ¸ÅÄª
+    // ì£¼ë¬¸ ìƒíƒœ ì´ë²¤íŠ¸(ì‹¤ê±°ë˜ í•„ìˆ˜)
+    // - FillEventëŠ” "ë¶€ë¶„ ì²´ê²°"ë¡œ ì—¬ëŸ¬ ë²ˆ ì˜¬ ìˆ˜ ìˆê³ , ê·¸ ìì²´ë¡œ "ì™„ì „ ì²´ê²°"ì„ ë³´ì¥í•˜ì§€ ì•ŠëŠ”ë‹¤.
+    // - ë”°ë¼ì„œ Pending í•´ì œ / ë¡¤ë°±(ì·¨ì†ŒÂ·ê±°ì ˆ) / ìµœì¢… í™•ì •(Filled)ì€ OrderStatusEventë¥¼ ê¸°ì¤€ìœ¼ë¡œ ì²˜ë¦¬í•˜ëŠ” ê²Œ ì•ˆì „í•˜ë‹¤.
+    // - client_order_idë¡œ ì „ëµì´ "ë‚´ê°€ ë‚¸ ì£¼ë¬¸"ì¸ì§€ ë§¤ì¹­
     struct OrderStatusEvent final {
         std::string identifier;
         core::OrderStatus status{ core::OrderStatus::Pending };
         core::OrderPosition position{ core::OrderPosition::BID };
 
-        // (¼±ÅÃ) WS/¿£ÁøÀÌ Á¦°øÇÒ ¼ö ÀÖÀ¸¸é Ã¤¿ö¼­ Àü´Ş
-        // - ½ÃÀå°¡ ¸Å¼ö(Amount)Ã³·³ ¿øÁÖ¹® ¼ö·®À» ¾Ë±â ¾î·Á¿î °æ¿ì°¡ ÀÖ¾î, Àü·«ÀÌ ÀÌ °ª¿¡ ÀÇÁ¸ÇÏÁö ¾Ê´Â ¼³°è¸¦ ±ÇÀå
+        // (ì„ íƒ) WS/ì—”ì§„ì´ ì œê³µí•  ìˆ˜ ìˆìœ¼ë©´ ì±„ì›Œì„œ ì „ë‹¬
+        // - ì‹œì¥ê°€ ë§¤ìˆ˜(Amount)ì²˜ëŸ¼ ì›ì£¼ë¬¸ ìˆ˜ëŸ‰ì„ ì•Œê¸° ì–´ë ¤ìš´ ê²½ìš°ê°€ ìˆì–´, ì „ëµì´ ì´ ê°’ì— ì˜ì¡´í•˜ì§€ ì•ŠëŠ” ì„¤ê³„ë¥¼ ê¶Œì¥
         double executed_volume{ 0.0 };
         double remaining_volume{ 0.0 };
 
@@ -89,12 +89,9 @@ namespace trading {
     };
 
     struct Decision final {
-        // order°¡ ÀÖÀ¸¸é SubmitOrder, ¾øÀ¸¸é None/NoAction
+        // orderê°€ ìˆìœ¼ë©´ SubmitOrder, ì—†ìœ¼ë©´ None/NoAction
         std::optional<core::OrderRequest> order{}; 
-
-        [[nodiscard]] static constexpr Decision none() noexcept { return {}; }
-
-        // ·Î±ë ¸ñÀûÀÇ "NoAction"À» À¯ÁöÇÏ°í ½Í´Ù¸é ÇÃ·¡±×¸¸ º°µµ·Î µÖµµ µÊ
+        // ë¡œê¹… ëª©ì ì˜ "NoAction"ì„ ìœ ì§€í•˜ê³  ì‹¶ë‹¤ë©´ í”Œë˜ê·¸ë§Œ ë³„ë„ë¡œ ë‘¬ë„ ë¨
         bool is_no_action{false};
 
         [[nodiscard]] static constexpr Decision noAction() noexcept {
@@ -113,27 +110,27 @@ namespace trading {
         [[nodiscard]] constexpr bool hasOrder() const noexcept { return order.has_value(); }
     };
 
-    // ¡°ÁöÇ¥/ÇÊÅÍ °á°ú¸¦ ÇÑ ¹ø¿¡¡± µé°í ´Ù´Ï´Â ½º³À¼¦
+    // â€œì§€í‘œ/í•„í„° ê²°ê³¼ë¥¼ í•œ ë²ˆì—â€ ë“¤ê³  ë‹¤ë‹ˆëŠ” ìŠ¤ëƒ…ìƒ·
     struct Snapshot final {
-        // ÀÔ·Â(ÇöÀç ºÀ)
+        // ì…ë ¥(í˜„ì¬ ë´‰)
         double close{ 0.0 };
 
-        // ÁöÇ¥(ÁØºñ ¿©ºÎ Æ÷ÇÔ)
+        // ì§€í‘œ(ì¤€ë¹„ ì—¬ë¶€ í¬í•¨)
         Value<double> rsi{};
         Value<double> closeN{};
-        Value<double> volatility{}; // ChangeVolatilityIndicator °á°ú(¼öÀÍ·ü stdev)
-        //Value<double> sma{}; // ´Ü¼ø ÀÌµ¿ Æò±Õ
+        Value<double> volatility{}; // ChangeVolatilityIndicator ê²°ê³¼(ìˆ˜ìµë¥  stdev)
+        //Value<double> sma{}; // ë‹¨ìˆœ ì´ë™ í‰ê· 
 
-        // ÆÄ»ı ÇÊÅÍ °ª
+        // íŒŒìƒ í•„í„° ê°’
         bool trendReady{ false };
         double trendStrength{ 0.0 };
 
-        // ÃÖÁ¾ ¡°½ÃÀå ÀûÇÕ¼º¡±
+        // ìµœì¢… â€œì‹œì¥ ì í•©ì„±â€
         bool marketOk{ false };
     };
 
 
-    // (¼±ÅÃ) Àü·« ½Äº°ÀÚ: ¹®ÀÚ¿­ º¹»ç ¾øÀÌ string_view·Î »ç¿ë °¡´É
+    // (ì„ íƒ) ì „ëµ ì‹ë³„ì: ë¬¸ìì—´ ë³µì‚¬ ì—†ì´ string_viewë¡œ ì‚¬ìš© ê°€ëŠ¥
     using StrategyId = std::string_view;
 
 } // namespace trading

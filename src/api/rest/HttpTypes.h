@@ -1,45 +1,45 @@
-#pragma once
+ï»¿#pragma once
 #include <chrono>
 #include <map>
 #include <string>
 
 /*
 * HttpTypes.h
-* REST È£Ãâ¿¡ ÇÊ¿äÇÑ ¿äÃ»/ÀÀ´äÀÇ ¡®°øÅë µ¥ÀÌÅÍ ±¸Á¶¡¯¸¦ Á¤ÀÇ
-* ¾î¶² API(Upbit ¸»°í ´Ù¸¥ °Å·¡¼Ò µî)¿¡µµ Àç»ç¿ë °¡´ÉÇÏ°Ô ¡°¹ü¿ë ÇüÅÂ¡±·Î À¯Áö
+* REST í˜¸ì¶œì— í•„ìš”í•œ ìš”ì²­/ì‘ë‹µì˜ â€˜ê³µí†µ ë°ì´í„° êµ¬ì¡°â€™ë¥¼ ì •ì˜
+* ì–´ë–¤ API(Upbit ë§ê³  ë‹¤ë¥¸ ê±°ë˜ì†Œ ë“±)ì—ë„ ì¬ì‚¬ìš© ê°€ëŠ¥í•˜ê²Œ â€œë²”ìš© í˜•íƒœâ€ë¡œ ìœ ì§€
 */
 
 namespace api::rest
 {
-	// HTTP ¸Ş¼­µå Á¾·ù Á¤¸®
+	// HTTP ë©”ì„œë“œ ì¢…ë¥˜ ì •ë¦¬
 	enum class HttpMethod {Get, Post, Put, Delete};
 
-	// "¿äÃ»¿¡ ÇÊ¿äÇÑ °øÅë Á¤º¸"¸¦ ´ã´Â ±¸Á¶Ã¼
-	// - ¼ø¼ö ³×Æ®¿öÅ© °èÃş Å¸ÀÔ
+	// "ìš”ì²­ì— í•„ìš”í•œ ê³µí†µ ì •ë³´"ë¥¼ ë‹´ëŠ” êµ¬ì¡°ì²´
+	// - ìˆœìˆ˜ ë„¤íŠ¸ì›Œí¬ ê³„ì¸µ íƒ€ì…
 	struct HttpRequest
 	{
-		HttpMethod method{ HttpMethod::Get };		// ±âº» http ¿äÃ» Å¸ÀÔÀ» GETÀ¸·Î
+		HttpMethod method{ HttpMethod::Get };		// ê¸°ë³¸ http ìš”ì²­ íƒ€ì…ì„ GETìœ¼ë¡œ
 		
-		// °øÅëÀ¸·Î ¿äÃ»ÇÏ´Â host/port/targetÀ» ºĞ¸®
+		// ê³µí†µìœ¼ë¡œ ìš”ì²­í•˜ëŠ” host/port/targetì„ ë¶„ë¦¬
 		std::string host;							// "api.upbit.com"
-		std::string port{ "443" };					// https´Â 443 »ç¿ë
+		std::string port{ "443" };					// httpsëŠ” 443 ì‚¬ìš©
 		std::string target;							// "/v1/ticker?markets=KRW-BTC"  (path + query)
 
-		// Ãß°¡ Çì´õ (ÀÎÁõ µîÀº »óÀ§ client¿¡¼­)
+		// ì¶”ê°€ í—¤ë” (ì¸ì¦ ë“±ì€ ìƒìœ„ clientì—ì„œ)
 		std::map<std::string, std::string> headers;
 
-		// request body (POST/PUT¿¡¼­ ÁÖ·Î »ç¿ë, GETÀº ÁÖ·Î ºó ¹®ÀÚ¿­)
+		// request body (POST/PUTì—ì„œ ì£¼ë¡œ ì‚¬ìš©, GETì€ ì£¼ë¡œ ë¹ˆ ë¬¸ìì—´)
 		std::string body;
 
-		// ³×Æ®¿öÅ© timeout (connect/write/read¿¡ Àû¿ë)
+		// ë„¤íŠ¸ì›Œí¬ timeout (connect/write/readì— ì ìš©)
 		std::chrono::microseconds timeout{ 5000 };
 	};
 
-	// "ÀÀ´ä ¿À´Â °øÅë Á¤º¸"¸¦ ´ã´Â ±¸Á¶Ã¼
+	// "ì‘ë‹µ ì˜¤ëŠ” ê³µí†µ ì •ë³´"ë¥¼ ë‹´ëŠ” êµ¬ì¡°ì²´
 	struct HttpResponse
 	{
-		int status = 0;								// HTTP satus code (200, 429, 500 µî)
+		int status = 0;								// HTTP satus code (200, 429, 500 ë“±)
 		std::map<std::string, std::string> headers;
-		std::string	body;							// JSON ¿ø¹®(¹®ÀÚ¿­), DTO ÆÄ½ÌÀ» ÀÌ°É ¹Ş¾Æ¼­ ¼öÇà
+		std::string	body;							// JSON ì›ë¬¸(ë¬¸ìì—´), DTO íŒŒì‹±ì„ ì´ê±¸ ë°›ì•„ì„œ ìˆ˜í–‰
 	};
 }

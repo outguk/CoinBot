@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include <cstddef>
 #include <optional>
@@ -11,89 +11,89 @@ namespace trading::indicators
 {
 
 	/*
-	RollingWindow (double Àü¿ë, °íÁ¤ ±æÀÌ ¸µ¹öÆÛ)
+	RollingWindow (double ì „ìš©, ê³ ì • ê¸¸ì´ ë§ë²„í¼)
 
-	¿ªÇÒ
-	- ÁöÇ¥ °è»ê¿¡¼­ ÃÖ±Ù N°³ °ª(Á¾°¡, º¯È­·® µî)À» O(1)·Î °ü¸®ÇÏ±â À§ÇÔ
-	- "ÃÖ±Ù N°³ °ª"À» ÀúÀåÇÏ°í oldest -> latest ±âÁØÀ¸·Î Á¢±ÙÇÒ ¼ö ÀÖ°Ô ÇÑ´Ù.
-	- push(»õ °ª Ãß°¡) ½Ã ¹öÆÛ°¡ °¡µæ Â÷¸é °¡Àå ¿À·¡µÈ °ªÀ» µ¤¾î¾¸
-	- SMA, Ç¥ÁØÆíÂ÷(rolling stdev), close[N] °°Àº ·Ñ¸µ ÁöÇ¥ ±¸Çö¿¡ ÃÖÀû
-	- ÁöÇ¥ Å¬·¡½º ³»ºÎ¿¡¼­¸¸ ¾²ÀÌ´Â ÀúÀå¼Ò·Î, Candle/Strategy/Engine¿¡ ´ëÇØ ¾Æ¹«°Íµµ ¸ğ¸¥´Ù.
+	ì—­í• 
+	- ì§€í‘œ ê³„ì‚°ì—ì„œ ìµœê·¼ Nê°œ ê°’(ì¢…ê°€, ë³€í™”ëŸ‰ ë“±)ì„ O(1)ë¡œ ê´€ë¦¬í•˜ê¸° ìœ„í•¨
+	- "ìµœê·¼ Nê°œ ê°’"ì„ ì €ì¥í•˜ê³  oldest -> latest ê¸°ì¤€ìœ¼ë¡œ ì ‘ê·¼í•  ìˆ˜ ìˆê²Œ í•œë‹¤.
+	- push(ìƒˆ ê°’ ì¶”ê°€) ì‹œ ë²„í¼ê°€ ê°€ë“ ì°¨ë©´ ê°€ì¥ ì˜¤ë˜ëœ ê°’ì„ ë®ì–´ì”€
+	- SMA, í‘œì¤€í¸ì°¨(rolling stdev), close[N] ê°™ì€ ë¡¤ë§ ì§€í‘œ êµ¬í˜„ì— ìµœì 
+	- ì§€í‘œ í´ë˜ìŠ¤ ë‚´ë¶€ì—ì„œë§Œ ì“°ì´ëŠ” ì €ì¥ì†Œë¡œ, Candle/Strategy/Engineì— ëŒ€í•´ ì•„ë¬´ê²ƒë„ ëª¨ë¥¸ë‹¤.
 
-	ÇÙ½É ¼³°è ÀÇµµ
-	1) push(x) ´Â »õ °ªÀ» ³Ö°í, ¹öÆÛ°¡ ²Ë Âù »óÅÂ¿¡¼­ µ¤¾î¾´ °ªÀÌ ÀÖÀ¸¸é ¹İÈ¯ÇÑ´Ù.
-	   - SMA: µ¤¾î¾´ °ªÀ» sum¿¡¼­ »©±â À§ÇØ ÇÊ¿ä
-	   - RollingStdev: µ¤¾î¾´ °ªÀ» sum/sumsq¿¡¼­ »©±â À§ÇØ ÇÊ¿ä
-	2) at(i)´Â oldest ±âÁØ i¹øÂ°¸¦ ¹İÈ¯ÇÑ´Ù. (0=oldest, count-1=latest)
-	3) latest()´Â °¡Àå ÃÖ±Ù °ªÀ» ºü¸£°Ô ¹İÈ¯ÇÑ´Ù.
-	4) capacity=0µµ ¾ÈÀüÇÏ°Ô µ¿ÀÛ (push´Â nullopt, at/latest´Â nullopt)
+	í•µì‹¬ ì„¤ê³„ ì˜ë„
+	1) push(x) ëŠ” ìƒˆ ê°’ì„ ë„£ê³ , ë²„í¼ê°€ ê½‰ ì°¬ ìƒíƒœì—ì„œ ë®ì–´ì“´ ê°’ì´ ìˆìœ¼ë©´ ë°˜í™˜í•œë‹¤.
+	   - SMA: ë®ì–´ì“´ ê°’ì„ sumì—ì„œ ë¹¼ê¸° ìœ„í•´ í•„ìš”
+	   - RollingStdev: ë®ì–´ì“´ ê°’ì„ sum/sumsqì—ì„œ ë¹¼ê¸° ìœ„í•´ í•„ìš”
+	2) at(i)ëŠ” oldest ê¸°ì¤€ ië²ˆì§¸ë¥¼ ë°˜í™˜í•œë‹¤. (0=oldest, count-1=latest)
+	3) latest()ëŠ” ê°€ì¥ ìµœê·¼ ê°’ì„ ë¹ ë¥´ê²Œ ë°˜í™˜í•œë‹¤.
+	4) capacity=0ë„ ì•ˆì „í•˜ê²Œ ë™ì‘ (pushëŠ” nullopt, at/latestëŠ” nullopt)
 
-	¼º´É
-	- push/at/latest ¸ğµÎ O(1)
-	//- ³»ºÎ vector´Â »ı¼º ½Ã capacity·Î °íÁ¤, ÀÌÈÄ realloc ¾øÀ½
-	//- ±×·¡¼­ T´Â ±âº» »ı¼º °¡´É(default-constructible)ÇØ¾ß ÇÔ
-	//(double ±â¹İ ÁöÇ¥¿¡¼­´Â ¹®Á¦ ¾øÀ½)
+	ì„±ëŠ¥
+	- push/at/latest ëª¨ë‘ O(1)
+	//- ë‚´ë¶€ vectorëŠ” ìƒì„± ì‹œ capacityë¡œ ê³ ì •, ì´í›„ realloc ì—†ìŒ
+	//- ê·¸ë˜ì„œ TëŠ” ê¸°ë³¸ ìƒì„± ê°€ëŠ¥(default-constructible)í•´ì•¼ í•¨
+	//(double ê¸°ë°˜ ì§€í‘œì—ì„œëŠ” ë¬¸ì œ ì—†ìŒ)
 	*/
 
 	template <typename T>
 	class RingBuffer final
 	{
-		// vector¸¦ capacity¸¸Å­ ¹Ì¸® Ã¤¿ì±â ¶§¹®¿¡ T{}°¡ °¡´ÉÇØ¾ß ÇÔ
+		// vectorë¥¼ capacityë§Œí¼ ë¯¸ë¦¬ ì±„ìš°ê¸° ë•Œë¬¸ì— T{}ê°€ ê°€ëŠ¥í•´ì•¼ í•¨
 		static_assert(std::is_default_constructible_v<T>,
-			"RingBuffer<T>´Â T°¡ ±âº» »ı¼º °¡´ÉÇØ¾ß ÇÕ´Ï´Ù (¹Ì¸® ÇÒ´çµÈ vector »ç¿ë)");
-		// push ½Ã µ¤¾î¾²±â ¶§¹®¿¡ ´ëÀÔÀÌ °¡´ÉÇØ¾ß ÇÔ(ÀÌµ¿/º¹»ç)
+			"RingBuffer<T>ëŠ” Tê°€ ê¸°ë³¸ ìƒì„± ê°€ëŠ¥í•´ì•¼ í•©ë‹ˆë‹¤ (ë¯¸ë¦¬ í• ë‹¹ëœ vector ì‚¬ìš©)");
+		// push ì‹œ ë®ì–´ì“°ê¸° ë•Œë¬¸ì— ëŒ€ì…ì´ ê°€ëŠ¥í•´ì•¼ í•¨(ì´ë™/ë³µì‚¬)
 		static_assert(std::is_move_assignable_v<T> || std::is_copy_assignable_v<T>,
-			"RingBuffer<T>´Â move-assignable ¶Ç´Â copy-assignableÀÌ¾î¾ß ÇÕ´Ï´Ù");
+			"RingBuffer<T>ëŠ” move-assignable ë˜ëŠ” copy-assignableì´ì–´ì•¼ í•©ë‹ˆë‹¤");
 
 	public:
-		using value_type = T;
+		using value_type = T; // ì»¨í…Œì´ë„ˆë¼ëŠ” ì„¤ëª…
 
-		// ±âº» »ı¼ºÀÚ: capacity=0ÀÎ ºñÈ°¼º ¹öÆÛ
+		// ê¸°ë³¸ ìƒì„±ì: capacity=0ì¸ ë¹„í™œì„± ë²„í¼
 		RingBuffer() = default;
 
-		// capacity¸¦ ÁöÁ¤ÇÏ´Â »ı¼ºÀÚ: ³»ºÎ vector¸¦ capacity¸¸Å­ ¹Ì¸® È®º¸
+		// capacityë¥¼ ì§€ì •í•˜ëŠ” ìƒì„±ì: ë‚´ë¶€ vectorë¥¼ capacityë§Œí¼ ë¯¸ë¦¬ í™•ë³´
 		explicit RingBuffer(std::size_t capacity)
 			: buf_(capacity), cap_(capacity) {
 		}
 
 		/*
-		* reset: capacity¸¦ »õ·Î ÁöÁ¤ÇÏ¸é¼­ ³»ºÎ »óÅÂ ÃÊ±âÈ­(³»¿ë ºñ¿ò)
-		* - ÁöÇ¥ À©µµ¿ì Å©±â°¡ ¹Ù²î°Å³ª Àç½ÃÀÛÇÒ ¶§ À¯¿ë
+		* reset: capacityë¥¼ ìƒˆë¡œ ì§€ì •í•˜ë©´ì„œ ë‚´ë¶€ ìƒíƒœ ì´ˆê¸°í™”(ë‚´ìš© ë¹„ì›€)
+		* - ì§€í‘œ ìœˆë„ìš° í¬ê¸°ê°€ ë°”ë€Œê±°ë‚˜ ì¬ì‹œì‘í•  ë•Œ ìœ ìš©
 		*/
 		void reset(std::size_t capacity) {
 			buf_.assign(capacity, T{});
 			cap_ = capacity;
-			head_ = 0;  // °¡Àå ¿À·¡µÈ ¿ä¼ÒÀÇ ¹°¸® ÀÎµ¦½º
-			size_ = 0;  // ÇöÀç À¯È¿ µ¥ÀÌÅÍ °³¼ö
+			head_ = 0;  // ê°€ì¥ ì˜¤ë˜ëœ ìš”ì†Œì˜ ë¬¼ë¦¬ ì¸ë±ìŠ¤
+			size_ = 0;  // í˜„ì¬ ìœ íš¨ ë°ì´í„° ê°œìˆ˜
 		}
 
 		/*
-		* clear: ³»¿ë¸¸ ºñ¿ì±â (vector ¸Ş¸ğ¸®´Â À¯Áö)
-		* - resetº¸´Ù ÈÎ¾À °¡º±°í ºü¸§
+		* clear: ë‚´ìš©ë§Œ ë¹„ìš°ê¸° (vector ë©”ëª¨ë¦¬ëŠ” ìœ ì§€)
+		* - resetë³´ë‹¤ í›¨ì”¬ ê°€ë³ê³  ë¹ ë¦„
 		*/
 		void clear() noexcept {
 			head_ = 0;
 			size_ = 0;
 		}
 
-		// ¿ë·®/Å©±â Á¶È¸
+		// ìš©ëŸ‰/í¬ê¸° ì¡°íšŒ
 		[[nodiscard]] std::size_t capacity() const noexcept { return cap_; }
 		[[nodiscard]] std::size_t size() const noexcept { return size_; }
 		[[nodiscard]] bool empty() const noexcept { return size_ == 0; }
 		[[nodiscard]] bool full() const noexcept { return cap_ != 0 && size_ == cap_; }
 
 		/*
-		 * push: »õ °ªÀ» ¹öÆÛ¿¡ ³Ö´Â´Ù.
+		 * push: ìƒˆ ê°’ì„ ë²„í¼ì— ë„£ëŠ”ë‹¤.
 		 *
-		 * µ¿ÀÛ
-		 * - ¾ÆÁ÷ °¡µæ Â÷Áö ¾Ê¾ÒÀ¸¸é: µÚ¿¡ Ãß°¡(size Áõ°¡), µ¤¾î¾´ °ª ¾øÀ½(nullopt)
-		 * - °¡µæ Ã¡À¸¸é: °¡Àå ¿À·¡µÈ ¿ä¼Ò¸¦ µ¤¾î¾¸
-		 *   ¡æ µ¤¾î¾´(oldest) °ªÀ» optional·Î ¹İÈ¯
+		 * ë™ì‘
+		 * - ì•„ì§ ê°€ë“ ì°¨ì§€ ì•Šì•˜ìœ¼ë©´: ë’¤ì— ì¶”ê°€(size ì¦ê°€), ë®ì–´ì“´ ê°’ ì—†ìŒ(nullopt)
+		 * - ê°€ë“ ì°¼ìœ¼ë©´: ê°€ì¥ ì˜¤ë˜ëœ ìš”ì†Œë¥¼ ë®ì–´ì”€
+		 *   â†’ ë®ì–´ì“´(oldest) ê°’ì„ optionalë¡œ ë°˜í™˜
 		 *
-		 * ¿Ö µ¤¾î¾´ °ªÀ» ¹İÈ¯ÇÏ³ª?
+		 * ì™œ ë®ì–´ì“´ ê°’ì„ ë°˜í™˜í•˜ë‚˜?
 		 * - SMA: sum += new - old
-		 * - RollingStdDev: sum/sumsq °»½Å¿¡¼­ old Á¦°Å°¡ ÇÊ¿ä
-		 *   ÀÌ ¶§ old¸¦ Áï½Ã ¾Ë ¼ö ÀÖÀ¸¸é O(1) À¯Áö °¡´É
+		 * - RollingStdDev: sum/sumsq ê°±ì‹ ì—ì„œ old ì œê±°ê°€ í•„ìš”
+		 *   ì´ ë•Œ oldë¥¼ ì¦‰ì‹œ ì•Œ ìˆ˜ ìˆìœ¼ë©´ O(1) ìœ ì§€ ê°€ëŠ¥
 		 */
 		std::optional<T> push(const T& v)
 			noexcept(std::is_nothrow_copy_assignable_v<T>&& std::is_nothrow_copy_constructible_v<T>)
@@ -110,11 +110,11 @@ namespace trading::indicators
 
 		/*
 		 * at(index_from_oldest)
-		 * - ¡°°¡Àå ¿À·¡µÈ °ª ±âÁØ¡± ÀÎµ¦½Ì
+		 * - â€œê°€ì¥ ì˜¤ë˜ëœ ê°’ ê¸°ì¤€â€ ì¸ë±ì‹±
 		 * - 0 = oldest, size-1 = newest
-		 * - ¹üÀ§ ¹ş¾î³ª¸é ¿¹¿Ü ¹ß»ı(std::out_of_range)
+		 * - ë²”ìœ„ ë²—ì–´ë‚˜ë©´ ì˜ˆì™¸ ë°œìƒ(std::out_of_range)
 		 *
-		 * ÁöÇ¥ ±¸Çö¿¡¼­ ¡°N°³ Áß i¹øÂ°¡± Á¢±ÙÀÌ ÇÊ¿äÇÒ ¶§ »ç¿ë
+		 * ì§€í‘œ êµ¬í˜„ì—ì„œ â€œNê°œ ì¤‘ ië²ˆì§¸â€ ì ‘ê·¼ì´ í•„ìš”í•  ë•Œ ì‚¬ìš©
 		 */
 		[[nodiscard]] T& at(std::size_t index_from_oldest) {
 			if (index_from_oldest >= size_) throw std::out_of_range("RingBuffer::at (oldest) out of range");
@@ -128,8 +128,8 @@ namespace trading::indicators
 
 		/*
 		 * operator[]
-		* - at()°ú µ¿ÀÏÇÏÁö¸¸ ¹üÀ§ Ã¼Å© ¾øÀ½(ºü¸§)
-		 * - È£ÃâÀÚ°¡ ÀÎµ¦½º ¹üÀ§¸¦ º¸ÀåÇØ¾ß ÇÔ
+		* - at()ê³¼ ë™ì¼í•˜ì§€ë§Œ ë²”ìœ„ ì²´í¬ ì—†ìŒ(ë¹ ë¦„)
+		 * - í˜¸ì¶œìê°€ ì¸ë±ìŠ¤ ë²”ìœ„ë¥¼ ë³´ì¥í•´ì•¼ í•¨
 		*/
 		[[nodiscard]] T& operator[](std::size_t index_from_oldest) noexcept {
 			return buf_[physicalIndexFromOldest(index_from_oldest)];
@@ -140,8 +140,8 @@ namespace trading::indicators
 		}
 
 		/*
-		 * newest(): °¡Àå ÃÖ½Å °ª(°¡Àå ¸¶Áö¸·¿¡ pushµÈ °ª)
-		 * - ºñ¾îÀÖÀ¸¸é ¿¹¿Ü
+		 * newest(): ê°€ì¥ ìµœì‹  ê°’(ê°€ì¥ ë§ˆì§€ë§‰ì— pushëœ ê°’)
+		 * - ë¹„ì–´ìˆìœ¼ë©´ ì˜ˆì™¸
 		 */
 		[[nodiscard]] T& newest() {
 			if (size_ == 0) throw std::out_of_range("RingBuffer::newest on empty buffer");
@@ -154,8 +154,8 @@ namespace trading::indicators
 		}
 
 		/*
-		 * oldest(): °¡Àå ¿À·¡µÈ °ª
-		 * - ºñ¾îÀÖÀ¸¸é ¿¹¿Ü
+		 * oldest(): ê°€ì¥ ì˜¤ë˜ëœ ê°’
+		 * - ë¹„ì–´ìˆìœ¼ë©´ ì˜ˆì™¸
 		 */
 		[[nodiscard]] T& oldest() {
 			if (size_ == 0) throw std::out_of_range("RingBuffer::oldest on empty buffer");
@@ -169,16 +169,16 @@ namespace trading::indicators
 
 		/*
 		 * valueFromBack(back_index)
-		 * - ¡°ÃÖ½Å ±âÁØ¡± ÀÎµ¦½Ì(µÚ¿¡¼­ºÎÅÍ)
+		 * - â€œìµœì‹  ê¸°ì¤€â€ ì¸ë±ì‹±(ë’¤ì—ì„œë¶€í„°)
 		 * - back_index = 0 -> newest
-		 * - back_index = 1 -> newestº¸´Ù 1°³ ÀÌÀü
+		 * - back_index = 1 -> newestë³´ë‹¤ 1ê°œ ì´ì „
 		 *
-		 * close[N] °°Àº ÁöÇ¥¿¡ À¯¿ë:
-		 * - ¿¹: N=20ÀÏ ¶§, back_index=20À¸·Î °ú°Å °ª Á¢±Ù(´Ü, size°¡ ÃæºĞÇØ¾ß)
+		 * close[N] ê°™ì€ ì§€í‘œì— ìœ ìš©:
+		 * - ì˜ˆ: N=20ì¼ ë•Œ, back_index=20ìœ¼ë¡œ ê³¼ê±° ê°’ ì ‘ê·¼(ë‹¨, sizeê°€ ì¶©ë¶„í•´ì•¼)
 		 *
-		 * ¹İÈ¯°ª:
-		 * - ÃæºĞÇÑ µ¥ÀÌÅÍ°¡ ¾øÀ¸¸é nullopt
-		 * - ÀÖÀ¸¸é °ª(º¹»ç) ¹İÈ¯
+		 * ë°˜í™˜ê°’:
+		 * - ì¶©ë¶„í•œ ë°ì´í„°ê°€ ì—†ìœ¼ë©´ nullopt
+		 * - ìˆìœ¼ë©´ ê°’(ë³µì‚¬) ë°˜í™˜
 		 */
 		[[nodiscard]] std::optional<T> valueFromBack(std::size_t back_index) const
 			noexcept(std::is_nothrow_copy_constructible_v<T>)
@@ -189,12 +189,12 @@ namespace trading::indicators
 
 		/*
 		 * refFromBack(back_index)
-		 * - valueFromBack°ú µ¿ÀÏÇÑ ÀÇ¹ÌÁö¸¸ ¡°ÂüÁ¶¡±¸¦ ¹İÈ¯
-		 * - ¹üÀ§ ¹ş¾î³ª¸é ¿¹¿Ü
+		 * - valueFromBackê³¼ ë™ì¼í•œ ì˜ë¯¸ì§€ë§Œ â€œì°¸ì¡°â€ë¥¼ ë°˜í™˜
+		 * - ë²”ìœ„ ë²—ì–´ë‚˜ë©´ ì˜ˆì™¸
 		 *
-		 * ¼º´É:
-		 * - Å« Å¸ÀÔÀÌ¸é º¹»ç ´ë½Å ÂüÁ¶°¡ À¯¸®
-		 * - doubleÀÌ¸é Å« Â÷ÀÌ ¾øÁö¸¸ API·Î Á¦°øÇØµÎ¸é È®Àå¼º ÁÁÀ½
+		 * ì„±ëŠ¥:
+		 * - í° íƒ€ì…ì´ë©´ ë³µì‚¬ ëŒ€ì‹  ì°¸ì¡°ê°€ ìœ ë¦¬
+		 * - doubleì´ë©´ í° ì°¨ì´ ì—†ì§€ë§Œ APIë¡œ ì œê³µí•´ë‘ë©´ í™•ì¥ì„± ì¢‹ìŒ
 		 */
 		[[nodiscard]] const T& refFromBack(std::size_t back_index) const {
 			if (back_index >= size_) throw std::out_of_range("RingBuffer::refFromBack out of range");
@@ -202,33 +202,33 @@ namespace trading::indicators
 		}
 
 		/*
-		* has(n): ÃÖ¼Ò n°³ ÀÌ»óÀÇ µ¥ÀÌÅÍ°¡ ½×¿´´ÂÁö
-		* - ÁöÇ¥ ÁØºñ ¿©ºÎ(À©µµ¿ì ÃæÁ·) Ã¼Å©¿¡ ¹Ù·Î »ç¿ë °¡´É
+		* has(n): ìµœì†Œ nê°œ ì´ìƒì˜ ë°ì´í„°ê°€ ìŒ“ì˜€ëŠ”ì§€
+		* - ì§€í‘œ ì¤€ë¹„ ì—¬ë¶€(ìœˆë„ìš° ì¶©ì¡±) ì²´í¬ì— ë°”ë¡œ ì‚¬ìš© ê°€ëŠ¥
 		*/
 		[[nodiscard]] bool hasEnough(std::size_t n) const noexcept { return size_ >= n; }
 
 	private:
 
 		/*
-		* pushImpl: pushÀÇ °øÅë ±¸Çö
-		* - const& / rvalue¸¦ ¸ğµÎ Ã³¸®ÇÏ±â À§ÇØ ÅÛÇÃ¸´À¸·Î ÀÛ¼º
+		* pushImpl: pushì˜ ê³µí†µ êµ¬í˜„
+		* - const& / rvalueë¥¼ ëª¨ë‘ ì²˜ë¦¬í•˜ê¸° ìœ„í•´ í…œí”Œë¦¿ìœ¼ë¡œ ì‘ì„±
 		*/
 		template <class U>
 		std::optional<T> pushImpl(U&& v)
 			noexcept((std::is_nothrow_assignable_v<T&, U&&>) &&
 				(std::is_nothrow_move_constructible_v<T> || std::is_nothrow_copy_constructible_v<T>))
 		{
-			// capacity°¡ 0ÀÌ¸é ¾î¶² °ªµµ ÀúÀåÇÏÁö ¾ÊÀ½(¾ÈÀüÇÑ no-op)
+			// capacityê°€ 0ì´ë©´ ì–´ë–¤ ê°’ë„ ì €ì¥í•˜ì§€ ì•ŠìŒ(ì•ˆì „í•œ no-op)
 			if (cap_ == 0) return std::nullopt;
 
 			std::optional<T> overwritten;
 
 			if (size_ == cap_) {
 				/*
-				 * °¡µæ Âù »óÅÂ:
-				 * - head_ À§Ä¡(= oldest)¸¦ µ¤¾î¾´´Ù.
-				 * - µ¤¾î¾²±â Àü¿¡ ±âÁ¸ °ªÀ» overwrittenÀ¸·Î ¹İÈ¯(ÁöÇ¥ ·Ñ¸µ ¾÷µ¥ÀÌÆ®¿ë)
-				 * - head_¸¦ ÇÑ Ä­ ¾ÕÀ¸·Î ÀÌµ¿ ¡æ ÀÌÁ¦ ´ÙÀ½ oldest°¡ µÊ
+				 * ê°€ë“ ì°¬ ìƒíƒœ:
+				 * - head_ ìœ„ì¹˜(= oldest)ë¥¼ ë®ì–´ì“´ë‹¤.
+				 * - ë®ì–´ì“°ê¸° ì „ì— ê¸°ì¡´ ê°’ì„ overwrittenìœ¼ë¡œ ë°˜í™˜(ì§€í‘œ ë¡¤ë§ ì—…ë°ì´íŠ¸ìš©)
+				 * - head_ë¥¼ í•œ ì¹¸ ì•ìœ¼ë¡œ ì´ë™ â†’ ì´ì œ ë‹¤ìŒ oldestê°€ ë¨
 				 */
 				overwritten.emplace(std::move(buf_[head_]));
 				buf_[head_] = std::forward<U>(v);
@@ -236,9 +236,9 @@ namespace trading::indicators
 			}
 			else {
 				/*
-				 * ¾ÆÁ÷ ´ú Âù »óÅÂ:
-				 * - head_´Â ±×´ë·Î µÎ°í, (head_ + size_) À§Ä¡¿¡ »õ °ªÀ» ³Ö´Â´Ù.
-				 * - size_ Áõ°¡
+				 * ì•„ì§ ëœ ì°¬ ìƒíƒœ:
+				 * - head_ëŠ” ê·¸ëŒ€ë¡œ ë‘ê³ , (head_ + size_) ìœ„ì¹˜ì— ìƒˆ ê°’ì„ ë„£ëŠ”ë‹¤.
+				 * - size_ ì¦ê°€
 				 */
 				const std::size_t idx = (head_ + size_) % cap_;
 				buf_[idx] = std::forward<U>(v);
@@ -249,8 +249,8 @@ namespace trading::indicators
 
 		/*
 		* physicalIndexFromOldest(i)
-		* - ¡°oldest ±âÁØ i¹øÂ°¡±°¡ ³»ºÎ vector¿¡¼­ ¾îµğ¿¡ ÀÖ´ÂÁö(¹°¸® ÀÎµ¦½º) °è»ê
-		* - oldest´Â head_°¡ °¡¸®Å´
+		* - â€œoldest ê¸°ì¤€ ië²ˆì§¸â€ê°€ ë‚´ë¶€ vectorì—ì„œ ì–´ë””ì— ìˆëŠ”ì§€(ë¬¼ë¦¬ ì¸ë±ìŠ¤) ê³„ì‚°
+		* - oldestëŠ” head_ê°€ ê°€ë¦¬í‚´
 		*/
 		[[nodiscard]] std::size_t physicalIndexFromOldest(std::size_t i) const noexcept {
 			return (cap_ == 0) ? 0 : (head_ + i) % cap_;
@@ -258,9 +258,9 @@ namespace trading::indicators
 
 		/*
 		* physicalIndexFromNewest(back_index)
-		 * - ¡°newest ±âÁØ back_index¹øÂ°¡±°¡ ³»ºÎ vector¿¡¼­ ¾îµğÀÎÁö °è»ê
-		 * - newest´Â (head_ + size_ - 1) À§Ä¡
-		 * - ±× À§Ä¡¿¡¼­ back_index¸¸Å­ µÚ·Î ÀÌµ¿ÇÑ ÀÎµ¦½º¸¦ ¹İÈ¯
+		 * - â€œnewest ê¸°ì¤€ back_indexë²ˆì§¸â€ê°€ ë‚´ë¶€ vectorì—ì„œ ì–´ë””ì¸ì§€ ê³„ì‚°
+		 * - newestëŠ” (head_ + size_ - 1) ìœ„ì¹˜
+		 * - ê·¸ ìœ„ì¹˜ì—ì„œ back_indexë§Œí¼ ë’¤ë¡œ ì´ë™í•œ ì¸ë±ìŠ¤ë¥¼ ë°˜í™˜
 		*/
 		[[nodiscard]] std::size_t physicalIndexFromNewest(std::size_t back_index) const noexcept {
 			if (cap_ == 0) return 0;
@@ -269,14 +269,14 @@ namespace trading::indicators
 			return (newest + cap_ - (back_index % cap_)) % cap_;
 		}
 
-		// ½ÇÁ¦ ÀúÀå¼Ò(°íÁ¤ Å©±â). cap_¸¸Å­ ¹Ì¸® È®º¸
-		std::vector<T> buf_{};
-		std::size_t cap_{ 0 };
+		// ì‹¤ì œ ì €ì¥ì†Œ(ê³ ì • í¬ê¸°). cap_ë§Œí¼ ë¯¸ë¦¬ í™•ë³´
+		std::vector<T> buf_{};	// ì‹¤ì œ ë°ì´í„°ë¥¼ ë‹´ëŠ” ì €ì¥ì†Œ
+		std::size_t cap_{ 0 };	// ì´ ë²„í¼ê°€ ìµœëŒ€ ëª‡ ê°œê¹Œì§€ ê°€ëŠ¥í•œì§€ì— ëŒ€í•œ ë…¼ë¦¬ì  ê·œì¹™
 
-		// head_´Â ¡°oldest¡±ÀÇ ¹°¸® ÀÎµ¦½º¸¦ °¡¸®Å²´Ù( size_ > 0ÀÏ ¶§ ÀÇ¹Ì ÀÖÀ½ )
+		// head_ëŠ” â€œoldestâ€ì˜ ë¬¼ë¦¬ ì¸ë±ìŠ¤ë¥¼ ê°€ë¦¬í‚¨ë‹¤( size_ > 0ì¼ ë•Œ ì˜ë¯¸ ìˆìŒ )
 		std::size_t head_{ 0 };
 
-		// ÇöÀç À¯È¿ÇÑ µ¥ÀÌÅÍ °³¼ö (0..cap_)
-		std::size_t size_{ 0 };
+		// í˜„ì¬ ìœ íš¨í•œ ë°ì´í„° ê°œìˆ˜ (0..cap_)
+		std::size_t size_{ 0 }; // í˜„ì¬ ìœ íš¨í•œ ë°ì´í„°ì˜ ê°œìˆ˜ì— ëŒ€í•œ ë…¼ë¦¬(0ì´ë©´ ì‹¤ì œ ë°ì´í„°ëŠ” ìˆì§€ë§Œ ì‚¬ìš© ëª»í•¨)
 	};
 }

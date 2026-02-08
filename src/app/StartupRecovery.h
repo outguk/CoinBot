@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include <string>
 #include <string_view>
@@ -8,27 +8,29 @@
 
 namespace app {
     // StartupRecovery:
-    // - ÇÁ·Î±×·¥ Àç½ÃÀÛ ½ÃÁ¡¿¡ "¹ÌÃ¼°á ÁÖ¹® Á¤¸® + Æ÷Áö¼Ç º¹±¸"¸¦ ¼öÇàÇÏ´Â À¯Æ¿¸®Æ¼.
-    // - ÄÉÀÌ½º A Á¤Ã¥:
-    //   1) ¹ÌÃ¼°á ÁÖ¹® Áß "³» º¿ÀÌ ³½ ÁÖ¹®"¸¸ ÀüºÎ Ãë¼ÒÇÑ´Ù.
-    //   2) °èÁ¤ ÀÜ°í¿¡¼­ ÇØ´ç marketÀÇ º¸À¯ Æ÷Áö¼Ç(¼ö·®/Æò´Ü)À» ÀÐ¾î PositionSnapshotÀ» ¸¸µç´Ù.
-    //   3) Àü·«¿¡ syncOnStart(PositionSnapshot)·Î ÁÖÀÔÇÏ¿© »óÅÂ¸¦ InPosition/Flat·Î º¹±¸ÇÑ´Ù.
+    // - í”„ë¡œê·¸ëž¨ ìž¬ì‹œìž‘ ì‹œì ì— "ë¯¸ì²´ê²° ì£¼ë¬¸ ì •ë¦¬ + í¬ì§€ì…˜ ë³µêµ¬"ë¥¼ ìˆ˜í–‰í•˜ëŠ” ìœ í‹¸ë¦¬í‹°.
+    // - ì¼€ì´ìŠ¤ A ì •ì±…:
+    //   1) ë¯¸ì²´ê²° ì£¼ë¬¸ ì¤‘ "ë‚´ ë´‡ì´ ë‚¸ ì£¼ë¬¸"ë§Œ ì „ë¶€ ì·¨ì†Œí•œë‹¤.
+    //   2) ê³„ì • ìž”ê³ ì—ì„œ í•´ë‹¹ marketì˜ ë³´ìœ  í¬ì§€ì…˜(ìˆ˜ëŸ‰/í‰ë‹¨)ì„ ì½ì–´ PositionSnapshotì„ ë§Œë“ ë‹¤.
+    //   3) ì „ëžµì— syncOnStart(PositionSnapshot)ë¡œ ì£¼ìž…í•˜ì—¬ ìƒíƒœë¥¼ InPosition/Flatë¡œ ë³µêµ¬í•œë‹¤.
     //
-    // - Àç½ÃÀÛ ÈÄ¿¡µµ Àü·«ÀÌ "ÀÌ¹Ì º¸À¯ ÁßÀÎ ÄÚÀÎ"À» ¸ð¸¥ Ã¤ ÀçÁøÀÔ(Áßº¹ ¸Å¼ö)ÇÏ´Â »ç°í¸¦ ¹æÁö.
-    // - Àç½ÃÀÛ ½Ã ³²¾ÆÀÖ´Â º¿ ÁÖ¹®À» Á¤¸®ÇÏÁö ¾ÊÀ¸¸é, »õ ÁÖ¹®°ú Ãæµ¹/Áßº¹ ÁÖ¹® À§ÇèÀÌ Ä¿Áü.
+    // - ìž¬ì‹œìž‘ í›„ì—ë„ ì „ëžµì´ "ì´ë¯¸ ë³´ìœ  ì¤‘ì¸ ì½”ì¸"ì„ ëª¨ë¥¸ ì±„ ìž¬ì§„ìž…(ì¤‘ë³µ ë§¤ìˆ˜)í•˜ëŠ” ì‚¬ê³ ë¥¼ ë°©ì§€.
+    // - ìž¬ì‹œìž‘ ì‹œ ë‚¨ì•„ìžˆëŠ” ë´‡ ì£¼ë¬¸ì„ ì •ë¦¬í•˜ì§€ ì•Šìœ¼ë©´, ìƒˆ ì£¼ë¬¸ê³¼ ì¶©ëŒ/ì¤‘ë³µ ì£¼ë¬¸ ìœ„í—˜ì´ ì»¤ì§.
+
+    // - ì¶”í›„ ì£¼ë¬¸ ì·¨ì†Œê°€ ì•„ë‹Œ ê¸°ì¡´ ì£¼ë¬¸ ë³µì› ê¸°ëŠ¥ì„ ì¶”ê°€!!!!!!!!!!!!!!
     class StartupRecovery final {
     public:
         struct Options {
-            // º¿ ÁÖ¹®¸¸ Ãë¼ÒÇÏ±â À§ÇÑ prefix
-            // ¿¹) "rsi_mean_reversion:KRW-BTC:"
-            // strategy_id + ":" + market + ":" ÇüÅÂ·Î °íÁ¤
+            // ë´‡ ì£¼ë¬¸ë§Œ ì·¨ì†Œí•˜ê¸° ìœ„í•œ prefix
+            // ì˜ˆ) "rsi_mean_reversion:KRW-BTC:"
+            // strategy_id + ":" + market + ":" í˜•íƒœë¡œ ê³ ì •
             std::string bot_identifier_prefix;
 
             int cancel_retry = 3;
             int verify_retry = 3;
 
-            // (º¸¿Ï Æ÷ÀÎÆ®) verify_retry »çÀÌ¿¡ Àá±ñ sleep/backoff°¡ ÀÖÀ¸¸é
-            // Upbit ¹Ý¿µ Áö¿¬/·¹ÀÌÆ®¸®¹Ô¿¡ ´õ ¾ÈÁ¤Àû
+            // (ë³´ì™„ í¬ì¸íŠ¸) verify_retry ì‚¬ì´ì— ìž ê¹ sleep/backoffê°€ ìžˆìœ¼ë©´
+            // Upbit ë°˜ì˜ ì§€ì—°/ë ˆì´íŠ¸ë¦¬ë°‹ì— ë” ì•ˆì •ì 
         };
 
         template <class StrategyT>
@@ -37,32 +39,32 @@ namespace app {
             const Options& opt,
             StrategyT& strategy)
         {
-            // 1) Àç½ÃÀÛ ½ÃÁ¡¿¡ ³²¾ÆÀÖ´Â "º¿ ÁÖ¹®" ¹ÌÃ¼°áÀ» Á¤¸®
+            // 1) ìž¬ì‹œìž‘ ì‹œì ì— ë‚¨ì•„ìžˆëŠ” "ë´‡ ì£¼ë¬¸" ë¯¸ì²´ê²°ì„ ì •ë¦¬
             cancelBotOpenOrders(api, market, opt);
 
-            // 2) °èÁ¤ Á¶È¸·Î Æ÷Áö¼Ç ½º³À¼¦ »ý¼º
+            // 2) ê³„ì • ì¡°íšŒë¡œ í¬ì§€ì…˜ ìŠ¤ëƒ…ìƒ· ìƒì„±
             const trading::PositionSnapshot pos = buildPositionSnapshot(api, market);
 
-            // 3) Àü·« »óÅÂ º¹±¸
+            // 3) ì „ëžµ ìƒíƒœ ë³µêµ¬
             strategy.syncOnStart(pos);
         }
 
     private:
-        // ¹ÌÃ¼°á ÁÖ¹® Áß "º¿ prefix"°¡ ºÙÀº ÁÖ¹®¸¸ Ãë¼ÒÇÑ´Ù
+        // ë¯¸ì²´ê²° ì£¼ë¬¸ ì¤‘ "ë´‡ prefix"ê°€ ë¶™ì€ ì£¼ë¬¸ë§Œ ì·¨ì†Œí•œë‹¤
         static void cancelBotOpenOrders(api::rest::UpbitExchangeRestClient& api,
             std::string_view market,
             const Options& opt);
 
-        // °èÁ¤(core::Account)¿¡¼­ ÇØ´ç marketÀÇ base currency Æ÷Áö¼ÇÀ» Ã£¾Æ PositionSnapshotÀ» ¸¸µç´Ù
+        // ê³„ì •(core::Account)ì—ì„œ í•´ë‹¹ marketì˜ base currency í¬ì§€ì…˜ì„ ì°¾ì•„ PositionSnapshotì„ ë§Œë“ ë‹¤
         static trading::PositionSnapshot buildPositionSnapshot(api::rest::UpbitExchangeRestClient& api,
             std::string_view market);
 
-        // market ÆÄ½Ì À¯Æ¿:
-        //  - "KRW-BTC"¿¡¼­ BTC / KRW ÃßÃâ
+        // market íŒŒì‹± ìœ í‹¸:
+        //  - "KRW-BTC"ì—ì„œ BTC / KRW ì¶”ì¶œ
         static std::string_view baseCurrency(std::string_view market); // "KRW-BTC" -> "BTC"
         static std::string_view unitCurrency(std::string_view market); // "KRW-BTC" -> "KRW"
 
-        // prefix °Ë»ç (¿ÀÃë¼Ò ¹æÁö ÇÙ½É)
+        // prefix ê²€ì‚¬ (ì˜¤ì·¨ì†Œ ë°©ì§€ í•µì‹¬)
         static bool startsWith(std::string_view s, std::string_view prefix) noexcept;
     };
 

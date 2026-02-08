@@ -1,4 +1,4 @@
-// core/domain/Position.h
+ï»¿// core/domain/Position.h
 #pragma once
 
 #include <string>
@@ -9,19 +9,19 @@ namespace core
 {
 
 	/*
-	* ÇöÀçÀÇ Æ÷Áö¼Ç
-	* º¸À¯ ÁßÀÎ ÄÚÀÎÀÇ ¼ö·®°ú Æò´Ü°¡
-	* Ã¼°áÇÑ °Å·¡ÀÇ ´©Àû »óÅÂ
+	* í˜„ì¬ì˜ í¬ì§€ì…˜
+	* ë³´ìœ  ì¤‘ì¸ ì½”ì¸ì˜ ìˆ˜ëŸ‰ê³¼ í‰ë‹¨ê°€
+	* ì²´ê²°í•œ ê±°ë˜ì˜ ëˆ„ì  ìƒíƒœ
 	*/
 
 	struct Position 
 	{
-		std::string		currency;			// °Å·¡ »óÇ° Á¤º¸
-		double			free;			// ÁÖ¹® °¡´É ¼ö·® ¶Ç´Â ±İ¾×
+		std::string		currency;			// ê±°ë˜ ìƒí’ˆ ì •ë³´
+		double			free;			// ì£¼ë¬¸ ê°€ëŠ¥ ìˆ˜ëŸ‰ ë˜ëŠ” ê¸ˆì•¡
 		
-		Price			avg_buy_price;		// ¸Å¼ö Æò±Õ°¡
+		Price			avg_buy_price;		// ë§¤ìˆ˜ í‰ê· ê°€
 
-		std::string		unit_currency;		// Æò±Õ°¡ ±âÁØ ÅëÈ­ (¸Å¼ö Æò±Õ°¡ÀÇ ´ÜÀ§ KRW)
+		std::string		unit_currency;		// í‰ê· ê°€ ê¸°ì¤€ í†µí™” (ë§¤ìˆ˜ í‰ê· ê°€ì˜ ë‹¨ìœ„ KRW)
 	};
 
 

@@ -1,4 +1,4 @@
-// core/domain/Candle.h
+ï»¿// core/domain/Candle.h
 #pragma once
 
 #include <chrono>
@@ -8,7 +8,7 @@
 namespace core {
 
     /*
-	* µé¾î¿À´Â Äµµé(ºÀ) µ¥ÀÌÅÍ ±¸Á¶Ã¼
+	* ë“¤ì–´ì˜¤ëŠ” ìº”ë“¤(ë´‰) ë°ì´í„° êµ¬ì¡°ì²´
     */
 
 	enum class TimeFrame
@@ -24,16 +24,16 @@ namespace core {
 
     struct Candle 
 	{
-		std::string	market;		// Á¾¸ñ Á¤º¸
+		std::string	market;		// ì¢…ëª© ì •ë³´
 
-		Price  open_price;		// ½Ã°¡
-		Price  high_price;		// °í°¡
-		Price  low_price;		// Àú°¡
-		Price  close_price;		// Á¾°¡
+		Price  open_price;		// ì‹œê°€
+		Price  high_price;		// ê³ ê°€
+		Price  low_price;		// ì €ê°€
+		Price  close_price;		// ì¢…ê°€
 
-		Volume volume;			// °Å·¡·®
+		Volume volume;			// ê±°ë˜ëŸ‰
 
-		std::string start_timestamp;			// Á¤º¸°¡ µé¾î¿Â ½Ã°¢
+		std::string start_timestamp;			// ì •ë³´ê°€ ë“¤ì–´ì˜¨ ì‹œê°
     };
 
 } // namespace core

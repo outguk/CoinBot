@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include <string>
 
@@ -13,7 +13,7 @@ namespace api::upbit::mappers
 		core::Ticker t;
 		t.market = dto.market;
 
-		// °¡°Ý
+		// ê°€ê²©
 		t.ticker_opening_price = dto.opening_price;
 		t.ticker_high_price = dto.high_price;
 		t.ticker_low_price = dto.low_price;

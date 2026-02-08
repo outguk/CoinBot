@@ -1,4 +1,4 @@
-// engine/EngineEvents.h
+ï»¿// engine/EngineEvents.h
 #pragma once
 
 #include <string>
@@ -9,16 +9,16 @@
 
 namespace engine
 {
-    // ¿£ÁøÀÌ »óÀ§(App)·Î ³»º¸³»´Â Áß¸³ ÀÌº¥Æ® Å¸ÀÔ.
-    // ÀÌ ÀÌº¥Æ®¸¦ ¹Ş¾Æ trading::FillEvent / trading::OrderStatusEvent·Î º¯È¯ÇØ Àü·«¿¡ Àü´ŞÇÑ´Ù.
+    // ì—”ì§„ì´ ìƒìœ„(App)ë¡œ ë‚´ë³´ë‚´ëŠ” ì¤‘ë¦½ ì´ë²¤íŠ¸ íƒ€ì….
+    // ì´ ì´ë²¤íŠ¸ë¥¼ ë°›ì•„ trading::FillEvent / trading::OrderStatusEventë¡œ ë³€í™˜í•´ ì „ëµì— ì „ë‹¬í•œë‹¤.
 
     struct EngineFillEvent final
     {
-        // Àü·«ÀÌ ÁÖ¹®À» ¸ÅÄªÇÒ ¶§ »ç¿ëÇÏ´Â Å°(identifier).
-        // - ¾÷ºñÆ® uuid(order_id)¿Í´Â ´Ù¸£¸ç, ÇÁ·Î±×·¥ÀÌ ºÎ¿©ÇÑ identifier.
+        // ì „ëµì´ ì£¼ë¬¸ì„ ë§¤ì¹­í•  ë•Œ ì‚¬ìš©í•˜ëŠ” í‚¤(identifier).
+        // - ì—…ë¹„íŠ¸ uuid(order_id)ì™€ëŠ” ë‹¤ë¥´ë©°, í”„ë¡œê·¸ë¨ì´ ë¶€ì—¬í•œ identifier.
         std::string identifier;
 
-        // ¾÷ºñÆ® ÁÖ¹® uuid / Ã¼°á uuid (ÃßÀû/µğ¹ö±ë/Áßº¹ Á¦°Å¿¡ À¯¿ë)
+        // ì—…ë¹„íŠ¸ ì£¼ë¬¸ uuid / ì²´ê²° uuid (ì¶”ì /ë””ë²„ê¹…/ì¤‘ë³µ ì œê±°ì— ìœ ìš©)
         std::string order_id;
         std::string trade_id;
 
@@ -27,20 +27,21 @@ namespace engine
         core::Volume filled_volume{ 0.0 };
     };
 
+    // ì¢…ê²° ìƒíƒœë¡œ ë³€ê²½ë  ë•Œë§Œ ì´ë²¤íŠ¸ ë°œìƒ
     struct EngineOrderStatusEvent final
     {
-        // Àü·« ¸ÅÄª Å°(client_order_id)
+        // ì „ëµ ë§¤ì¹­ í‚¤(client_order_id)
         std::string identifier;
 
-        // ¾÷ºñÆ® ÁÖ¹® uuid
+        // ì—…ë¹„íŠ¸ ì£¼ë¬¸ uuid
         std::string order_id;
 
         core::OrderStatus   status{ core::OrderStatus::Pending };
         core::OrderPosition position{ core::OrderPosition::BID };
 
-        // ¾Æ·¡ °ªµéÀº ÀÖÀ¸¸é À¯¿ëÇÏÁö¸¸(ºÎºĞÃ¼°á/ÀÜ·® È®ÀÎ) ¾ø´õ¶óµµ Àü·«ÀÌ µ¿ÀÛÇÏµµ·Ï ¼³°è °¡´É
-        double executed_volume{ 0.0 };
-        double remaining_volume{ 0.0 };
+        // ì•„ë˜ ê°’ë“¤ì€ ìˆìœ¼ë©´ ìœ ìš©í•˜ì§€ë§Œ(ë¶€ë¶„ì²´ê²°/ì”ëŸ‰ í™•ì¸) ì—†ë”ë¼ë„ ì „ëµì´ ë™ì‘í•˜ë„ë¡ ì„¤ê³„ ê°€ëŠ¥
+        double executed_volume{ 0.0 };  // ì´ ì£¼ë¬¸ì—ì„œ ì§€ê¸ˆê¹Œì§€ â€œì‹¤ì œë¡œ ì²´ê²°ëœ ëˆ„ì  ìˆ˜ëŸ‰â€
+        double remaining_volume{ 0.0 }; // ì´ ì£¼ë¬¸ì—ì„œ â€œì•„ì§ ì²´ê²°ë˜ì§€ ì•Šê³  ë‚¨ì•„ ìˆëŠ” ìˆ˜ëŸ‰â€
     };
 
     using EngineEvent = std::variant<EngineFillEvent, EngineOrderStatusEvent>;

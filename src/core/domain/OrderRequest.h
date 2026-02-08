@@ -1,4 +1,4 @@
-// core/domain/OrderRequest.h
+ï»¿// core/domain/OrderRequest.h
 #pragma once
 
 #include <string>
@@ -11,8 +11,8 @@
 namespace core
 {
 	/*
-	* Àü·«(Strategy)ÀÌ ¿£Áø(OrderEngine)¿¡ Àü´ŞÇÏ´Â "ÁÖ¹® ÀÇµµ" °´Ã¼
-	* Àü·«Àº ½ÃÀå µ¥ÀÌÅÍ¸¦ º¸°í ÀÇµµÇÑ OrderRequest¸¦ ¸¸µç´Ù.
+	* ì „ëµ(Strategy)ì´ ì—”ì§„(OrderEngine)ì— ì „ë‹¬í•˜ëŠ” "ì£¼ë¬¸ ì˜ë„" ê°ì²´
+	* ì „ëµì€ ì‹œì¥ ë°ì´í„°ë¥¼ ë³´ê³  ì˜ë„í•œ OrderRequestë¥¼ ë§Œë“ ë‹¤.
 	*/
 	struct VolumeSize {
 		Volume value{};
@@ -22,28 +22,28 @@ namespace core
 		Amount value{};
 	};
 
-	using OrderSize = std::variant<VolumeSize, AmountSize>; // ¼ö·®(Volume) ¶Ç´Â ±İ¾×(Amount)
+	using OrderSize = std::variant<VolumeSize, AmountSize>; // ìˆ˜ëŸ‰(Volume) ë˜ëŠ” ê¸ˆì•¡(Amount)
 
 	struct OrderRequest
 	{
-		std::string		market;				// ¸¶ÄÏ ÄÚµå (ex: "KRW-BTC")
-		OrderPosition	position;			// BID - ¸Å¼ö / ASK - ¸Åµµ
-		OrderType		type;				// Market - ½ÃÀå°¡ / Limit - ÁöÁ¤°¡
+		std::string		market;				// ë§ˆì¼“ ì½”ë“œ (ex: "KRW-BTC")
+		OrderPosition	position;			// BID - ë§¤ìˆ˜ / ASK - ë§¤ë„
+		OrderType		type;				// Market - ì‹œì¥ê°€ / Limit - ì§€ì •ê°€
 
-		OrderSize		size;				// ÁÖ¹® Å©±â (¼ö·® ¶Ç´Â ±İ¾×)
+		OrderSize		size;				// ì£¼ë¬¸ í¬ê¸° (ìˆ˜ëŸ‰ ë˜ëŠ” ê¸ˆì•¡)
 
-		// ÁöÁ¤°¡ ÁÖ¹®ÀÎ °æ¿ì¿¡¸¸ °¡°İ ÁöÁ¤
-		std::optional<Price>	price;		// ÁöÁ¤°¡ ÁÖ¹® °¡°İ
+		// ì§€ì •ê°€ ì£¼ë¬¸ì¸ ê²½ìš°ì—ë§Œ ê°€ê²© ì§€ì •
+		std::optional<Price>	price;		// ì§€ì •ê°€ ì£¼ë¬¸ ê°€ê²©
 
-		// µ¿½Ã ÁÖ¹® / µğ¹ö±ëÀ» À§ÇÑ ÃßÀû Á¤º¸
-		std::string		strategy_id;		// ÀÌ ÁÖ¹®À» »ı¼ºÇÑ Àü·«
-		std::string		identifier;			// Å¬¶óÀÌ¾ğÆ® ÁÖ¹® ID, ÇÁ·Î±×·¥¿¡¼­ ºÎ¿© (µ¿½Ã ÁÖ¹® ±¸ºĞ)
-		std::string		client_tag;			// ·Î±× / ÃßÀû¿ë ÅÂ±×
+		// ë™ì‹œ ì£¼ë¬¸ / ë””ë²„ê¹…ì„ ìœ„í•œ ì¶”ì  ì •ë³´
+		std::string		strategy_id;		// ì´ ì£¼ë¬¸ì„ ìƒì„±í•œ ì „ëµ
+		std::string		identifier;			// í´ë¼ì´ì–¸íŠ¸ ì£¼ë¬¸ ID, í”„ë¡œê·¸ë¨ì—ì„œ ë¶€ì—¬ (ë™ì‹œ ì£¼ë¬¸ êµ¬ë¶„)
+		std::string		client_tag;			// ë¡œê·¸ / ì¶”ì ìš© íƒœê·¸
 
 	};
 
-	// ---- À¯È¿¼º Ã¼Å© °¡ÀÌµå ----
-	// - BID(¸Å¼ö)´Â Amount¸¦ ±â´ë (Amount ±âÁØ)
-	// - ASK(¸Åµµ)´Â VolumeÀ» ±â´ë (Volume ±âÁØ)
-	// - ¿¹¿ÜÀûÀ¸·Î ´Ù¸¥ Á¶ÇÕÀ» Çã¿ëÇÒÁö´Â ¿£Áø Á¤Ã¥¿¡¼­ °áÁ¤
+	// ---- ìœ íš¨ì„± ì²´í¬ ê°€ì´ë“œ ----
+	// - BID(ë§¤ìˆ˜)ëŠ” Amountë¥¼ ê¸°ëŒ€ (Amount ê¸°ì¤€)
+	// - ASK(ë§¤ë„)ëŠ” Volumeì„ ê¸°ëŒ€ (Volume ê¸°ì¤€)
+	// - ì˜ˆì™¸ì ìœ¼ë¡œ ë‹¤ë¥¸ ì¡°í•©ì„ í—ˆìš©í• ì§€ëŠ” ì—”ì§„ ì •ì±…ì—ì„œ ê²°ì •
 }

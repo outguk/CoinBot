@@ -4,9 +4,9 @@
 
 namespace engine
 {
-	// "¿­·ÁÀÖ´Â ÁÖ¹®" ÆÇÁ¤ (µ¥¸ğ ¿£Áø¿ë ±ÔÄ¢)
-		// - New/Open/Pending : ÁøÇà Áß
-		// - Filled/Canceled/Rejected : Á¾·á
+	// "í™œì„±ì¤‘ì¸ ì£¼ë¬¸" íŒë³„ (ì—…ë¹„íŠ¸ ìŠ¤í™ì— ë§ì¶˜)
+		// - New/Open/Pending : í™œì„± ì¤‘
+		// - Filled/Canceled/Rejected : ì™„ë£Œ
 	constexpr bool isOpenStatus(core::OrderStatus s) noexcept
 	{
 		using S = core::OrderStatus;
@@ -22,57 +22,66 @@ namespace engine
 		case S::Rejected:
 			return false;
 		}
-		return false; // enum È®Àå ´ëºñ
+		return false; // enum í™•ì¥ ëŒ€ë¹„
 	}
 
-	// »õ ÁÖ¹® ÀúÀå
-	bool OrderStore::add(const core::Order& order) 
+	// ìƒˆ ì£¼ë¬¸ ì¶”ê°€
+	bool OrderStore::add(const core::Order& order)
 	{
-		// ¾²±â ÀÛ¾÷ÀÌ´Ï unique lock
+		// ì“°ê¸° ì‘ì—…ì´ë‹ˆ unique lock
 		std::unique_lock lock(mtx_);
 
-		// order_id°¡ ÇÙ½É Å°ÀÌ¹Ç·Î, ºñ¾îÀÖÀ¸¸é ÀúÀå ºÒ°¡ (¿£Áø¿¡¼­ »ı¼º º¸ÀåÇÏ´Â °Ô ÀÌ»óÀû)
-		// ¿©±â¼­´Â Store°¡ ¹æ¾îÀûÀ¸·Î °Å¸¥´Ù.
+		// order_idëŠ” ë°˜ë“œì‹œ í‚¤ì´ë¯€ë¡œ, ë¹„ì–´ìˆìœ¼ë©´ ì¶”ê°€ ë¶ˆê°€ (ë¹„ì–´ìˆëŠ” ê°’ì„ ì €ì¥í•˜ëŠ” ê±´ ì´ìƒí•¨)
+		// ì—¬ê¸°ì„œëŠ” Storeì˜ ì±…ì„ë²”ìœ„ë¡œ íŒë‹¨í•¨.
 		if (order.id.empty())
 			return false;
 
 		auto [it, inserted] = orders_.emplace(order.id, order);
-		return inserted;	// ÀÌ¹Ì Á¸ÀçÇÏ¸é false
+		return inserted;	// ì´ë¯¸ ì¡´ì¬í•˜ë©´ false
 	}
 
-	// order_id·Î ÁÖ¹® Á¶È¸(º¹»çº»)
-	std::optional<core::Order> OrderStore::get(const std::string_view& order_id) const 
+	// order_idë¡œ ì£¼ë¬¸ ì¡°íšŒ(ë³µì‚¬ë³¸)
+	std::optional<core::Order> OrderStore::get(const std::string_view& order_id) const
 	{
-		// ÀĞ±â ÀÛ¾÷ÀÌ´Ï shared lock
+		// ì½ê¸° ì‘ì—…ì´ë‹ˆ shared lock
 		std::shared_lock lock(mtx_);
 
 		auto it = orders_.find(std::string(order_id));
-		if (it == orders_.end())
+		if (it == orders_.end()) // ì»¨í…Œì´ë„ˆì—ì„œ ë§ˆì§€ë§‰ ë‹¤ìŒ(ì¦‰ ë²”ìœ„ì˜ ë)
 			return std::nullopt;
 
-		// "º¹»çº»" ¹İÈ¯: ¿ÜºÎ°¡ ³»ºÎ Order¸¦ Á÷Á¢ º¯ÇüÇÒ ¼ö ¾ø°Ô ÇÔ
+		// "ë³µì‚¬ë³¸" ë°˜í™˜: ì™¸ë¶€ê°€ ë‚´ë¶€ Orderë¥¼ ì„ì˜ë¡œ ë³€ê²½í•  ìˆ˜ ì—†ê²Œ í•¨
 		return it->second;
 	}
 
-	// ÁÖ¹® ÅëÀ¸·Î ±³Ã¼(update)
-	bool OrderStore::update(const core::Order& order) 
+	// ì£¼ë¬¸ ìƒíƒœë¥¼ êµì²´(update)
+	bool OrderStore::update(const core::Order& order)
 	{
-		// ¾²±â ÀÛ¾÷ÀÌ´Ï unique lock
+		// ì“°ê¸° ì‘ì—…ì´ë‹ˆ unique lock
 		std::unique_lock lock(mtx_);
 
 		auto it = orders_.find(order.id);
 		if (it == orders_.end())
 			return false;
 
-		// ÀüÃ¼ ±³Ã¼ - µ¥¸ğ ´Ü°è¿¡¼­´Â "ºÎºĞ ¼öÁ¤"º¸´Ù "ÅëÂ° ±³Ã¼"°¡ ´Ü¼øÇÏ°í ¹ö±×°¡ Àû´Ù.
+		const core::OrderStatus old_status = it->second.status;
+
+		// ì „ì²´ êµì²´ - ì§€ê¸ˆ ë‹¨ê³„ì—ì„œëŠ” "ë¶€ë¶„ ìˆ˜ì •"ë³´ë‹¤ "í†µì§¸ êµì²´"ê°€ ë‹¨ìˆœí•˜ê³  ëª…í™•í•œ ì˜ë¯¸.
 		it->second = order;
+
+		// ë§Œì•½ Open -> Completed ì „í™˜ì´ë©´ íì— ì¶”ê°€
+		if (isOpenStatus(old_status) && !isOpenStatus(order.status))
+		{
+			completed_order_ids_.push_back(order.id);
+		}
+
 		return true;
 	}
 
-	// order_id·Î ÁÖ¹® »èÁ¦
-	bool OrderStore::erase(const std::string_view& order_id) 
+	// order_idë¡œ ì£¼ë¬¸ ì‚­ì œ
+	bool OrderStore::erase(const std::string_view& order_id)
 	{
-		// ¾²±â ÀÛ¾÷ÀÌ´Ï unique lock
+		// ì“°ê¸° ì‘ì—…ì´ë‹ˆ unique lock
 		std::unique_lock lock(mtx_);
 
 		auto it = orders_.find(std::string(order_id));
@@ -85,45 +94,88 @@ namespace engine
 
 	void OrderStore::upsert(const core::Order& order)
 	{
-		// ¡°¾øÀ¸¸é Ãß°¡, ÀÖÀ¸¸é ±³Ã¼¡±
-		// - ½Ç°Å·¡¿¡¼­ Àç¿¬°á/REST ÃÊ±âÈ­/WS Àç¼ö½ÅÀ» ¾ÈÀüÇÏ°Ô Ã³¸®ÇÏ±â À§ÇÑ ÇÙ½É
+		// ì—†ìœ¼ë©´ ì¶”ê°€, ìˆìœ¼ë©´ êµì²´í•¨
+		// - ë©±ë“±ì„±ë³´ì¥ - ì¬ì—°ê²°/REST ì´ˆê¸°í™”/WS ìˆœì„œê¼¬ì„ ë“±ì„ ì•ˆì „í•˜ê²Œ ì²˜ë¦¬í•˜ê¸° ìœ„í•œ ë°©ì‹
 		std::unique_lock lock(mtx_);
 		if (order.id.empty()) return;
 
+		// ì´ì „ ìƒíƒœ í™•ì¸ (ì¤‘ë³µ í ì¶”ê°€ ë°©ì§€)
+		auto it = orders_.find(order.id);
+		core::OrderStatus old_status = core::OrderStatus::New;  // ê¸°ë³¸ê°’ (ìƒˆ ì£¼ë¬¸)
+		if (it != orders_.end())
+			old_status = it->second.status;
+
 		orders_[order.id] = order;
+
+		// ìƒíƒœ ì „í™˜ ì‹œì—ë§Œ íì— ì¶”ê°€ (Open â†’ Completed)
+		// update()ì™€ ë™ì¼í•œ ë¡œì§ìœ¼ë¡œ ì¤‘ë³µ ë°©ì§€
+		if (isOpenStatus(old_status) && !isOpenStatus(order.status))
+		{
+			completed_order_ids_.push_back(order.id);
+		}
 	}
 
-	// Æ¯Á¤ ¸¶ÄÏÀÇ ¿­·ÁÀÖ´Â(New/Open) ÁÖ¹®µé Á¶È¸
-	std::vector<core::Order> OrderStore::getOpenOrdersByMarket(const std::string_view& market) const 
+	// íŠ¹ì • ë§ˆì¼“ì— í™œì„±ì¤‘ì¸(New/Open) ì£¼ë¬¸ë“¤ ì¡°íšŒ
+	std::vector<core::Order> OrderStore::getOpenOrdersByMarket(const std::string_view& market) const
 	{
-		// ÀĞ±â ÀÛ¾÷ÀÌ´Ï shared lock
+		// ì½ê¸° ì‘ì—…ì´ë‹ˆ shared lock
 		std::shared_lock lock(mtx_);
 
 		std::vector<core::Order> result;
-		result.reserve(orders_.size()); // ´ë·«ÀûÀÎ Å©±â ¿¹¾à
+		result.reserve(orders_.size()); // ë„‰ë„‰í•˜ê²Œ í¬ê¸° ì˜ˆì•½
 
 		for (const auto& [id, order] : orders_)
 		{
-			// 1) ¸¶ÄÏ ÇÊÅÍ¸µ : "KRW-BTC" °°Àº Æä¾î ½Ö ¹®ÀÚ¿­ ºñ±³
+			// 1) ë§ˆì¼“ í•„í„°ë§ : "KRW-BTC" ê°™ì€ ê²ƒë§Œ ë½‘ì„ ë•Œ ë¬¸ìì—´ ë¹„êµ
 			if (std::string_view(order.market) != market)
 				continue;
 
-			// 2) ¾ÆÁ÷ ÁøÇàÁßÀÎ ÁÖ¹®¸¸ ¹İÈ¯
+			// 2) ì•„ì§ í™œì„±ì¤‘ì¸ ì£¼ë¬¸ë§Œ ë°˜í™˜
 			if(!isOpenStatus(order.status))
 				continue;
 
-			// 3) ½º³À¼¦(º¹»çº») ¹İÈ¯
+			// 3) ë³µì‚¬í•˜ì—¬(ë³µì‚¬ë³¸) ë°˜í™˜
 			result.push_back(order);
 		}
 		return result;
 	}
 
 
-	// ÀüÃ¼ ÁÖ¹® ¼ö
-	std::size_t OrderStore::size() const 
+	// ì „ì²´ ì£¼ë¬¸ ìˆ˜
+	std::size_t OrderStore::size() const
 	{
-		// ÀĞ±â ÀÛ¾÷ÀÌ´Ï shared lock
+		// ì½ê¸° ì‘ì—…ì´ë‹ˆ shared lock
 		std::shared_lock lock(mtx_);
 		return orders_.size();
+	}
+
+	// ì™„ë£Œ ì£¼ë¬¸ ì •ë¦¬
+	std::size_t OrderStore::cleanup()
+	{
+		std::unique_lock lock(mtx_);
+
+		std::size_t removed_count = 0;
+
+		// ì™„ë£Œ ì£¼ë¬¸ì´ ìµœëŒ€ ê°œìˆ˜ ì´ˆê³¼í•˜ë©´ ê°€ì¥ ì˜¤ë˜ëœ ê²ƒë¶€í„° ì‚­ì œ
+		while (completed_order_ids_.size() > max_completed_orders_)
+		{
+			const std::string& oldest_id = completed_order_ids_.front();
+
+			// ì‹¤ì œë¡œ ì €ì¥ì¤‘ì¸ ì£¼ë¬¸ì´ë©´ ì‚­ì œ
+			auto it = orders_.find(oldest_id);
+			if (it != orders_.end())
+			{
+				// ì²´í¬: ì •ë§ Open ìƒíƒœê°€ ì•„ë‹Œì§€ í™•ì¸(í˜¹ì‹œë¼ë„ íì— ì¤‘ë³µ ì¶”ê°€ëœ ê²½ìš° ëŒ€ë¹„ ë°©ì–´)
+				if (!isOpenStatus(it->second.status))
+				{
+					orders_.erase(it);
+					++removed_count;
+				}
+			}
+
+			completed_order_ids_.pop_front();
+		}
+
+		return removed_count;
 	}
 }

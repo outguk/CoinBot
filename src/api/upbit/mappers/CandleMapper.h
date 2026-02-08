@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include <string>
 
@@ -14,7 +14,7 @@ namespace api::upbit::mappers
 		core::Candle c;
 		c.market = dto.market;
 
-		// °¡°Ý
+		// ê°€ê²©
 		c.open_price = dto.opening_price;
 		c.high_price = dto.high_price;
 		c.low_price = dto.low_price;
@@ -27,7 +27,7 @@ namespace api::upbit::mappers
 		return c;
 	}
 
-	// Äµµé + Å¸ÀÓÇÁ·¹ÀÓ
+	// ìº”ë“¤ + íƒ€ìž„í”„ë ˆìž„
 	/*inline core::CandleWithTimeFrame toDomainWithTimeFrame(
 		const dto::CandleDto_Minute& d,
 		int unit) noexcept

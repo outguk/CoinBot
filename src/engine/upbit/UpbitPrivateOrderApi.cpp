@@ -1,4 +1,4 @@
-#include <iostream>
+ï»¿#include <iostream>
 
 #include "engine/upbit/UpbitPrivateOrderApi.h"
 
@@ -7,10 +7,10 @@ namespace engine::upbit
     std::optional<std::string>
         UpbitPrivateOrderApi::getOrderId(const core::OrderRequest& req)
     {
-        // Upbit·Î ½ÇÁ¦ ÁÖ¹® »ı¼º(POST /v1/orders)
+        // Upbitë¡œ ì‹¤ì œ ì£¼ë¬¸ ìƒì„±(POST /v1/orders)
         auto r = client_.postOrder(req);
 
-        // ½ÇÆĞ¸é nullopt (¿£Áø submitÀÌ Fail Ã³¸®)
+        // ì‹¤íŒ¨ë©´ nullopt (ì—”ì§„ submitì´ Fail ì²˜ë¦¬)
         if (std::holds_alternative<api::rest::RestError>(r))
         {
             const auto& e = std::get<api::rest::RestError>(r);
@@ -23,7 +23,7 @@ namespace engine::upbit
         }
             
 
-        // ¼º°øÀÌ¸é uuid¸¸ ¹İÈ¯
+        // ì„±ê³µì´ë©´ uuidë§Œ ë°˜í™˜
         const auto& uuid = std::get<std::string>(r);
         if (uuid.empty())
         {

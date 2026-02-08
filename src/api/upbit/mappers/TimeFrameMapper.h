@@ -1,9 +1,9 @@
-#pragma once
+ï»¿#pragma once
 #include "../src/core/domain/Candle.h"
 
 namespace api::upbit::mappers {
 
-    // ÃßÈÄ day¿Í weekÀ¸·Î ´Ã·Á°£´Ù
+    // ì¶”í›„ dayì™€ weekìœ¼ë¡œ ëŠ˜ë ¤ê°„ë‹¤
     inline core::TimeFrame toTimeFrameFromMinuteUnit(int unit)
     {
         switch (unit)
@@ -16,9 +16,9 @@ namespace api::upbit::mappers {
         case 60:  return core::TimeFrame::MIN_60;
         case 240: return core::TimeFrame::MIN_240;
         default:
-            // ÇÁ·ÎÁ§Æ® ½ºÅ¸ÀÏ¿¡ ¸ÂÃç Ã³¸®:
-            // 1) throw ±İÁö ¼±È£¸é ±âº»°ª ¼±ÅÃ
-            // 2) ¶Ç´Â optional/expected·Î À§·Î ÀüÆÄ
+            // í”„ë¡œì íŠ¸ ìŠ¤íƒ€ì¼ì— ë§ì¶° ì²˜ë¦¬:
+            // 1) throw ê¸ˆì§€ ì„ í˜¸ë©´ ê¸°ë³¸ê°’ ì„ íƒ
+            // 2) ë˜ëŠ” optional/expectedë¡œ ìœ„ë¡œ ì „íŒŒ
             return core::TimeFrame::MIN_5;
         }
     }

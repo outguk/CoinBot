@@ -1,40 +1,40 @@
-#pragma once
+ï»¿#pragma once
 #include <string>
+#include <iosfwd>
 
 /*
 * RestError.h
-* ½ÇÆĞ¸¦ ¡°ÇÑ °¡Áö Å¸ÀÔ¡±À¸·Î ÅëÀÏÇØ¼­ »óÀ§ ·¹ÀÌ¾î°¡ Ã³¸®ÇÏ±â ½±°Ô ÇÔ
-* ³×Æ®¿öÅ©/ÇÁ·ÎÅäÄİ ¿À·ù¿Í HTTP status ¿À·ù¸¦ °°Àº ±Ô°İÀ¸·Î Æ÷Àå
+* ì‹¤íŒ¨ë¥¼ â€œí•œ ê°€ì§€ íƒ€ì…â€ìœ¼ë¡œ í†µì¼í•´ì„œ ìƒìœ„ ë ˆì´ì–´ê°€ ì²˜ë¦¬í•˜ê¸° ì‰½ê²Œ í•¨
+* ë„¤íŠ¸ì›Œí¬/í”„ë¡œí† ì½œ ì˜¤ë¥˜ì™€ HTTP status ì˜¤ë¥˜ë¥¼ ê°™ì€ ê·œê²©ìœ¼ë¡œ í¬ì¥
 */
 
 namespace api::rest
 {
 
-	// RestClinet ·¹º§(°øÅë ·¹º§)¿¡¼­ ¹ß»ı °¡´ÉÇÑ ¿À·ù¸¦ ºĞ·ù
-	// DTO ÆÄ½Ì ¿À·ù´Â ¾Æ´Ô
+	// RestClinet ë ˆë²¨(ê³µí†µ ë ˆë²¨)ì—ì„œ ë°œìƒ ê°€ëŠ¥í•œ ì˜¤ë¥˜ë¥¼ ë¶„ë¥˜
 
 	enum class RestErrorCode
 	{
-		ResolveFailed,			// DNS/È£½ºÆ® ÇØ¼® ½ÇÆĞ
-		ConnectFailed,			// TCP connect ½ÇÆĞ or connect timeout
-		HandshakeFailed,		// TLS handshake ½ÇÆĞ (ÀÎÁõ¼­/SNI Æ÷ÇÔ)
-		WriteFailed,			// HTTP request Àü¼Û ½ÇÆĞ
-		ReadFailed,				// HTTP response ÀÏ±â ½ÇÆĞ
-		Timeout,				// (ÃßÈÄ ±¸Ã¼È­ °¡´É) Å¸ÀÓ¾Æ¿ô ¸í½ÃÀû ±¸ºĞ ½Ã
-		BadStatus,				// status Á¤Ã¥»ó ½ÇÆĞ (4xx/5xx)
-		InvaildArgiment,		// host/target ´©¶ô µî Àß¸øµÈ ÀÔ·Â
-		ParseError,				// ÆÄ½Ì ¿¡·¯
+		ResolveFailed,			// DNS/í˜¸ìŠ¤íŠ¸ í•´ì„ ì‹¤íŒ¨
+		ConnectFailed,			// TCP connect ì‹¤íŒ¨ or connect timeout
+		HandshakeFailed,		// TLS handshake ì‹¤íŒ¨ (ì¸ì¦ì„œ/SNI í¬í•¨)
+		WriteFailed,			// HTTP request ì „ì†¡ ì‹¤íŒ¨
+		ReadFailed,				// HTTP response ì¼ê¸° ì‹¤íŒ¨
+		Timeout,				// (ì¶”í›„ êµ¬ì²´í™” ê°€ëŠ¥) íƒ€ì„ì•„ì›ƒ ëª…ì‹œì  êµ¬ë¶„ ì‹œ
+		BadStatus,				// status ì •ì±…ìƒ ì‹¤íŒ¨ (4xx/5xx)
+		InvalidArgument,		// host/target ëˆ„ë½ ë“± ì˜ëª»ëœ ì…ë ¥
+		ParseError,				// íŒŒì‹± ì—ëŸ¬
 
-		Unknown					// ¸ğ¸£´Â ¿À·ù
+		Unknown					// ëª¨ë¥´ëŠ” ì˜¤ë¥˜
 	};
 
-	// ¿À·ù¸¦ Ç¥ÁØÈ­ÇÑ µ¥ÀÌÅÍ ±¸Á¶
-	// - »óÀ§ °èÃşÀÌ "¿Ö ½ÇÆĞÇß´ÂÁö" ÀÏ°üµÇ°Ô Ã³¸®ÇÏ±â À§ÇÔ
+	// ì˜¤ë¥˜ë¥¼ í‘œì¤€í™”í•œ ë°ì´í„° êµ¬ì¡°
+	// - ìƒìœ„ ê³„ì¸µì´ "ì™œ ì‹¤íŒ¨í–ˆëŠ”ì§€" ì¼ê´€ë˜ê²Œ ì²˜ë¦¬í•˜ê¸° ìœ„í•¨
 	struct RestError
 	{
-		RestErrorCode code = RestErrorCode::Unknown;	// UnknownÀ¸·Î ÃÊ±âÈ­
-		std::string	message;							// error ¶Ç´Â Ä¿½ºÅÒ ¸Ş½ÃÁö
-		int http_status{ 0 };							// BadStatus ¿¡¼­ »ç¿ë
+		RestErrorCode code = RestErrorCode::Unknown;	// Unknownìœ¼ë¡œ ì´ˆê¸°í™”
+		std::string	message;							// error ë˜ëŠ” ì»¤ìŠ¤í…€ ë©”ì‹œì§€
+		int http_status{ 0 };							// BadStatus ì—ì„œ ì‚¬ìš©
 	};
 
 

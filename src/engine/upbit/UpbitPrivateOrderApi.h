@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include <optional>
 #include <string>
@@ -9,8 +9,8 @@
 
 namespace engine::upbit
 {
-    // PrivateOrderApiÀÇ Upbit ±¸ÇöÃ¼.
-    // - UpbitExchangeRestClient::postOrder()¸¦ È£ÃâÇØ¼­ uuid¸¸ »Ì¾Æ ¿£Áø¿¡ Á¦°øÇÑ´Ù.
+    // PrivateOrderApiì˜ Upbit êµ¬í˜„ì²´.
+    // - UpbitExchangeRestClient::postOrder()ë¥¼ í˜¸ì¶œí•´ì„œ uuidë§Œ ë½‘ì•„ ì—”ì§„ì— ì œê³µí•œë‹¤.
     class UpbitPrivateOrderApi final : public PrivateOrderApi
     {
     public:

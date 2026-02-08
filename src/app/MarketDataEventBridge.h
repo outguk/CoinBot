@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 #include <string_view>
 #include <string>
 #include "core/BlockingQueue.h"
@@ -16,7 +16,7 @@ namespace app {
     private:
         PrivateQueue& private_q_;
 
-        // WS ½º·¹µå¿¡¼­ JSON parse ¾øÀÌ type prefix¸¸ °¡º±°Ô ÇÊÅÍ
+        // WS ìŠ¤ë ˆë“œì—ì„œ JSON parse ì—†ì´ type prefixë§Œ ê°€ë³ê²Œ í•„í„°
         static bool isCandleMessage(std::string_view msg) noexcept;
     };
 

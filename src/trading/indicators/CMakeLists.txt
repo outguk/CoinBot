@@ -1,4 +1,4 @@
-add_library(trading_indicators
+ï»¿add_library(trading_indicators
     RingWindow.h
     ClosePriceWindow.h
     RsiWilder.h
@@ -11,8 +11,8 @@ add_library(trading_indicators
 
 target_compile_features(trading_indicators PUBLIC cxx_std_20)
 
-# include °æ·Î¸¦ "ÇÁ·ÎÁ§Æ® ·çÆ®"·Î ÀâÀ¸¸é
-# ÄÚµå¿¡¼­ #include "trading/indicators/RsiWilder.h" ÇüÅÂ°¡ ¾ÈÁ¤ÀûÀ¸·Î µ¿ÀÛ
+# include ê²½ë¡œë¥¼ "í”„ë¡œì íŠ¸ ë£¨íŠ¸"ë¡œ ì¡ìœ¼ë©´
+# ì½”ë“œì—ì„œ #include "trading/indicators/RsiWilder.h" í˜•íƒœê°€ ì•ˆì •ì ìœ¼ë¡œ ë™ì‘
 target_include_directories(trading_indicators
     PUBLIC
         ${CMAKE_SOURCE_DIR}/src

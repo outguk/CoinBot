@@ -1,4 +1,4 @@
-#include <iostream>
+ï»¿#include <iostream>
 
 #include "MarketDataEventBridge.h"
 
@@ -6,8 +6,8 @@ namespace app {
 
     bool MarketDataEventBridge::isCandleMessage(std::string_view msg) noexcept
     {
-        // °£´Ü ÇÊÅÍ: "type":"candle" ¶Ç´Â "type":"candle.1s" µî
-        // (Á¤È® ÆÄ½ÌÀº ¿£Áø¿¡¼­ 1È¸ ¼öÇà)
+        // ê°„ë‹¨ í•„í„°: "type":"candle" ë˜ëŠ” "type":"candle.1s" ë“±
+        // (ì •í™• íŒŒì‹±ì€ ì—”ì§„ì—ì„œ 1íšŒ ìˆ˜í–‰)
         const auto p = msg.find("\"type\"");
         if (p == std::string_view::npos) return false;
 
@@ -32,8 +32,8 @@ namespace app {
         if (!isCandleMessage(msg))
             return false;
 
-        // MarketData´Â »èÁ¦ÇÏ¿© ¹«Á¦ÇÑ ¸Þ¸ð¸® Áõ°¡¸¦ ¹æÁö
-        constexpr std::size_t kMaxBacklog = 5000; // ¿î¿µ È¯°æ¿¡ ¸Â°Ô Á¶Àý
+        // MarketDataëŠ” ì‚­ì œí•˜ì—¬ ë¬´ì œí•œ ë©”ëª¨ë¦¬ ì¦ê°€ë¥¼ ë°©ì§€
+        constexpr std::size_t kMaxBacklog = 5000; // ìš´ì˜ í™˜ê²½ì— ë§žê²Œ ì¡°ì ˆ
         if (private_q_.size() > kMaxBacklog)
         {
             static std::uint64_t dropped = 0;
@@ -42,7 +42,7 @@ namespace app {
                 std::cout << "[Bridge][MarketData] dropped=" << dropped
                     << " backlog=" << private_q_.size() << "\n";
             }
-            return true; // candle ¸Þ½ÃÁö´Â ¸ÂÁö¸¸ Å¥ ÀûÀç´Â »ý·«
+            return true; // candle ë©”ì‹œì§€ëŠ” ë§žì§€ë§Œ í ì ìž¬ëŠ” ìƒëžµ
         }
 
         private_q_.push(engine::input::MarketDataRaw{ std::string(msg) });

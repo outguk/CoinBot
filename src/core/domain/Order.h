@@ -1,4 +1,4 @@
-// core//domain/Order.h
+ï»¿// core//domain/Order.h
 #pragma once
 
 #include <string>
@@ -12,54 +12,55 @@ namespace core
 {
 
 	/*
-	* ÁÖ¹® ¿£Áø	
-	* ¿£ÁøÀÌ ¡°ÁÖ¹® »ı¾ÖÁÖ±â(»óÅÂ/Ã¼°á/¼ö¼ö·á/½Ã°£)¡±¸¦ ÃßÀûÇÏ´Â °ü¸® °´Ã¼(ÇöÀç ÁøÇàÇüÀ¸·Î ¾÷µ¥ÀÌÆ®)
-	* ÁÖ¹®ÀÌ	»ı¼ºµÇ°í, Ã¼°áµÇ°í, Ãë¼ÒµÇ´Â ÀüÃ¼ Èå¸§À» °ü¸®
-	* 
-	* ¿£ÁøÀº Àü·«ÀÇ OrderRequest¸¦ ¹Ş¾Æ¼­ ÁøÂ¥ ÁÖ¹® »ı¾ÖÁÖ±â¸¦ Ã¥ÀÓ
-	* 
-	* ¿£ÁøÀÌ submit(OrderRequest)¸¦ ¹ŞÀ¸¸é
-	* À¯È¿¼º °Ë»ç(ÀÜ°í/º¸À¯¼ö·®/ÃÖ¼Ò´ÜÀ§)
-	* ÇÊ¿ä ½Ã Amount¡æVolume È¯»ê(¸Å¼ö)
-	* Order¸¦ »ı¼ºÇÏ°í id/status/timestamp¸¦ Ã¤¿ò
+	* Order - ì£¼ë¬¸ ìƒíƒœ ì¶”ì  ê°ì²´
+	*
+	* [ì—­í• ]
+	* OrderEngineì´ ì£¼ë¬¸ ìƒì• ì£¼ê¸°(ìƒíƒœ/ì²´ê²°/ìˆ˜ìˆ˜ë£Œ/ì‹œê°„)ë¥¼ ì¶”ì í•˜ëŠ” ë„ë©”ì¸ ëª¨ë¸
+	* ì „ëµì˜ OrderRequestë¥¼ ë°›ì•„ ì‹¤ì œ ê±°ë˜ì†Œ ì£¼ë¬¸ìœ¼ë¡œ ë³€í™˜ëœ í›„ ìƒì„±ë¨
+	*
+	* [ìƒì• ì£¼ê¸°]
+	* 1. ì—”ì§„ì´ submit(OrderRequest)ë¥¼ ë°›ìŒ
+	* 2. ìœ íš¨ì„± ê²€ì‚¬ í›„ Order ìƒì„± (id/status/timestamp í• ë‹¹)
+	* 3. WebSocket ì´ë²¤íŠ¸ë¡œ ìƒíƒœ ì—…ë°ì´íŠ¸ (ì²´ê²°ëŸ‰/ì”ì—¬ëŸ‰/ìˆ˜ìˆ˜ë£Œ)
+	* 4. OrderStoreì—ì„œ ê´€ë¦¬ (í™œì„± ì£¼ë¬¸ ì¡°íšŒ/ì™„ë£Œ ì£¼ë¬¸ ì •ë¦¬)
 	*/
 
 	struct Order 
 	{
 
-		// --- ½Äº° ---
-		std::string			market;					// °Å·¡ »óÇ° Á¤º¸
-		std::optional<std::string> identifier;		// Å¬¶óÀÌ¾ğÆ® ÁöÁ¤ ½Äº°ÀÚ, ÇÁ·Î±×·¥¿¡¼­ ºÎ¿©. OrderRequest¿¡¼­ º¸³½ °ÍÀÇ º¹»çº»
+		// --- ì‹ë³„ ---
+		std::string			market;					// ê±°ë˜ ìƒí’ˆ ì •ë³´
+		std::optional<std::string> identifier;		// í´ë¼ì´ì–¸íŠ¸ ì§€ì • ì‹ë³„ì, í”„ë¡œê·¸ë¨ì—ì„œ ë¶€ì—¬. OrderRequestì—ì„œ ë³´ë‚¸ ê²ƒì˜ ë³µì‚¬ë³¸
 
-		// --- ±âº» ¼Ó¼º(º¯ÇÏÁö ¾Ê´Â ¼º°İ) ---
-		std::string			id;						// ³»ºÎ ÁÖ¹® ID, ¾÷ºñÆ®¿¡¼­ ºÎ¿© (UUID µî)
-		OrderPosition		position;				// ¸Å¼ö/¸Åµµ ±¸ºĞ
-		OrderType			type;					// ÁÖ¹® Å¸ÀÔ (½ÃÀå°¡/ÁöÁ¤°¡)
+		// --- ê¸°ë³¸ ì†ì„±(ë³€í•˜ì§€ ì•ŠëŠ” ì„±ê²©) ---
+		std::string			id;						// ë‚´ë¶€ ì£¼ë¬¸ ID, ì—…ë¹„íŠ¸ì—ì„œ ë¶€ì—¬ (UUID ë“±)
+		OrderPosition		position;				// ë§¤ìˆ˜/ë§¤ë„ êµ¬ë¶„
+		OrderType			type;					// ì£¼ë¬¸ íƒ€ì… (ì‹œì¥ê°€/ì§€ì •ê°€)
 
-		// --- ¿äÃ» °ª(ÀÖÀ» ¼öµµ/¾øÀ» ¼öµµ) ---
-		std::optional<Price>	price;					// ÁÖ¹® °¡°İ
-		std::optional<Volume>	volume;					// ÁÖ¹® ¼ö·®
+		// --- ìš”ì²­ ê°’(ìˆì„ ìˆ˜ë„/ì—†ì„ ìˆ˜ë„) ---
+		std::optional<Price>	price;					// ì£¼ë¬¸ ê°€ê²©
+		std::optional<Volume>	volume;					// ì£¼ë¬¸ ìˆ˜ëŸ‰
 
-		// --- ºÎºĞÃ¼°á ÃßÀû(½Ç°Å·¡ ÇÙ½É) ---
-		Volume				executed_volume{ 0.0 };     // ´©Àû Ã¼°á·®
-		Volume				remaining_volume{ 0.0 };	// ÀÜ¿©·®
-		int					trades_count{ 0 };          // Ã¼°á °Ç¼ö(ÀÖÀ¸¸é ÃßÀû/°ËÁõ¿¡ µµ¿ò)
+		// --- ë¶€ë¶„ì²´ê²° ì¶”ì (ì‹¤ê±°ë˜ í•µì‹¬) ---
+		Volume				executed_volume{ 0.0 };     // ëˆ„ì  ì²´ê²°ëŸ‰
+		Volume				remaining_volume{ 0.0 };	// ì”ì—¬ëŸ‰
+		int					trades_count{ 0 };          // ì²´ê²° ê±´ìˆ˜(ìˆìœ¼ë©´ ì¶”ì /ê²€ì¦ì— ë„ì›€)
 
-		// --- ºñ¿ë/ÀÚ±İ ¹­ÀÓ(½Ç°Å·¡ ÇÙ½É) ---
-		Amount				reserved_fee{ 0.0 };        // ¿¹¾à ¼ö¼ö·á
-		Amount				paid_fee{ 0.0 };			// ÀÌ¹Ì ÁöºÒÇÑ ¼ö¼ö·á
-		Amount				remaining_fee{ 0.0 };		// ³²Àº ¼ö¼ö·á
-		Amount				locked{ 0.0 };				// ÁÖ¹®À¸·Î ÀÎÇØ ¹­ÀÎ ±İ¾×(¿¹: KRW ¶Ç´Â ÄÚÀÎ)
+		// --- ë¹„ìš©/ìê¸ˆ ë¬¶ì„(ì‹¤ê±°ë˜ í•µì‹¬) ---
+		Amount				reserved_fee{ 0.0 };        // ì˜ˆì•½ ìˆ˜ìˆ˜ë£Œ
+		Amount				paid_fee{ 0.0 };			// ì´ë¯¸ ì§€ë¶ˆí•œ ìˆ˜ìˆ˜ë£Œ
+		Amount				remaining_fee{ 0.0 };		// ë‚¨ì€ ìˆ˜ìˆ˜ë£Œ
+		Amount				locked{ 0.0 };				// ì£¼ë¬¸ìœ¼ë¡œ ì¸í•´ ë¬¶ì¸ ê¸ˆì•¡(ì˜ˆ: KRW ë˜ëŠ” ì½”ì¸)
 
-		Amount				executed_funds{ 0.0 };		// ´©Àû Ã¼°á ±İ¾×(Price*Volume ´©Àû)
+		Amount				executed_funds{ 0.0 };		// ëˆ„ì  ì²´ê²° ê¸ˆì•¡(Price*Volume ëˆ„ì )
 
-		// --- »óÅÂ(½Ã°£¿¡ µû¶ó º¯ÇÔ) ---
-		OrderStatus				status;					// ÁÖ¹® »óÅÂ
-		std::string				created_at;				// ¿ì¼± ¹®ÀÚ¿­·Î
-		//std::int64_t			created_at{ 0 };        // ºñ±³/Á¤·Ä °¡´ÉÇÑ UTC
+		// --- ìƒíƒœ(ì‹œê°„ì— ë”°ë¼ ë³€í•¨) ---
+		OrderStatus				status;					// ì£¼ë¬¸ ìƒíƒœ
+		std::string				created_at;				// ìš°ì„  ë¬¸ìì—´ë¡œ
+		//std::int64_t			created_at{ 0 };        // ë¹„êµ/ì •ë ¬ ê°€ëŠ¥í•œ UTC
 
-		// ÆíÀÇ ÇÔ¼ö(¼±ÅÃ): ¿£Áø/Àü·«ÀÇ ÆÇ´ÜÀ» ´Ü¼øÈ­
-		// ÆíÀÇ ÇÔ¼ö
+		// í¸ì˜ í•¨ìˆ˜(ì„ íƒ): ì—”ì§„/ì „ëµì˜ íŒë‹¨ì„ ë‹¨ìˆœí™”
+		// í¸ì˜ í•¨ìˆ˜
 		bool isOpen() const noexcept
 		{
 			return status == OrderStatus::New
