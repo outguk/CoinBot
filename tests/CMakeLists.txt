@@ -89,6 +89,41 @@ target_link_libraries(test_account_manager_unified
         Boost::chrono
 )
 
+# MarketEngine unit test (manual test style, no GoogleTest)
+add_executable(test_market_engine
+    test_market_engine.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/MarketEngine.cpp
+    ${CMAKE_SOURCE_DIR}/src/engine/OrderStore.cpp
+    ${CMAKE_SOURCE_DIR}/src/trading/allocation/AccountManager.cpp
+)
+
+target_include_directories(test_market_engine
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/src
+        ${CMAKE_SOURCE_DIR}/tests
+        "C:/git-repository/boost_1_89_0"
+        "C:/git-repository/nlohmann_json"
+)
+
+target_link_libraries(test_market_engine
+    PRIVATE
+        Boost::thread
+        Boost::chrono
+)
+
+# EventRouter unit test (fast path, fallback, backpressure, multi-market, stats)
+add_executable(test_event_router
+    test_event_router.cpp
+    ${CMAKE_SOURCE_DIR}/src/app/EventRouter.cpp
+)
+
+target_include_directories(test_event_router
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/src
+        ${CMAKE_SOURCE_DIR}/tests
+        "C:/git-repository/nlohmann_json"
+)
+
 # Other test executables (currently not building, can be added later)
 # These would require proper library separation first
 

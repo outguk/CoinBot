@@ -1,4 +1,4 @@
-// engine/MarketEngine.cpp
+﻿// engine/MarketEngine.cpp
 
 #include "MarketEngine.h"
 
@@ -15,7 +15,7 @@
 namespace engine
 {
     MarketEngine::MarketEngine(std::string market,
-                               api::upbit::SharedOrderApi& api,
+                               api::upbit::IOrderApi& api,
                                OrderStore& store,
                                trading::allocation::AccountManager& account_mgr)
         : market_(std::move(market))
@@ -67,6 +67,11 @@ namespace engine
                 return EngineResult::Fail(EngineErrorCode::OrderRejected,
                     "already has pending buy order for " + market_);
 
+            // 반대 포지션 방지 (전량 거래 모델: BUY/SELL 동시 불가)
+            if (!active_sell_order_id_.empty())
+                return EngineResult::Fail(EngineErrorCode::OrderRejected,
+                    "cannot submit buy while sell order is active for " + market_);
+
             const core::Amount reserve_amount = computeReserveAmount(req);
             auto token = account_mgr_.reserve(market_, reserve_amount);
             if (!token.has_value())
@@ -82,6 +87,11 @@ namespace engine
             if (!active_sell_order_id_.empty())
                 return EngineResult::Fail(EngineErrorCode::OrderRejected,
                     "already has pending sell order for " + market_);
+
+            // 반대 포지션 방지 (전량 거래 모델: BUY/SELL 동시 불가)
+            if (active_buy_token_.has_value())
+                return EngineResult::Fail(EngineErrorCode::OrderRejected,
+                    "cannot submit sell while buy order is active for " + market_);
         }
 
         // 4) 거래소 주문 발송 (SharedOrderApi, variant 반환)
@@ -172,35 +182,10 @@ namespace engine
             return;
         }
 
-        // OrderStore 업데이트 + identifier 확인
+        // identifier 확인 (EngineFillEvent 발행용)
         std::optional<std::string> id = t.identifier;
-
-        if (ordOpt.has_value())
-        {
-            auto o = *ordOpt;
-            o.market = t.market;
-
-            // 체결 발생 시 Pending/New → Open 전환
-            if (o.status == core::OrderStatus::Pending || o.status == core::OrderStatus::New)
-                o.status = core::OrderStatus::Open;
-
-            o.executed_volume += t.volume;
-            o.trades_count += 1;
-
-            if (o.volume.has_value())
-            {
-                const double rem = std::max(0.0, o.volume.value() - o.executed_volume);
-                o.remaining_volume = rem;
-            }
-
-            o.paid_fee += t.fee;
-            o.executed_funds += t.executed_funds;
-
-            store_.update(o);
-
-            if (!id.has_value())
-                id = o.identifier;
-        }
+        if (!id.has_value() && ordOpt.has_value())
+            id = ordOpt->identifier;
 
         // 2) EngineFillEvent 발행
         if (id.has_value() && !id->empty())
@@ -215,10 +200,11 @@ namespace engine
             pushEvent_(EngineEvent{ std::move(ev) });
         }
 
-        // 3) AccountManager를 통한 잔고 업데이트
+        // 3) AccountManager를 통한 잔고 업데이트(onOrderSnapshot에서 절대값으로 처리)
         if (t.side == core::OrderPosition::BID)
         {
             // 매수 체결: 현재 활성 토큰이 이 주문과 연결되었는지 검증
+            // 리스크 1 해결: MyTrade를 먼저 처리하므로 토큰이 살아있음
             if (active_buy_token_.has_value() && active_buy_order_id_ == t.order_id)
             {
                 const core::Amount executed_krw = t.executed_funds + t.fee;
@@ -251,6 +237,16 @@ namespace engine
         if (!ordOpt.has_value()) return;
 
         auto o = *ordOpt;
+
+        // 마켓 격리 검증 (OrderStore 공유 환경에서 크로스 마켓 오염 방지)
+        if (!o.market.empty() && o.market != market_)
+        {
+            util::Logger::instance().warn(
+                "[MarketEngine][", market_, "] Ignoring order status for other market: ",
+                "order_market=", o.market, ", order_id=", order_id);
+            return;
+        }
+
         const core::OrderStatus old_status = o.status;
         o.status = s;
 

@@ -16,7 +16,10 @@
       "Bash(cmd /c \"cmake --build out/build/x64-debug 2>&1\")",
       "Bash(cmd.exe /c \"cd /d C:\\\\cpp\\\\CoinBot && cmake --build out/build/x64-debug\")",
       "WebSearch",
-      "WebFetch(domain:docs.upbit.com)"
+      "WebFetch(domain:docs.upbit.com)",
+      "Bash(powershell.exe -Command \"cmake --build C:/cpp/CoinBot/out/build/x64-debug --target test_event_router 2>&1\":*)",
+      "Bash(powershell.exe -Command:*)",
+      "Bash(cmd /c \"cmake --preset x64-debug 2>&1\")"
     ]
   }
 }

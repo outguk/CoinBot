@@ -1,4 +1,4 @@
-﻿// src/api/upbit/SharedOrderApi.h
+// src/api/upbit/SharedOrderApi.h
 #pragma once
 
 #include <memory>
@@ -9,6 +9,7 @@
 #include <variant>
 #include <vector>
 
+#include "IOrderApi.h"
 #include "core/domain/Account.h"
 #include "core/domain/Order.h"
 #include "core/domain/OrderRequest.h"
@@ -32,6 +33,7 @@ namespace api::upbit {
      * - 내부에 UpbitExchangeRestClient를 보유하고 모든 호출을 mutex로 직렬화
      * - 각 마켓 스레드는 이 객체를 shared_ptr로 공유
      * - Upbit API는 초당 요청 제한(rate limit)이 있으므로, 직렬화가 필수
+     * - IOrderApi 인터페이스 구현 (의존성 역전, 테스트 가능성)
      *
      * [확장 포인트]
      * 1. Rate Limiting: 추후 요청 간 최소 시간 간격 적용 가능 (예: 100ms)
@@ -43,7 +45,7 @@ namespace api::upbit {
      * - 모든 public 메서드는 std::lock_guard로 보호됨
      * - 내부 UpbitExchangeRestClient는 단일 스레드에서만 호출됨
      */
-    class SharedOrderApi {
+    class SharedOrderApi : public IOrderApi {
     public:
         // UpbitExchangeRestClient의 unique ownership을 받음
         explicit SharedOrderApi(std::unique_ptr<api::rest::UpbitExchangeRestClient> client);
@@ -58,27 +60,29 @@ namespace api::upbit {
 
         ~SharedOrderApi() = default;
 
+        // IOrderApi 구현
+
         // GET /v1/accounts
         // - 계좌 정보 조회 (KRW 잔고, 코인 보유량 등)
         std::variant<core::Account, api::rest::RestError>
-            getMyAccount();
+            getMyAccount() override;
 
         // GET /v1/orders/open?market=...
         // - 특정 마켓의 미체결 주문 조회
         std::variant<std::vector<core::Order>, api::rest::RestError>
-            getOpenOrders(std::string_view market);
+            getOpenOrders(std::string_view market) override;
 
         // DELETE /v1/order?uuid=... OR identifier=...
         // - 주문 취소
         std::variant<bool, api::rest::RestError>
             cancelOrder(const std::optional<std::string>& uuid,
-                        const std::optional<std::string>& identifier);
+                        const std::optional<std::string>& identifier) override;
 
         // POST /v1/orders
         // - 주문 제출 (매수/매도)
         // - 반환값: Upbit 주문 UUID (Order.id로 사용)
         std::variant<std::string, api::rest::RestError>
-            postOrder(const core::OrderRequest& req);
+            postOrder(const core::OrderRequest& req) override;
 
 
         // --- Test-only / Debug instrumentation ---

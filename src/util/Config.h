@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <chrono>
 #include <cstddef>
@@ -20,8 +20,13 @@ namespace util
 
         // 예약 여유분 (수수료 0.05% 커버 + 안전 마진)
         // 시장가 매수 시 executed_funds + fee가 예약을 초과하지 않도록 방지
-        // 1.001 = 0.1% 여유 (수수료 0.05% + 추가 0.05%)
+        // 1.001 = 0.01% 여유 (수수료 0.005% + 추가 0.005%)
         double reserve_margin = 1.001;
+
+        // 기본 거래 수수료 (Upbit 기준)
+        // trade_fee 필드 누락 시 fallback으로 사용 (리스크 3 대응)
+        // Upbit 표준 수수료: 0.05% (Maker/Taker 동일)
+        double default_trade_fee_rate = 0.0005; // 0.05%
     };
 
     // 이벤트 브릿지 설정

@@ -509,3 +509,178 @@
 - 오버코딩 금지
 - 주석으로 왜 필요한지, 기능과 동작을 간단히 설명할 것
 - 우선 테스트 코드는 작성, 수정하지 말고 요청 시 작성
+
+---
+
+## 테스트 작성 지침
+
+### 스타일 규칙
+
+**CoinBot 프로젝트는 수동 테스트 스타일을 사용합니다.**
+
+- ❌ **GoogleTest/GTest 사용 금지**
+- ✅ **수동 함수 기반 테스트 사용**
+
+### 테스트 작성 패턴
+
+```cpp
+// tests/test_example.cpp
+
+#include <iostream>
+
+// 공통 테스트 유틸리티 (NDEBUG 안전, 예외 기반)
+#include "test_utils.h"
+
+// 프로젝트 헤더
+#include "module/ClassName.h"
+
+namespace test {
+
+    // 테스트 함수 (void testXXX() 형식)
+    void testBasicFunctionality() {
+        std::cout << "\n[TEST 1] Basic functionality\n";
+
+        // Arrange
+        ClassName obj(param1, param2);
+
+        // Act
+        auto result = obj.someMethod();
+
+        // Assert (TEST_ASSERT 사용 - NDEBUG 안전, 예외 기반)
+        TEST_ASSERT(result.success);
+        TEST_ASSERT_EQ(result.value, expected_value);
+        TEST_ASSERT_DOUBLE_EQ(result.price, 100.5);  // 부동소수점
+
+        std::cout << "  result: " << result.value << "\n";
+        std::cout << "  [PASS] Basic functionality works\n";
+    }
+
+    void testEdgeCase() {
+        std::cout << "\n[TEST 2] Edge case handling\n";
+
+        // 테스트 로직...
+        TEST_ASSERT(condition);
+
+        std::cout << "  [PASS] Edge case handled\n";
+    }
+
+    // 메인 실행 함수 (개별 테스트 실패 보고)
+    struct TestCase {
+        const char* name;
+        void (*func)();
+    };
+
+    bool runAllTests() {
+        std::cout << "\n========================================\n";
+        std::cout << "  Example Module Tests\n";
+        std::cout << "========================================\n";
+
+        TestCase tests[] = {
+            {"BasicFunctionality", testBasicFunctionality},
+            {"EdgeCase", testEdgeCase},
+        };
+
+        int passed = 0;
+        int failed = 0;
+        const int total = sizeof(tests) / sizeof(tests[0]);
+
+        for (int i = 0; i < total; ++i) {
+            try {
+                tests[i].func();
+                ++passed;
+            }
+            catch (const TestFailure& e) {
+                ++failed;
+                std::cerr << "\n[TEST FAILED] " << tests[i].name << "\n";
+                std::cerr << "  Reason: " << e.condition() << "\n";
+                std::cerr << "  Location: " << e.file() << ":" << e.line() << "\n";
+            }
+            catch (const std::exception& e) {
+                ++failed;
+                std::cerr << "\n[TEST FAILED] " << tests[i].name << "\n";
+                std::cerr << "  Exception: " << e.what() << "\n";
+            }
+        }
+
+        std::cout << "\n========================================\n";
+        if (failed == 0) {
+            std::cout << "  ALL TESTS PASSED (" << passed << "/" << total << ")\n";
+            return true;
+        }
+        else {
+            std::cerr << "  TESTS FAILED: " << failed << " failed\n";
+            return false;
+        }
+    }
+
+} // namespace test
+
+int main() {
+    bool success = test::runAllTests();
+    return success ? 0 : 1;
+}
+```
+
+### 핵심 원칙
+
+1. **namespace test { } 사용**
+   - 모든 테스트 함수를 `test` 네임스페이스 안에 작성
+
+2. **함수 기반 테스트**
+   - `void testXXX()` 형식의 함수로 각 테스트 작성
+   - TEST_F, EXPECT_EQ 같은 GTest 매크로 사용 금지
+
+3. **test_utils.h 포함 + TEST_ASSERT 사용** ⭐
+   - `#include "test_utils.h"` 필수
+   - `TEST_ASSERT(condition)` - NDEBUG 영향 없음, 예외 기반
+   - `TEST_ASSERT_EQ(actual, expected)` - 값 비교 (실패 시 양쪽 출력)
+   - `TEST_ASSERT_DOUBLE_EQ(actual, expected)` - 부동소수점 비교
+   - ❌ `assert()` 사용 금지 (NDEBUG에서 제거됨, 실패 보고 불가)
+
+4. **std::cout으로 출력**
+   - `[TEST N] 테스트 이름` 형식으로 시작
+   - `[PASS]` 메시지로 성공 표시
+   - 중요한 값은 출력해서 확인
+   - 실패 시 자동으로 `[TEST FAILED]` + 위치 출력
+
+5. **runAllTests() 패턴** ⭐
+   - `TestCase` 배열로 테스트 목록 관리
+   - 각 테스트를 try/catch로 감싸 실패 보고
+   - 실패 시 테스트 이름, 조건, 파일 위치 출력
+   - 모든 테스트 실행 후 요약 (passed/failed/total)
+   - 반환값: 성공 0, 실패 1
+
+6. **CMakeLists.txt 설정**
+   ```cmake
+   add_executable(test_example
+       test_example.cpp
+       ${CMAKE_SOURCE_DIR}/src/module/Source.cpp
+   )
+
+   target_include_directories(test_example
+       PRIVATE
+           ${CMAKE_SOURCE_DIR}/src
+           ${CMAKE_SOURCE_DIR}/tests  # test_utils.h 위치
+   )
+
+   target_link_libraries(test_example
+       PRIVATE
+           # 필요한 라이브러리만
+   )
+   ```
+
+### 기존 테스트 참고
+
+- `tests/test_market_engine.cpp` - MarketEngine 테스트 (24개 테스트) ⭐ **최신 패턴**
+- `tests/test_account_manager_unified.cpp` - AccountManager 테스트 (23개 테스트)
+- `tests/test_shared_order_api_advanced.cpp` - SharedOrderApi 테스트
+- `tests/test_utils.h` - 공통 테스트 유틸리티 (TEST_ASSERT 매크로)
+
+### 일관성 유지 이유
+
+1. **단순성**: 외부 프레임워크 의존성 없음
+2. **명확성**: 테스트 로직이 명시적으로 보임
+3. **일관성**: 프로젝트 내 모든 테스트가 동일한 스타일
+4. **가독성**: 새로운 개발자도 쉽게 이해 가능
+5. **안정성**: NDEBUG 영향 없음, Release 빌드에서도 동작
+6. **실패 보고**: 어떤 테스트가 왜 실패했는지 명확히 출력
