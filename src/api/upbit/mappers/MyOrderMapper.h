@@ -8,7 +8,9 @@
 
 #include "core/domain/Order.h"
 #include "core/domain/MyTrade.h"
-#include "api/upbit/dto/UpbitWsDtos.h" // 네가 만든 DTO 경로에 맞춰 조정
+#include "api/upbit/dto/UpbitWsDtos.h"
+#include "util/Config.h"
+#include "util/Logger.h"
 
 namespace api::upbit::mappers
 {
@@ -58,7 +60,55 @@ namespace api::upbit::mappers
         std::vector<MyOrderEvent> out;
         out.reserve(2);
 
-        // (1) 항상 Order 스냅샷 이벤트 생성
+        const bool is_trade = (d.state == "trade" && d.trade_uuid.has_value());
+
+        // (1) trade일 때 MyTrade를 먼저 생성 (순서 변경: 리스크 1 해결)
+        // - MyTrade 먼저 처리 → AccountManager 정산 시 토큰 살아있음
+        // - Order snapshot 나중 처리 → 터미널 상태 시 토큰 정리 안전
+        if (is_trade)
+        {
+            core::MyTrade t;
+            t.order_id = d.uuid;
+            t.trade_id = *d.trade_uuid;
+
+            t.market = d.code;
+            t.side = toSide(d.ask_bid);
+
+            // trade 상태에서 price/volume은 "체결가/체결량" 의미로 사용
+            t.price = core::Price{ d.price };
+            t.volume = core::Volume{ d.volume };
+
+            // 1건 체결 금액(명확하게 price*volume)
+            t.executed_funds = core::Amount{ d.price * d.volume };
+
+            // trade_fee 누락 시 기본 수수료 적용
+            if (d.trade_fee.has_value())
+            {
+                t.fee = core::Amount{ *d.trade_fee };
+            }
+            else
+            {
+                // Upbit API 버그/지연으로 trade_fee 누락 시 기본 수수료율 적용
+                const double default_rate = util::AppConfig::instance().engine.default_trade_fee_rate;
+                t.fee = core::Amount{ t.executed_funds * default_rate };
+
+                util::Logger::instance().warn(
+                    "[MyOrderMapper] trade_fee missing, using default rate ", default_rate,
+                    ": order_id=", d.uuid,
+                    ", trade_id=", *d.trade_uuid,
+                    ", estimated_fee=", t.fee);
+            }
+
+            t.is_maker = d.is_maker;
+            t.identifier = d.identifier;
+
+            if (d.trade_timestamp.has_value())
+                t.trade_timestamp_ms = *d.trade_timestamp;
+
+            out.emplace_back(std::move(t));
+        }
+
+        // (2) Order 스냅샷 이벤트 생성 (항상, trade 시 뒤에)
         core::Order o;
         o.market = d.code;
         o.id = d.uuid;
@@ -66,7 +116,7 @@ namespace api::upbit::mappers
         o.type = toOrderType(d.order_type);
         o.status = toOrderStatus(d.state, d.remaining_volume);
 
-        // identifier는 있으면 붙여두면 “재시작 복원/디버깅”에 유리
+        // identifier는 있으면 붙여두면 "재시작 복원/디버깅"에 유리
         if (d.identifier.has_value()) o.identifier = *d.identifier;
 
         // created_at: core::Order가 string이므로 WS timestamp(ms)를 string으로 저장
@@ -74,7 +124,7 @@ namespace api::upbit::mappers
         else if (d.timestamp.has_value())       o.created_at = std::to_string(*d.timestamp);
         else                                    o.created_at.clear();
 
-        // price/volume: Upbit는 state=="trade"일 때 이 값이 “체결가/체결량” 의미로 바뀔 수 있음
+        // price/volume: Upbit는 state=="trade"일 때 이 값이 "체결가/체결량" 의미로 바뀔 수 있음
         // - 그래도 스냅샷 관점에선 누적(executed/remaining)이 더 중요하니,
         //   여기서는 raw를 넣되, 로직은 executed/remaining 기반으로 판단하는 정책.
         o.price = core::Price{ d.price };
@@ -92,36 +142,6 @@ namespace api::upbit::mappers
         o.executed_funds = core::Amount{ d.executed_funds };
 
         out.emplace_back(std::move(o));
-
-        // (2) trade일 때만 MyTrade 이벤트 생성
-        // trade_uuid가 있어야 “체결 1건 식별”이 가능하니 이를 기준으로 생성
-        if (d.state == "trade" && d.trade_uuid.has_value())
-        {
-            core::MyTrade t;
-            t.order_id = d.uuid;
-            t.trade_id = *d.trade_uuid;
-
-            t.market = d.code;
-            t.side = toSide(d.ask_bid);
-
-            // trade 상태에서 price/volume은 "체결가/체결량" 의미로 사용
-            t.price = core::Price{ d.price };
-            t.volume = core::Volume{ d.volume };
-
-            // 1건 체결 금액(명확하게 price*volume)
-            t.executed_funds = core::Amount{ d.price * d.volume };
-
-            if (d.trade_fee.has_value()) t.fee = core::Amount{ *d.trade_fee };
-            else                         t.fee = core::Amount{ 0.0 };
-
-            t.is_maker = d.is_maker;
-            t.identifier = d.identifier;
-
-            if (d.trade_timestamp.has_value())
-                t.trade_timestamp_ms = *d.trade_timestamp;
-
-            out.emplace_back(std::move(t));
-        }
 
         return out;
     }

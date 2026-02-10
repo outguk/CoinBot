@@ -15,20 +15,20 @@
 #include "OrderStore.h"
 #include "EngineResult.h"
 #include "EngineEvents.h"
-#include "api/upbit/SharedOrderApi.h"
+#include "api/upbit/IOrderApi.h"
 #include "trading/allocation/AccountManager.h"
 
 // 마켓별 독립 주문 엔진
 //
 // RealOrderEngine과의 핵심 차이:
-// - SharedOrderApi (thread-safe)를 통해 주문 제출
+// - IOrderApi (인터페이스)를 통해 주문 제출 (의존성 역전, 테스트 가능성)
 // - AccountManager를 통해 잔고 관리 (직접 Account 조작 대신)
 // - reserve/finalize 기반 KRW 예약 (ReservationToken)
 // - 마켓 스코프 검증 (자기 마켓 이벤트만 처리)
 // - 중복 매수 방지 (active_buy_token_ 존재 시 거부)
 //
 // IOrderEngine을 구현하지 않음:
-// - SharedOrderApi 반환 타입(variant)이 다르고 AccountManager 통합으로 인터페이스가 상이
+// - IOrderApi 반환 타입(variant)이 다르고 AccountManager 통합으로 인터페이스가 상이
 // - Step 1.5(MarketManager)에서 사용 예정
 namespace engine
 {
@@ -36,7 +36,7 @@ namespace engine
     {
     public:
         MarketEngine(std::string market,
-                     api::upbit::SharedOrderApi& api,
+                     api::upbit::IOrderApi& api,
                      OrderStore& store,
                      trading::allocation::AccountManager& account_mgr);
 
@@ -91,7 +91,7 @@ namespace engine
 
     private:
         std::string market_;
-        api::upbit::SharedOrderApi& api_;
+        api::upbit::IOrderApi& api_;
         OrderStore& store_;
         trading::allocation::AccountManager& account_mgr_;
 

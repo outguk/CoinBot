@@ -4,6 +4,7 @@
 #include <string_view>
 
 #include "api/upbit/UpbitExchangeRestClient.h"
+#include "api/upbit/IOrderApi.h"
 #include "trading/strategies/StrategyTypes.h"
 
 namespace app {
@@ -33,19 +34,27 @@ namespace app {
             // Upbit 반영 지연/레이트리밋에 더 안정적
         };
 
+        // 기존 UpbitExchangeRestClient 오버로드 (하위 호환)
         template <class StrategyT>
         static void run(api::rest::UpbitExchangeRestClient& api,
             std::string_view market,
             const Options& opt,
             StrategyT& strategy)
         {
-            // 1) 재시작 시점에 남아있는 "봇 주문" 미체결을 정리
             cancelBotOpenOrders(api, market, opt);
-
-            // 2) 계정 조회로 포지션 스냅샷 생성
             const trading::PositionSnapshot pos = buildPositionSnapshot(api, market);
+            strategy.syncOnStart(pos);
+        }
 
-            // 3) 전략 상태 복구
+        // IOrderApi 오버로드 (MarketEngineManager용)
+        template <class StrategyT>
+        static void run(api::upbit::IOrderApi& api,
+            std::string_view market,
+            const Options& opt,
+            StrategyT& strategy)
+        {
+            cancelBotOpenOrders(api, market, opt);
+            const trading::PositionSnapshot pos = buildPositionSnapshot(api, market);
             strategy.syncOnStart(pos);
         }
 
@@ -54,9 +63,14 @@ namespace app {
         static void cancelBotOpenOrders(api::rest::UpbitExchangeRestClient& api,
             std::string_view market,
             const Options& opt);
+        static void cancelBotOpenOrders(api::upbit::IOrderApi& api,
+            std::string_view market,
+            const Options& opt);
 
         // 계정(core::Account)에서 해당 market의 base currency 포지션을 찾아 PositionSnapshot을 만든다
         static trading::PositionSnapshot buildPositionSnapshot(api::rest::UpbitExchangeRestClient& api,
+            std::string_view market);
+        static trading::PositionSnapshot buildPositionSnapshot(api::upbit::IOrderApi& api,
             std::string_view market);
 
         // market 파싱 유틸:
