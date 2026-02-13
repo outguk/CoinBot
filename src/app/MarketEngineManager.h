@@ -1,4 +1,4 @@
-// app/MarketEngineManager.h
+﻿// app/MarketEngineManager.h
 //
 // 멀티마켓 중앙 코디네이터
 // - 마켓별 독립 워커 스레드를 관리 (MarketContext)
@@ -8,11 +8,11 @@
 // 생명주기: 생성자(동기화+복구) → registerWith(EventRouter) → start() → stop()
 #pragma once
 
-#include <atomic>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
-#include <thread>
+#include <thread>       // std::jthread, std::stop_token (C++20)
 #include <unordered_map>
 #include <vector>
 
@@ -35,7 +35,7 @@ public:
     using PrivateQueue = core::BlockingQueue<engine::input::EngineInput>;
 
     // 전략 파라미터 + 큐/폴링 설정
-    struct Config {
+    struct MarketManagerConfig {
         trading::strategies::RsiMeanReversionStrategy::Params strategy_params;
         std::size_t queue_capacity = 5000;      // 마켓별 큐 최대 크기 (drop-oldest)
         int sync_retry = 3;                     // 초기 계좌 동기화 재시도 횟수
@@ -53,7 +53,7 @@ public:
                         engine::OrderStore& store,
                         trading::allocation::AccountManager& account_mgr,
                         const std::vector<std::string>& markets,
-                        Config cfg = {});
+                        MarketManagerConfig cfg = {});
 
     ~MarketEngineManager();
 
@@ -65,6 +65,8 @@ public:
     void registerWith(EventRouter& router);
 
     // 마켓별 워커 스레드 시작
+    // 선행 조건: registerWith()가 먼저 호출되어야 함
+    //   → 미등록 시 이벤트가 큐에 전달되지 않아 전략이 동작하지 않음
     void start();
 
     // 모든 워커 스레드 정지 + join
@@ -79,11 +81,11 @@ private:
         std::unique_ptr<trading::strategies::RsiMeanReversionStrategy> strategy;
         PrivateQueue event_queue;
 
-        std::thread worker;
-        std::atomic<bool> stop_flag{false};
+        std::jthread worker;    // stop_token 내장 (stop_flag 불필요)
 
-        // 캔들 중복 제거용 타임스탬프
-        std::string last_candle_ts;
+        // 같은 분봉의 반복 업데이트를 최신값으로 유지하고,
+        // 다음 분봉이 들어오면 이전 분봉(최종 close)을 확정 처리한다.
+        std::optional<core::Candle> pending_candle;
 
         explicit MarketContext(std::string m, std::size_t queue_capacity)
             : market(std::move(m))
@@ -95,32 +97,33 @@ private:
     // throw_on_fail=true 시 실패하면 예외 발생
     void syncAccountWithExchange_(bool throw_on_fail);
 
-    // 생성자에서 호출: StartupRecovery로 마켓 상태 복구
+    // 생성자에서 호출: StartupRecovery로 시작 시점에 마켓 상태 복구
     void recoverMarketState_(MarketContext& ctx);
 
     // 워커 스레드 메인 루프 (EngineRunner::run() 패턴 미러링)
-    void workerLoop_(MarketContext& ctx);
+    void workerLoop_(MarketContext& ctx, std::stop_token stoken);
 
-    // 이벤트 핸들러 (EngineRunner 패턴 미러링)
+	// 이벤트 핸들러 (타입별로 분기)
     void handleOne_(MarketContext& ctx, const engine::input::EngineInput& in);
     void handleMyOrder_(MarketContext& ctx, const engine::input::MyOrderRaw& raw);
     void handleMarketData_(MarketContext& ctx, const engine::input::MarketDataRaw& raw);
+        // 엔진 출력을 전략으로 전달
     void handleEngineEvents_(MarketContext& ctx, const std::vector<engine::EngineEvent>& evs);
 
     // AccountManager에서 마켓별 예산 조회 → 전략용 AccountSnapshot 변환
     trading::AccountSnapshot buildAccountSnapshot_(std::string_view market) const;
 
     // 공유 자원 참조
-    api::upbit::IOrderApi& api_;
-    engine::OrderStore& store_;
-    trading::allocation::AccountManager& account_mgr_;
+	api::upbit::IOrderApi& api_;    // 외부 거래소 API
+	engine::OrderStore& store_;     // 마켓들이 공유하는 주문 저장소
+	trading::allocation::AccountManager& account_mgr_; // 공유 계좌 관리자
 
-    Config cfg_;
+    MarketManagerConfig cfg_;
 
     // 마켓별 컨텍스트 (생성자 이후 불변, 읽기 전용)
     std::unordered_map<std::string, std::unique_ptr<MarketContext>> contexts_;
 
-    // 전체 시작 여부
+    // 전체 시작 여부 (재진입 방지 플래그)
     bool started_{false};
 };
 

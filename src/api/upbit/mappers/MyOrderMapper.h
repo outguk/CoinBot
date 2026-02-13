@@ -37,13 +37,16 @@ namespace api::upbit::mappers
         double remaining_volume) noexcept
     {
         // Upbit state: wait/watch/trade/done/cancel/prevented
+        (void)remaining_volume;
+
         if (state == "wait")  return core::OrderStatus::Open;
         if (state == "watch") return core::OrderStatus::Pending;
 
         if (state == "trade")
         {
-            // trade 이벤트가 왔더라도 남은 물량이 있으면 "부분 체결"
-            return (remaining_volume <= 0.0) ? core::OrderStatus::Filled : core::OrderStatus::Open;
+            // trade는 체결 이벤트(비터미널)로 처리한다.
+            // 터미널 상태는 done/cancel/prevented에서만 확정한다.
+            return core::OrderStatus::Open;
         }
 
         if (state == "done")   return core::OrderStatus::Filled;

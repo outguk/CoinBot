@@ -30,9 +30,9 @@ namespace trading::strategies {
         // 전략 파라미터(“숫자 튜닝”은 이 구조체에서만)
         struct Params final {
             // RSI
-            std::size_t rsiLength{ 3 };
-            double oversold{ 80 };
-            double overbought{ 70 };
+            std::size_t rsiLength{ 5 };
+            double oversold{ 50 };
+            double overbought{ 60 };
             
             // SMA 추가
             int smaLength{ 20 };
@@ -40,17 +40,17 @@ namespace trading::strategies {
 
             // 추세 강도(trendStrength) 계산용: close[N]
             // trendStrength = abs(close - closeN) / closeN
-            std::size_t trendLookWindow{ 3 };
+            std::size_t trendLookWindow{ 5 };
             double maxTrendStrength{ 1 }; // 3% 이상 한 방향으로 벌어졌으면 “추세 강함 → 평균회귀 부적합” 같은 필터
 
             // 변동성(최근 수익률 표준편차)
-            std::size_t volatilityWindow{ 3 };
+            std::size_t volatilityWindow{ 5 };
             double minVolatility{ 0 };    // 1% 이상이면 거래하기 적당
 
             // 포지션/리스크
-            double riskPercent{ 10.0 };       // 매수에 사용할 KRW 비율(계좌의 krw_available 기준)
-            double stopLossPct{ 1.0 };        // 진입가 대비 손절 %
-            double profitTargetPct{ 1 };    // 진입가 대비 익절 %
+            double riskPercent{ 90 };       // 매수에 사용할 KRW 비율(계좌의 krw_available 기준)
+            double stopLossPct{ 2.0 };        // 진입가 대비 손절 %
+            double profitTargetPct{ 2 };    // 진입가 대비 익절 %
         };
 
         enum class State : std::uint8_t {

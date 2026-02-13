@@ -282,9 +282,10 @@ namespace trading::strategies {
         if (krw_to_use <= 0.0)
             return Decision::noAction();
 
-        // 주문 생성
-        const std::string cid = makeIdentifier("entry");
-        core::OrderRequest req = makeMarketBuyByAmount(krw_to_use, "entry"); // 우선 시장가로
+        // 진입 사유를 태그로 남겨 주문/로그에서 추적 가능하게 한다.
+        const char* reason_tag = "entry_rsi_oversold";
+        const std::string cid = makeIdentifier(reason_tag);
+        core::OrderRequest req = makeMarketBuyByAmount(krw_to_use, reason_tag); // 우선 시장가로
         req.identifier = cid;
 
         // 이 주문에 대한 부분 체결 누적을 새로 시작
@@ -310,6 +311,8 @@ namespace trading::strategies {
         // ------------------------ 청산 조건 ------------------------
         // 1. 과매수 신호
         const bool rsiExit = (s.rsi.ready && (s.rsi.v >= params_.overbought));
+        bool hitStop = false;
+        bool hitTarget = false;
 
         // RSI 기반 청산은 허용해서 InPosition 고착을 방지
         if (!entry_price_.has_value() || !stop_price_.has_value() || !target_price_.has_value())
@@ -322,21 +325,35 @@ namespace trading::strategies {
             const double close = s.close;
 
             // 2. 손절
-            const bool hitStop = (close <= *stop_price_);
+            hitStop = (close <= *stop_price_);
 
             // 3. 익절
-            const bool hitTarget = (close >= *target_price_);
+            hitTarget = (close >= *target_price_);
 
             if (!(hitStop || hitTarget || rsiExit))
                 return Decision::noAction();
         }
 
-        const std::string cid = makeIdentifier("exit");
+        std::string reason_tag;
+        if (hitStop) {
+            reason_tag = "exit_stop";
+        }
+        if (hitTarget) {
+            reason_tag = reason_tag.empty() ? "exit_target" : reason_tag + "_target";
+        }
+        if (rsiExit) {
+            reason_tag = reason_tag.empty() ? "exit_rsi_overbought" : reason_tag + "_rsi_overbought";
+        }
+        if (reason_tag.empty()) {
+            reason_tag = "exit_unknown";
+        }
+
+        const std::string cid = makeIdentifier(reason_tag);
         const double sellVol = std::max(0.0, account.coin_available - util::AppConfig::instance().strategy.volume_safety_eps);
         if (sellVol * s.close < util::AppConfig::instance().strategy.min_notional_krw)
             return Decision::noAction();
 
-        core::OrderRequest req = makeMarketSellByVolume(sellVol, "exit");
+        core::OrderRequest req = makeMarketSellByVolume(sellVol, reason_tag);
         req.identifier = cid;
 
         // 이 주문에 대한 부분 체결 누적을 새로 시작
@@ -388,8 +405,11 @@ namespace trading::strategies {
         // 1) 실패/취소: pending 해제 + 롤백
         if (ev.status == core::OrderStatus::Rejected || ev.status == core::OrderStatus::Canceled) 
         {
-
-            if (pending_filled_volume_ <= 0.0)
+            // WS trade 이벤트 누락 시에도, 터미널 스냅샷의 executed_volume으로
+            // "부분 체결 후 취소"를 감지해 Flat 롤백을 피한다.
+            const bool hasExecutedEvidence =
+                (pending_filled_volume_ > 0.0) || (ev.executed_volume > 0.0);
+            if (!hasExecutedEvidence)
             {
                 if (state_ == State::PendingEntry)
                 {
@@ -409,11 +429,21 @@ namespace trading::strategies {
             else
             {
                 // cancel after trade: "실질적으로 체결 발생" -> 확정 처리
-                const double vwap = pending_cost_sum_ / pending_filled_volume_; // 지금까지 매수된 금액
+                // Fill 누적이 있으면 VWAP, 없으면 마지막 체결가(있을 때)를 사용
+                const double vwap = (pending_filled_volume_ > 0.0)
+                    ? (pending_cost_sum_ / pending_filled_volume_)
+                    : pending_last_price_;
                 if (state_ == State::PendingEntry) {
-                    entry_price_ = vwap;
-                    setStopsFromEntry(*entry_price_);
-                    logEntryConfirmed_("cancel_after_trade", *entry_price_);
+                    if (vwap > 0.0) {
+                        entry_price_ = vwap;
+                        setStopsFromEntry(*entry_price_);
+                        logEntryConfirmed_("cancel_after_trade", *entry_price_);
+                    }
+                    else {
+                        util::Logger::instance().warn(
+                            "[Strategy][EntryConfirmed] reason=cancel_after_trade market=", market_,
+                            " entry_price_unavailable");
+                    }
                     state_ = State::InPosition;
                 }
                 else if (state_ == State::PendingExit) {
@@ -438,17 +468,17 @@ namespace trading::strategies {
                 ? (pending_cost_sum_ / pending_filled_volume_)
                 : pending_last_price_;
 
-            if (state_ == State::PendingEntry) 
-            {
-                // 진입 확정
-                if (final_price > 0.0) 
+                if (state_ == State::PendingEntry) 
                 {
-                    entry_price_ = final_price;
-                    setStopsFromEntry(*entry_price_);
-                    logEntryConfirmed_("cancel_after_trade", *entry_price_);
+                    // 진입 확정
+                    if (final_price > 0.0) 
+                    {
+                        entry_price_ = final_price;
+                        setStopsFromEntry(*entry_price_);
+                        logEntryConfirmed_("filled", *entry_price_);
+                    }
+                    state_ = State::InPosition;
                 }
-                state_ = State::InPosition;
-            }
             else if (state_ == State::PendingExit) 
             {
                 // 청산 확정

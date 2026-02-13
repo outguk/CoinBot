@@ -1,4 +1,11 @@
-﻿#pragma once
+// api/ws/UpbitWebSocketClient.h
+//
+// 업비트 WebSocket 클라이언트
+// - TLS 연결, 캔들/myOrder 구독, raw JSON 수신
+// - 전략/도메인 파싱은 담당하지 않음
+//
+// 생명주기: setMessageHandler → connectPublic/Private → subscribeXxx → start() → stop()
+#pragma once
 
 #include <boost/asio.hpp>
 #include <boost/asio/ssl.hpp>
@@ -6,15 +13,13 @@
 #include <boost/beast/ssl.hpp>
 #include <boost/beast/websocket.hpp>
 
-#include <atomic>
-#include <condition_variable>
 #include <deque>
 #include <functional>
 #include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
-#include <thread>
+#include <thread>       // std::jthread, std::stop_token (C++20)
 #include <unordered_map>
 #include <variant>
 #include <vector>
@@ -23,187 +28,160 @@
 
 namespace api::ws
 {
-	using tcp = boost::asio::ip::tcp;
-	namespace beast = boost::beast;
-	namespace websocket = beast::websocket;
-	namespace http = beast::http;
+    using tcp = boost::asio::ip::tcp;
+    namespace beast     = boost::beast;
+    namespace websocket = beast::websocket;
+    namespace http      = beast::http;
 
-	// 이 클래스의 역할
-	// - 업비트 WebSocket 서버에 TLS로 연결
-	// - 캔들 데이터 구독 메시지를 전송
-	// - 서버에서 오는 raw JSON 문자열을 수신
-	// (전략/도메인 파싱은 여기서 하지 않음
-	// 추후 비동기 방식으로 여러 마켓을 관리하도록 변경
-	class UpbitWebSocketClient final
-	{
-	public:
-		// WebSocket stream type alias
-		using WsStream = websocket::stream<beast::ssl_stream<beast::tcp_stream>>;
-		/* 
-		* Handler는 “UpbitWebSocketClient가 자기 책임을 끝낸 뒤, 다음 책임자에게 데이터를 넘겨주는 출구”다.
-		*/
-		// WS에서 받은 원본 JSON 문자열 그대로 전달 
-		// string_view를 받아서, 함수를 담는 타입의 별명을 MessageHandler로 설정
-		using MessageHandler = std::function<void(std::string_view)>; // raw json text
+    class UpbitWebSocketClient final
+    {
+    public:
+        using WsStream       = websocket::stream<beast::ssl_stream<beast::tcp_stream>>;
+        using MessageHandler = std::function<void(std::string_view)>; // raw JSON
 
-		// io_context: 네트워크 이벤트 루프
-		// ssl_ctx   : TLS 인증/암호화 설정
-		UpbitWebSocketClient(boost::asio::io_context& ioc,
-			boost::asio::ssl::context& ssl_ctx);
+        UpbitWebSocketClient(boost::asio::io_context& ioc,
+                             boost::asio::ssl::context& ssl_ctx);
+        ~UpbitWebSocketClient();
 
-		
-		// 1) WebSocket 연결
-		// - DNS resolve
-		// - TCP 연결
-		// - TLS Handshake
-		// - WebSocket Handshake
-		void connectPublic(const std::string& host,
-			const std::string& port,
-			const std::string& target);
+        // 복사/이동 금지 (io_context 참조 보유)
+        UpbitWebSocketClient(const UpbitWebSocketClient&) = delete;
+        UpbitWebSocketClient& operator=(const UpbitWebSocketClient&) = delete;
 
-		// 1-2) WebSocket 연결 (PRIVATE)
-		// - myOrder / myAsset 처럼 인증이 필요한 채널은 /private 엔드포인트 사용
-		// - JWT 토큰을 Authorization: Bearer <token> 으로 WS 핸드셰이크 요청에 포함
-		void connectPrivate(const std::string& host,
-			const std::string& port,
-			const std::string& target,
-			const std::string& bearer_jwt);
+        // ---- 연결 예약 (커맨드 큐 경유, start() 전후 어느 시점에든 호출 가능) ----
 
+        // PUBLIC 채널 (캔들 등 인증 불필요)
+        void connectPublic(const std::string& host,
+                           const std::string& port,
+                           const std::string& target);
 
-		// 2) 캔들 구독 요청 전송
-		// - markets: ["KRW-BTC", "KRW-ETH"]
-		// - unit   : "candle.1s", "candle.1m" ...
-		// - format : DEFAULT / SIMPLE_LIST
-		void subscribeCandles(const std::string& type,
-			const std::vector<std::string>& markets,
-			bool is_only_snapshot = false,
-			bool is_only_realtime = false,
-			const std::string& format = "DEFAULT");
+        // PRIVATE 채널 (myOrder 등 JWT 인증 필요)
+        void connectPrivate(const std::string& host,
+                            const std::string& port,
+                            const std::string& target,
+                            const std::string& bearer_jwt);
 
-		// 2-2) 내 주문 및 체결(myOrder) 구독 요청
-		// - markets(codes): ["KRW-BTC", "KRW-ETH"]
-		// - format: DEFAULT / SIMPLE
-		// - is_only_realtime: true 권장(실시간 스트림만)
-		void subscribeMyOrder(const std::vector<std::string>& markets,
-			bool is_only_realtime = true,
-			const std::string& format = "DEFAULT");
+        // ---- 구독 요청 예약 ----
 
-		// 3) 메시지 수신 루프
-		// - 서버가 보내는 데이터를 계속 읽는다
-		// - 연결 유지 확인용
-		void runReadLoop();
+        // 캔들 구독: type = "candle.1s", "candle.1m" 등
+        void subscribeCandles(const std::string& type,
+                              const std::vector<std::string>& markets,
+                              bool is_only_snapshot = false,
+                              bool is_only_realtime = false,
+                              const std::string& format = "DEFAULT");
 
-		// 정상적인 종료(커맨드 큐)
-		void close();
+        // 내 주문 체결 구독
+        void subscribeMyOrder(const std::vector<std::string>& markets,
+                              bool is_only_realtime = true,
+                              const std::string& format = "DEFAULT");
 
-		// 수신 콜백(선택) - 외부에서 메시지 처리 로직을 주입
-		// MessageHandler는 함수를 담을 수 있기에 람다 함수를 넣으면 on_msg에 함수가 담긴다
-		void setMessageHandler(MessageHandler cb);
+        // ---- 수신 콜백 ----
 
-	private:
-		// ---- Command queue ----
-		struct CmdConnect {
-			std::string host, port, target;
-			std::optional<std::string> bearer_jwt; // nullopt이면 public
-		};
-		struct CmdSubCandles {
-			std::string type;
-			std::vector<std::string> markets;
-			bool is_only_snapshot{};
-			bool is_only_realtime{};
-			std::string format;
-		};
-		struct CmdSubMyOrder {
-			std::vector<std::string> markets;
-			bool is_only_realtime{};
-			std::string format;
-		};
-		struct CmdClose {};
+        // start() 전에 설정 권장
+        void setMessageHandler(MessageHandler cb);
 
-		using Command = std::variant<CmdConnect, CmdSubCandles, CmdSubMyOrder, CmdClose>;
+        // ---- 생명주기 ----
 
-		void pushCommand(Command c);
+        // 내부 jthread 시작 (수신 루프 가동)
+        void start();
 
-		// ws_ 생성/정리
-		void resetStream();
+        // 수신 루프 종료 + join (소멸자에서도 자동 호출)
+        void stop();
 
-		// thread-safe send
-		bool sendTextFrame(const std::string& text);
-		// reconnect + resubscribe
-		bool reconnectOnce();
-		void resubscribeAll();
+    private:
+        // ---- 커맨드 큐 타입 ----
+        struct CmdConnect {
+            std::string host, port, target;
+            std::optional<std::string> bearer_jwt; // nullopt → public
+        };
+        struct CmdSubCandles {
+            std::string type;
+            std::vector<std::string> markets;
+            bool is_only_snapshot{};
+            bool is_only_realtime{};
+            std::string format;
+        };
+        struct CmdSubMyOrder {
+            std::vector<std::string> markets;
+            bool is_only_realtime{};
+            std::string format;
+        };
 
-		// 다음 재연결 sleep 시간을 계산(지수 backoff + jitter)
-		std::chrono::milliseconds computeReconnectDelay_();
+        using Command = std::variant<CmdConnect, CmdSubCandles, CmdSubMyOrder>;
 
-		// 내부 공통 연결 루틴: resolve->tcp->tls->ws handshake
-		// - private 모드면 handshake 요청에 Authorization 헤더를 삽입한다.
-		void connectImpl(const std::string& host,
-			const std::string& port,
-			const std::string& target,
-			std::optional<std::string> bearer_jwt);
+        void pushCommand(Command c);
 
-		// 업비트 구독 요청에 들어갈 ticket(구독 요청 묶음의 식별자(ID)) 값 생성
-		// (요청 식별용, 완전한 UUID일 필요는 없음)
-		static std::string makeTicket();
+        // ws_ 생성/정리
+        void resetStream();
 
-		// 업비트 WebSocket "캔들 구독" JSON 프레임 생성
-		static std::string buildCandleSubJsonFrame(
-			const std::string& ticket,
-			const std::string& type,
-			const std::vector<std::string>& markets,
-			bool is_only_snapshot,
-			bool is_only_realtime,
-			const std::string& format
-		);
+        // thread-safe send
+        bool sendTextFrame(const std::string& text);
 
-		static std::string buildMyOrderSubJsonFrame(
-			const std::string& ticket,
-			const std::vector<std::string>& markets,
-			bool is_only_realtime,
-			const std::string& format
-		);
+        // 재연결 + 재구독
+        bool reconnectOnce_(std::stop_token stoken);
+        void resubscribeAll();
 
-	private:
+        // 다음 재연결 sleep 시간 계산 (지수 backoff + jitter)
+        std::chrono::milliseconds computeReconnectDelay_();
 
-		boost::asio::io_context& ioc_;			// 네트워크 이벤트 루프
-		boost::asio::ssl::context& ssl_ctx_;	// TLS 설정 컨텍스트
+        // 내부 공통 연결 루틴: resolve → tcp → tls → ws handshake
+        void connectImpl(const std::string& host,
+                         const std::string& port,
+                         const std::string& target,
+                         std::optional<std::string> bearer_jwt);
 
-		tcp::resolver resolver_;				// DNS → IP 변환
+        // 수신 루프 (jthread에서 실행, stop_token으로 종료 감지)
+        void runReadLoop_(std::stop_token stoken);
 
-		// WebSocket(TLS 위에서 동작)
-		// 재연결을 위해 "stream을 새로 생성"할 수 있어야 해서 포인터로 보관
-		std::unique_ptr<WsStream> ws_;
+        // 구독 요청 JSON 프레임 생성
+        static std::string makeTicket();
+        static std::string buildCandleSubJsonFrame(
+            const std::string& ticket,
+            const std::string& type,
+            const std::vector<std::string>& markets,
+            bool is_only_snapshot,
+            bool is_only_realtime,
+            const std::string& format);
+        static std::string buildMyOrderSubJsonFrame(
+            const std::string& ticket,
+            const std::vector<std::string>& markets,
+            bool is_only_realtime,
+            const std::string& format);
 
-		// stop 플래그 (close 커맨드로만 제어)
-		std::atomic<bool> stop_{ false };
+    private:
+        boost::asio::io_context&  ioc_;
+        boost::asio::ssl::context& ssl_ctx_;
 
-		// ping 주기 / 재연결 backoff
-		std::chrono::seconds ping_interval_{ 25 };
-		std::chrono::milliseconds reconnect_min_backoff_{ 800 };
-		std::chrono::milliseconds reconnect_max_backoff_{ 30'000 };
-		double reconnect_jitter_ratio_{ 0.20 };                       // ±20% 흔들림
+        tcp::resolver resolver_;
 
-		std::uint32_t reconnect_failures_{ 0 };                       // 연속 실패 횟수 (성공 시 0으로 reset)
+        // WebSocket stream (재연결 시 새로 생성하므로 포인터 보관)
+        std::unique_ptr<WsStream> ws_;
 
-		// 연결 정보 저장 (재연결 대비)
-		std::string host_;
-		std::string port_;
-		std::string target_;
+        // 내부 수신 스레드 (stop_token 내장)
+        std::jthread thread_;
 
-		// PRIVATE 채널 접속 시 사용(없으면 PUBLIC 접속)
-		std::optional<std::string> bearer_jwt_;
+        // ping 주기 / 재연결 backoff
+        std::chrono::seconds      ping_interval_{ 25 };
+        std::chrono::milliseconds reconnect_min_backoff_{ 800 };
+        std::chrono::milliseconds reconnect_max_backoff_{ 30'000 };
+        double                    reconnect_jitter_ratio_{ 0.20 };
 
-		// 재연결 후 재구독을 위해 마지막 subscribe frame 저장
-		// key 예: "candle.1m", "myOrder"
-		std::unordered_map<std::string, std::string> last_sub_frames_;
+        std::uint32_t reconnect_failures_{ 0 };
 
-		// 커맨드 큐
-		std::mutex cmd_mu_;
-		std::condition_variable cmd_cv_; // 현재는 사용하지 않는데 비동기로 넘어가며 사용할 것
-		std::deque<Command> cmd_q_;
+        // 연결 정보 저장 (재연결 대비)
+        std::string host_;
+        std::string port_;
+        std::string target_;
+        std::optional<std::string> bearer_jwt_;
 
-		// 수신 콜백(다시 넘겨주기)
-		MessageHandler on_msg_;
-	};
-}
+        // 재연결 후 재구독을 위해 마지막 subscribe frame 보관
+        std::unordered_map<std::string, std::string> last_sub_frames_;
+
+        // 커맨드 큐
+        std::mutex cmd_mu_;
+        std::deque<Command> cmd_q_;
+
+        // 수신 콜백
+        MessageHandler on_msg_;
+    };
+
+} // namespace api::ws

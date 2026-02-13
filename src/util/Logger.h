@@ -1,14 +1,18 @@
-#pragma once
+﻿#pragma once
 
 #include <chrono>
 #include <ctime>
 #include <fstream>
+#include <filesystem>
 #include <iomanip>
 #include <iostream>
 #include <mutex>
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <thread>
+#include <atomic>
+#include <unordered_map>
 
 namespace util
 {
@@ -63,6 +67,23 @@ namespace util
             }
         }
 
+        // 스레드 태그(마켓) 기준 파일 분리 출력 활성화
+        // 예: market_logs/KRW-BTC.log
+        void enableMarketFileOutput(const std::string& directory)
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            market_file_output_enabled_ = true;
+            market_log_dir_ = directory;
+
+            std::error_code ec;
+            std::filesystem::create_directories(market_log_dir_, ec);
+            if (ec)
+            {
+                std::cerr << "[Logger] Failed to create market log directory: "
+                          << market_log_dir_ << " (" << ec.message() << ")\n";
+            }
+        }
+
         // 콘솔 출력 비활성화
         void disableConsoleOutput()
         {
@@ -93,6 +114,18 @@ namespace util
         void error(Args&&... args)
         {
             log(LogLevel::LV_ERROR, std::forward<Args>(args)...);
+        }
+
+
+        // 현재 스레드 로그 태그 설정/해제 (예: "KRW-BTC")
+        static void setThreadTag(std::string tag)
+        {
+            thread_tag_ = std::move(tag);
+        }
+
+        static void clearThreadTag()
+        {
+            thread_tag_.clear();
         }
 
     private:
@@ -140,12 +173,15 @@ namespace util
             if (level < min_level_)
                 return;
 
+            const std::uint64_t seq = seq_.fetch_add(1, std::memory_order_relaxed) + 1;
+
             std::lock_guard<std::mutex> lock(mutex_);
 
             // 메시지 조합
             std::ostringstream oss;
             oss << "[" << getTimestamp() << "] "
-                << "[" << levelToString(level) << "] ";
+                << "[" << levelToString(level) << "] "
+                << "[#" << seq << "] ";
             (oss << ... << args);
             oss << "\n";
 
@@ -162,13 +198,38 @@ namespace util
             {
                 file_stream_ << message << std::flush;
             }
+
+            // 마켓별 파일 출력: 워커에서 setThreadTag("KRW-BTC") 설정 시 사용
+            if (market_file_output_enabled_ && !thread_tag_.empty())
+            {
+                std::ofstream& stream = market_streams_[thread_tag_];
+                if (!stream.is_open())
+                {
+                    const std::filesystem::path p =
+                        std::filesystem::path(market_log_dir_) / (thread_tag_ + ".log");
+                    stream.open(p.string(), std::ios::app);
+                    if (!stream.is_open())
+                    {
+                        std::cerr << "[Logger] Failed to open market log file: "
+                                  << p.string() << "\n";
+                    }
+                }
+
+                if (stream.is_open())
+                    stream << message << std::flush;
+            }
         }
 
     private:
         std::mutex mutex_;
+        std::atomic<std::uint64_t> seq_{ 0 };
         LogLevel min_level_{ LogLevel::INFO };
         bool console_enabled_{ true };
         std::ofstream file_stream_;
+        bool market_file_output_enabled_{ false };
+        std::string market_log_dir_{ "market_logs" };
+        std::unordered_map<std::string, std::ofstream> market_streams_;
+        inline static thread_local std::string thread_tag_{};
     };
 
     // 전역 로거 접근 헬퍼

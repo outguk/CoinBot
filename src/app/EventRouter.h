@@ -33,7 +33,9 @@ public:
     // 성공 시 true, 파싱 실패/미등록 마켓 시 false
     [[nodiscard]] bool routeMarketData(std::string_view json);
 
-    // myOrder 라우팅 - 유실 불가 (항상 push)
+    // myOrder 라우팅 - 항상 push (파싱 실패/미등록 마켓 시 drop)
+    // 주의: marketData와 동일한 bounded queue (max_size=5000, drop-oldest) 공유
+    //       burst 시 오래된 myOrder가 밀려날 수 있음 → 실운영에서 큐 분리 검토
     // 성공 시 true, 파싱 실패/미등록 마켓 시 false
     [[nodiscard]] bool routeMyOrder(std::string_view json);
 

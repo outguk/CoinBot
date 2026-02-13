@@ -1,4 +1,4 @@
-// engine/MarketEngine.h
+﻿// engine/MarketEngine.h
 #pragma once
 
 #include <string>
@@ -41,7 +41,7 @@ namespace engine
                      trading::allocation::AccountManager& account_mgr);
 
         // 엔진을 현재 스레드로 바인딩 (엔진 루프 시작 시 1회 호출)
-        void bindToCurrentThread();
+        void bindToCurrentThread() noexcept;
 
         // 주문 제출 (BUY: 내부에서 reserve -> postOrder)
         EngineResult submit(const core::OrderRequest& req);
