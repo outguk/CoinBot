@@ -32,7 +32,7 @@ namespace api::rest
 		std::string body;
 
 		// 네트워크 timeout (connect/write/read에 적용)
-		std::chrono::microseconds timeout{ 5000 };
+		std::chrono::milliseconds timeout{ 5000 };  // 5초 (microseconds 오기 수정)
 	};
 
 	// "응답 오는 공통 정보"를 담는 구조체

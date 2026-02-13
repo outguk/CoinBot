@@ -1,4 +1,4 @@
-// app/MarketEngineManager.cpp
+﻿// app/MarketEngineManager.cpp
 
 #include "app/MarketEngineManager.h"
 #include "app/EventRouter.h"
@@ -59,13 +59,34 @@ MarketEngineManager::MarketEngineManager(
     engine::OrderStore& store,
     trading::allocation::AccountManager& account_mgr,
     const std::vector<std::string>& markets,
-    Config cfg)
+    MarketManagerConfig cfg)
     : api_(api)
     , store_(store)
     , account_mgr_(account_mgr)
     , cfg_(std::move(cfg))
 {
     auto& logger = util::Logger::instance();
+    const auto logBudgets = [this, &logger](std::string_view stage)
+    {
+        for (const auto& [market, ctx] : contexts_)
+        {
+            (void)ctx;
+            const auto b = account_mgr_.getBudget(market);
+            if (!b.has_value())
+            {
+                logger.warn("[MarketEngineManager][Budget][", stage,
+                    "] market=", market, " missing");
+                continue;
+            }
+
+            // 분배 잘 되었는지 확인 로그
+            logger.info("[MarketEngineManager][Budget][", stage, "] market=", market,
+                " krw_available=", b->available_krw,
+                " krw_reserved=", b->reserved_krw,
+                " coin_balance=", b->coin_balance,
+                " avg_entry=", b->avg_entry_price);
+        }
+    };
 
     // 1) 계좌 동기화 (1차: 실패 시 예외)
     logger.info("[MarketEngineManager] Syncing account with exchange...");
@@ -74,6 +95,13 @@ MarketEngineManager::MarketEngineManager(
     // 2) 마켓별 컨텍스트 생성 + 전략 복구
     for (const auto& market : markets)
     {
+        // 중복 마켓 입력 방어: 덮어쓰면 이전 큐 포인터가 댕글링될 수 있음
+        if (contexts_.count(market) > 0)
+        {
+            logger.warn("[MarketEngineManager] Duplicate market skipped: ", market);
+            continue;
+        }
+
         auto ctx = std::make_unique<MarketContext>(market, cfg_.queue_capacity);
 
         // MarketEngine 생성
@@ -91,11 +119,20 @@ MarketEngineManager::MarketEngineManager(
         contexts_[market] = std::move(ctx);
     }
 
+    // 생성 직후(1차 동기화 + 복구 반영) 분배 상태 확인 로그
+    logBudgets("after_recovery");
+
     // 3) 미체결 취소 후 최종 계좌 동기화 (2차: 실패 시 경고만)
     logger.info("[MarketEngineManager] Final account sync after recovery...");
     syncAccountWithExchange_(/*throw_on_fail=*/false);
 
-    logger.info("[MarketEngineManager] Initialized with ", markets.size(), " markets");
+    // 2차 동기화 후 최종 분배 상태 확인 로그
+    logBudgets("after_final_sync");
+
+    logger.info("[MarketEngineManager] Initialized with ", contexts_.size(), " markets",
+        (contexts_.size() < markets.size()
+            ? " (" + std::to_string(markets.size() - contexts_.size()) + " duplicates skipped)"
+            : ""));
 }
 
 // ========== 소멸자 ==========
@@ -117,18 +154,21 @@ void MarketEngineManager::registerWith(EventRouter& router)
 void MarketEngineManager::start()
 {
     if (started_) return;
-    started_ = true;
 
     auto& logger = util::Logger::instance();
 
+    // 마켓별로 스레드 생성
     for (auto& [market, ctx] : contexts_)
     {
-        ctx->worker = std::thread([this, &ctx_ref = *ctx]() {
-            workerLoop_(ctx_ref);
+        // jthread 생성 시 stop_token이 자동으로 전달됨
+        ctx->worker = std::jthread([this, &ctx_ref = *ctx](std::stop_token stoken) {
+            workerLoop_(ctx_ref, stoken);
         });
 
         logger.info("[MarketEngineManager] Worker started for market=", market);
     }
+
+    started_ = true;
 }
 
 // ========== stop ==========
@@ -139,9 +179,9 @@ void MarketEngineManager::stop()
     auto& logger = util::Logger::instance();
     logger.info("[MarketEngineManager] Stopping all workers...");
 
-    // 모든 stop_flag 설정
+    // 모든 워커에 stop 요청 (request_stop → stop_token을 통해 전달)
     for (auto& [market, ctx] : contexts_)
-        ctx->stop_flag.store(true, std::memory_order_relaxed);
+        ctx->worker.request_stop();
 
     // 모든 워커 스레드 join
     for (auto& [market, ctx] : contexts_)
@@ -217,22 +257,35 @@ void MarketEngineManager::recoverMarketState_(MarketContext& ctx)
 }
 
 // ========== workerLoop_ ==========
-void MarketEngineManager::workerLoop_(MarketContext& ctx)
+void MarketEngineManager::workerLoop_(MarketContext& ctx, std::stop_token stoken)
 {
     using namespace std::chrono_literals;
     auto& logger = util::Logger::instance();
 
+    // 워커 스레드에서 발생한 로그를 마켓 파일로 분리하기 위한 태그 설정
+    util::Logger::setThreadTag(ctx.market);
+    struct ThreadTagGuard final
+    {
+        ~ThreadTagGuard() { util::Logger::clearThreadTag(); }
+    } tag_guard;
+
     // 엔진을 현재 워커 스레드에 바인딩
-    ctx.engine->bindToCurrentThread();
+    try { ctx.engine->bindToCurrentThread(); }
+    catch (const std::exception& e)
+    {
+        logger.error("[MarketEngineManager][", ctx.market,
+            "] bindToCurrentThread failed: ", e.what());
+        return;  // 이 마켓만 포기, 전체 프로그램은 유지
+    }
 
     logger.info("[MarketEngineManager][", ctx.market, "] Worker loop started");
 
-    try
+    while (!stoken.stop_requested())
     {
-        while (!ctx.stop_flag.load(std::memory_order_relaxed))
+        try
         {
-            // 큐에서 이벤트 대기 (200ms 타임아웃)
-            auto maybe = ctx.event_queue.pop_for(200ms);
+            // 큐에서 이벤트 대기 (종료 반응성/CPU 균형값)
+            auto maybe = ctx.event_queue.pop_for(50ms);
 
             if (maybe.has_value())
                 handleOne_(ctx, *maybe);
@@ -242,11 +295,18 @@ void MarketEngineManager::workerLoop_(MarketContext& ctx)
             if (!out.empty())
                 handleEngineEvents_(ctx, out);
         }
-    }
-    catch (const std::exception& e)
-    {
-        logger.error("[MarketEngineManager][", ctx.market,
-            "] Worker terminated with exception: ", e.what());
+        catch (const std::exception& e)
+        {
+            // 이벤트 하나 건너뛰고 계속 — 워커는 유지됨
+            logger.error("[MarketEngineManager][", ctx.market,
+                "] Event handling error (skipping): ", e.what());
+        }
+        catch (...)
+        {
+            // 비표준 예외도 잡아 스레드 밖으로 전파되지 않도록 방어
+            logger.error("[MarketEngineManager][", ctx.market,
+                "] Unknown exception (skipping)");
+        }
     }
 
     logger.info("[MarketEngineManager][", ctx.market, "] Worker loop ended");
@@ -256,6 +316,7 @@ void MarketEngineManager::workerLoop_(MarketContext& ctx)
 void MarketEngineManager::handleOne_(MarketContext& ctx,
     const engine::input::EngineInput& in)
 {
+    // 코드 설명 필요
     std::visit([&](const auto& x)
     {
         using T = std::decay_t<decltype(x)>;
@@ -351,24 +412,47 @@ void MarketEngineManager::handleMarketData_(MarketContext& ctx,
     }
 
     // 2) DTO -> core::Candle
-    const core::Candle candle = api::upbit::mappers::toDomain(candleDto);
+    const core::Candle incoming = api::upbit::mappers::toDomain(candleDto);
 
-    // 캔들 중복 제거 (같은 타임스탬프의 반복 업데이트 무시)
-    if (!ctx.last_candle_ts.empty() && ctx.last_candle_ts == candle.start_timestamp)
+    // 동일 분봉 업데이트는 최신값으로 덮어쓰고,
+    // 다음 분봉이 도착하면 이전 분봉을 "확정 close"로 처리한다.
+    if (!ctx.pending_candle.has_value())
+    {
+        ctx.pending_candle = incoming;
         return;
-    ctx.last_candle_ts = candle.start_timestamp;
+    }
+
+    if (ctx.pending_candle->start_timestamp == incoming.start_timestamp)
+    {
+        ctx.pending_candle = incoming;
+        return;
+    }
+
+    const core::Candle candle = *ctx.pending_candle;
+    ctx.pending_candle = incoming;
 
     logger.info("[Manager][", ctx.market, "][Candle] ts=",
         candle.start_timestamp, " close=", candle.close_price);
 
     // 3) AccountManager에서 예산 조회 → 전략용 스냅샷 빌드
     const trading::AccountSnapshot account = buildAccountSnapshot_(ctx.market);
+    logger.info("[Manager][", ctx.market, "][Account] krw_available=",
+        account.krw_available, " coin_available=", account.coin_available);
 
     // 4) 전략 실행
     const trading::Decision d = ctx.strategy->onCandle(candle, account);
+    const trading::Snapshot snap = ctx.strategy->lastSnapshot();
 
+    // 전략 반영 여부 검증용 로그
     logger.info("[Manager][", ctx.market, "][Strategy] state=",
         toStringState(ctx.strategy->state()));
+    logger.info("[Manager][", ctx.market, "][Signal] marketOk=", snap.marketOk,
+        //" rsi=", snap.rsi.v,
+        " rsi_ready=", snap.rsi.ready,
+        //" trend_strength=", snap.trendStrength,
+        " trend_ready=", snap.trendReady,
+        //" vol=", snap.volatility.v,
+        " vol_ready=", snap.volatility.ready);
 
     // 5) 주문 의도가 있으면 엔진에 submit
     if (d.hasOrder())
@@ -377,6 +461,7 @@ void MarketEngineManager::handleMarketData_(MarketContext& ctx,
 
         logger.info("[Manager][", ctx.market, "][Decision] side=",
             (req.position == core::OrderPosition::BID ? "BUY" : "SELL"),
+            " reason=", req.client_tag,
             " ", orderSizeToLog(req.size));
 
         const auto r = ctx.engine->submit(req);

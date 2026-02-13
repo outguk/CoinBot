@@ -25,7 +25,7 @@ namespace engine
     {
     }
 
-    void MarketEngine::bindToCurrentThread()
+    void MarketEngine::bindToCurrentThread() noexcept
     {
         owner_thread_ = std::this_thread::get_id();
     }

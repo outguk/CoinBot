@@ -2,6 +2,8 @@
 
 #include <chrono>
 #include <cstddef>
+#include <string>
+#include <vector>
 
 namespace util
 {
@@ -74,9 +76,18 @@ namespace util
         double init_dust_threshold_krw = 5000.0; // 5000원 미만
     };
 
+    // 봇 운영 설정 (거래 마켓 목록 등)
+    struct BotConfig
+    {
+        // 거래할 마켓 목록
+        // 환경 변수 UPBIT_MARKETS (CSV) 로 재정의 가능
+        std::vector<std::string> markets = { "KRW-BTC", "KRW-ETH", "KRW-XRP" };
+    };
+
     // 통합 설정 (나중에 JSON 로딩 추가 가능)
     struct AppConfig
     {
+        BotConfig bot;
         StrategyConfig strategy;
         EngineConfig engine;
         EventBridgeConfig event_bridge;
