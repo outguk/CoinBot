@@ -29,8 +29,6 @@ namespace {
             }));
     }
 
-    // 커맨드/종료 반응성/CPU 균형값
-    constexpr std::chrono::milliseconds kIdleReadTimeout{ 200 };
 
 } // anonymous namespace
 
@@ -64,8 +62,17 @@ void UpbitWebSocketClient::start()
 
 void UpbitWebSocketClient::stop()
 {
-    // request_stop() → runReadLoop_ 내 stoken.stop_requested() 감지
     thread_.request_stop();
+
+    // ws_mu_로 reconnectOnce_의 ws_.reset()과 동기화하여 use-after-free 방지
+    {
+        std::lock_guard lk(ws_mu_);
+        if (ws_) {
+            boost::system::error_code ec;
+            beast::get_lowest_layer(*ws_).socket().cancel(ec);
+        }
+    }
+
     if (thread_.joinable())
         thread_.join();
 }
@@ -75,6 +82,11 @@ void UpbitWebSocketClient::stop()
 void UpbitWebSocketClient::setMessageHandler(MessageHandler cb)
 {
     on_msg_ = std::move(cb);
+}
+
+void UpbitWebSocketClient::setReconnectCallback(ReconnectCallback cb)
+{
+    on_reconnect_ = std::move(cb);
 }
 
 // ========== 커맨드 큐 ==========
@@ -132,7 +144,8 @@ void UpbitWebSocketClient::resetStream()
 
     websocket::stream_base::timeout opt{};
     opt.handshake_timeout = std::chrono::seconds(30);
-    opt.idle_timeout      = kIdleReadTimeout;
+    // idle_timeout 제거: io_context 미실행 환경에서 동작하지 않으며
+    //                    expires_after()와 내부 타이머 충돌 유발
     opt.keep_alive_pings  = false; // ping은 직접 전송
     ws_->set_option(opt);
 }
@@ -189,11 +202,14 @@ bool UpbitWebSocketClient::reconnectOnce_(std::stop_token stoken)
 
     if (stoken.stop_requested()) return false;
 
-    if (ws_ && ws_->is_open()) {
-        boost::system::error_code ignore;
-        ws_->close(websocket::close_code::normal, ignore);
+    {
+        std::lock_guard lk(ws_mu_);
+        if (ws_ && ws_->is_open()) {
+            boost::system::error_code ignore;
+            ws_->close(websocket::close_code::normal, ignore);
+        }
+        ws_.reset();
     }
-    ws_.reset();
 
     connectImpl(host_, port_, target_, bearer_jwt_);
     const bool ok = (ws_ && ws_->is_open());
@@ -277,6 +293,8 @@ void UpbitWebSocketClient::runReadLoop_(std::stop_token stoken)
         const bool ok = reconnectOnce_(stoken);
         if (ok) {
             resubscribeAll();
+            // 재연결 성공 → 외부 콜백 (계좌 동기화 등)
+            if (on_reconnect_) on_reconnect_();
             return;
         }
         if (max_reconnects > 0 &&
@@ -344,7 +362,7 @@ void UpbitWebSocketClient::runReadLoop_(std::stop_token stoken)
             }
         }
 
-        // 3) read (idle timeout 1초 → 루프 상단에서 stop/커맨드 체크)
+        // 3) read
         if (!ws_ || !ws_->is_open()) {
             // host_가 있으면 이전에 연결됐다가 끊긴 것 → 재연결
             // host_가 없으면 아직 connect 커맨드 전 → 대기
@@ -355,13 +373,23 @@ void UpbitWebSocketClient::runReadLoop_(std::stop_token stoken)
             continue;
         }
 
+        // [HYBRID v2 §4.1] read 전 TCP timeout 설정
+        // read 무한 블로킹 방지 → ping/command 처리 기회 보장 → 불필요한 reconnect 감소
+        beast::get_lowest_layer(*ws_).expires_after(
+            util::AppConfig::instance().websocket.idle_timeout);
+
         buffer.clear();
         boost::system::error_code ec;
         ws_->read(buffer, ec);
 
         if (ec) {
-            // idle timeout은 정상 (메시지 없음)
-            if (ec == beast::error::timeout || ec == boost::asio::error::timed_out)
+            // stop()에서 socket.cancel() 호출 → 정상 종료 경로
+            if (ec == boost::asio::error::operation_aborted)
+                break;
+
+            // [HYBRID v2 §4.1] timeout은 정상 wake-up으로 처리 (reconnect 사유 아님)
+            if (ec == beast::error::timeout ||
+                ec == boost::asio::error::timed_out)
                 continue;
 
             std::cout << "[WS] read error: " << ec.message() << "\n";

@@ -148,6 +148,7 @@ namespace trading::allocation {
         }
 
         if (markets_without_coin > 0) {
+            // 남은 KRW를 코인 없는 마켓에 전액 균등 분배
             core::Amount per_market = remaining_krw / static_cast<double>(markets_without_coin);
 
             for (auto& [_, budget] : budgets_) {
@@ -326,10 +327,11 @@ namespace trading::allocation {
     void AccountManager::finalizeFillSell(std::string_view market,
                                           core::Volume sold_coin,
                                           core::Amount received_krw) {
-        // 입력 검증: 0 이하 값 방어
-        if (sold_coin <= 0 || received_krw <= 0) {
-            // 경고: 잘못된 입력 (0 또는 음수)
-            // 실전: Logger로 기록 권장
+        // 입력 검증
+        // sold_coin <= 0: 매도량 없음 (로직 오류)
+        // received_krw < 0: 음수 금액 (데이터 오류)
+        // received_krw == 0: 허용 — delta_funds 누락 시에도 코인 차감 필요 (4-3)
+        if (sold_coin <= 0 || received_krw < 0) {
             return;
         }
 
@@ -441,7 +443,9 @@ namespace trading::allocation {
 
     // --- 동기화 메서드 ---
 
-    void AccountManager::syncWithAccount(const core::Account& account) {
+    // [HYBRID v2 §4.2] 시작/수동점검 전용 전체 재구축
+    // 런타임 복구에서는 호출 금지
+    void AccountManager::rebuildFromAccount(const core::Account& account) {
         std::unique_lock lock(mtx_);
 
         // 실제 KRW 잔고
@@ -505,7 +509,7 @@ namespace trading::allocation {
             return;
         }
 
-        // 4단계: 실제 KRW를 코인 없는 마켓에 균등 분배
+        // 4단계: 실제 free KRW를 코인 없는 마켓에 전액 균등 분배
         core::Amount per_market = actual_free_krw / static_cast<double>(krw_markets.size());
 
         for (const auto& market : krw_markets) {

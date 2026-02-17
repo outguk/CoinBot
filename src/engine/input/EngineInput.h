@@ -18,5 +18,8 @@ namespace engine::input
         std::string json;
     };
 
-    using EngineInput = std::variant<MyOrderRaw, MarketDataRaw>;
+    // WS 재연결 등으로 인한 계좌 동기화 요청
+    struct AccountSyncRequest {};
+
+    using EngineInput = std::variant<MyOrderRaw, MarketDataRaw, AccountSyncRequest>;
 }

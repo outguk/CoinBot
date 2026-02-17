@@ -300,10 +300,12 @@ namespace trading::allocation {
          */
         void finalizeOrder(ReservationToken&& token);
 
-        // --- 동기화 메서드 (unique_lock) ---
+        // --- 초기화 전용 동기화 메서드 (unique_lock) ---
 
         /*
-         * 물리 계좌와 동기화 (API 조회 결과 반영)
+         * [HYBRID v2 §4.2] 시작/수동점검 전용: 계좌 전체 기준으로 마켓별 예산을 재구축한다.
+         * 런타임 복구에서는 호출 금지 — MarketEngine::reconcileFromSnapshot을 사용할 것.
+         *
          * @param account: REST API로 조회한 실제 계좌 정보
          *
          * [동작]
@@ -312,28 +314,8 @@ namespace trading::allocation {
          * 3. Dust 처리: 가치 기준 (init_dust_threshold_krw 미만은 0으로)
          * 4. 코인을 보유한 마켓의 available_krw를 0으로 설정 (전량 거래 모델)
          * 5. 코인이 없는 마켓에 실제 KRW를 균등 분배
-         *
-         * [외부 거래 대응]
-         * - 1단계 전체 리셋으로 "포지션이 사라진 마켓" 자동 감지
-         * - 예: 외부 앱에서 전량 매도 → positions 없음 → coin_balance = 0
-         * - 리셋 없이는 기존 coin_balance가 유지되어 상태 불일치 발생
-         *
-         * [전량 거래 모델 준수]
-         * - coin_balance > 0 → available_krw = 0 (전량 코인 보유)
-         * - coin_balance = 0 → available_krw > 0 (전량 KRW 보유)
-         * - 상태 불변 조건: coin > 0 XOR krw > 0
-         *
-         * [Dust 처리 일관성]
-         * - 생성자와 동일한 가치 기준 (init_dust_threshold_krw = 5,000원)
-         * - 예: 0.00001 BTC @ 100M = 1,000원 → dust 처리
-         * - coin_epsilon은 코인 식별용 (formatDecimalFloor 미세 잔량)
-         *
-         * [사용 시나리오]
-         * - 프로그램 재시작 시 실제 계좌 상태 복구
-         * - 외부 수동 거래 후 동기화
-         * - AccountManager와 실제 계좌 불일치 해소
          */
-        void syncWithAccount(const core::Account& account);
+        void rebuildFromAccount(const core::Account& account);
 
         // --- 통계/디버깅 ---
 

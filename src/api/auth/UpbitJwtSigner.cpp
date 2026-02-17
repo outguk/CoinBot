@@ -13,7 +13,7 @@
 #include <iomanip>
 #include <vector>
 
-// Upbit 인증용 JWT(HS256) 토큰을 생성해서, HTTP 요청 헤더에 넣을 수 있게 해주는 역할
+// Upbit 인증용 JWT(HS512) 토큰을 생성해서, HTTP 요청 헤더에 넣을 수 있게 해주는 역할
 
 namespace {
 
@@ -76,11 +76,11 @@ namespace {
         return oss.str();
     }
 
-    std::string hmacSha256(const std::string& key, std::string_view msg) {
+    std::string hmacSha512(const std::string& key, std::string_view msg) {
         unsigned int len = 0;
         unsigned char out[EVP_MAX_MD_SIZE]{};
 
-        HMAC(EVP_sha256(),
+        HMAC(EVP_sha512(),
             key.data(), (int)key.size(),
             reinterpret_cast<const unsigned char*>(msg.data()), msg.size(),
             out, &len);
@@ -99,7 +99,7 @@ namespace api::auth {
     std::string UpbitJwtSigner::makeBearerToken(std::optional<std::string> query_string) const {
         using nlohmann::json;
 
-        const json header = { {"alg","HS256"}, {"typ","JWT"} };
+        const json header = { {"alg","HS512"}, {"typ","JWT"} };
 
         // nonce는 UUID v4
         const auto nonce = boost::uuids::to_string(boost::uuids::random_generator()());
@@ -121,7 +121,7 @@ namespace api::auth {
         const auto encPayload = base64UrlEncode(reinterpret_cast<const unsigned char*>(payloadDump.data()), payloadDump.size());
 
         const std::string signingInput = encHeader + "." + encPayload;
-        const auto sigBin = hmacSha256(secret_, signingInput);
+        const auto sigBin = hmacSha512(secret_, signingInput);
         const auto encSig = base64UrlEncode(reinterpret_cast<const unsigned char*>(sigBin.data()), sigBin.size());
 
         return "Bearer " + signingInput + "." + encSig;

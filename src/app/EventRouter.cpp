@@ -110,6 +110,9 @@ std::optional<std::string> EventRouter::extractMarketSlow_(std::string_view json
 // ── 시장 데이터 라우팅 (drop-oldest는 BlockingQueue 내부에서 처리) ────
 bool EventRouter::routeMarketData(std::string_view json)
 {
+    if (!accepting_.load(std::memory_order_relaxed))
+        return false;
+
     // 1. 마켓 코드 추출 (fast → fallback, 충돌 시 즉시 실패)
     std::string market_key;
 
@@ -159,6 +162,9 @@ bool EventRouter::routeMarketData(std::string_view json)
 // ── myOrder 라우팅 (유실 불가, 항상 push) ────────────────────────────
 bool EventRouter::routeMyOrder(std::string_view json)
 {
+    if (!accepting_.load(std::memory_order_relaxed))
+        return false;
+
     // 1. 마켓 코드 추출 (fast → fallback, 충돌 시 즉시 실패)
     std::string market_key;
 

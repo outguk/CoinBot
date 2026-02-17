@@ -1,11 +1,11 @@
 ﻿# 구현 현황
 
-마지막 업데이트: 2026-02-03
+마지막 업데이트: 2026-02-14
 
 ## 전체 진행률
 
 - [x] Phase 0: 기존 코드 리팩토링 (**실질적 완료**)
-- [ ] Phase 1: 멀티마켓 (2/7) - 진행 중
+- [x] Phase 1: 멀티마켓 (6/7) - **1차 통합 테스트 완료** (부하 테스트 미완)
 - [ ] Phase 2: PostgreSQL (0/5)
 - [ ] Phase 3: AWS 배포 (0/6)
 
@@ -189,82 +189,100 @@
 
 #### 1.3 MarketEngine (2일 예상)
 
-- **상태**: 미시작
-- **담당자**:
-- **시작일**:
-- **완료일**:
+- **상태**: ✅ 완료 (2026-02-08)
+- **담당자**: Claude
+- **시작일**: 2026-02-08
+- **완료일**: 2026-02-08
 - **노트**:
-  - `RealOrderEngine` 로직 추출 + 리팩토링
-  - 로컬 상태만 직접 변경, 공유 자원은 API 호출만
-  - `bindToCurrentThread()` 유지
-  - 검증: 단일 마켓 엔진 동작 테스트
+  - `RealOrderEngine` 로직 추출 + 리팩토링 완료 ✅
+  - 로컬 상태만 직접 변경, 공유 자원은 API 호출만 ✅
+  - `bindToCurrentThread()` + `assertOwner_()` 스레드 소유권 강제 ✅
+  - 전량 거래 모델: `active_buy_token_` / `active_sell_order_id_` ✅
+  - `submit()`, `onMyTrade()`, `onOrderStatus()`, `onOrderSnapshot()`, `pollEvents()` 구현 ✅
+  - 외부 주문 거부: `OrderStore` 없는 체결 이벤트 무시 ✅
+  - 검증: `tests/test_market_engine.cpp` 24개 테스트 ✅
+  - 관련 파일:
+    - `src/engine/MarketEngine.h` (121줄)
+    - `src/engine/MarketEngine.cpp` (563줄)
 
 #### 1.4 EventRouter (1일 예상)
 
-- **상태**: 미시작
-- **담당자**:
-- **시작일**:
-- **완료일**:
+- **상태**: ✅ 완료 (2026-02-13)
+- **담당자**: Claude
+- **시작일**: 2026-02-13
+- **완료일**: 2026-02-13
 - **노트**:
-  - `extractStringValue()` 일반화 함수 구현
-  - "KRW-" 하드코딩 제거
-  - Fast path + Fallback 파싱
-  - 검증: 다양한 JSON 포맷 테스트
+  - `extractStringValue()` 일반화 함수 구현 ✅ (zero-allocation Fast path)
+  - "KRW-" 하드코딩 제거 ✅ (마켓명 동적 파싱)
+  - Fast path (`code`/`market` 키 추출) + Fallback (nlohmann::json 정규 파싱) ✅
+  - 충돌 감지: `code`/`market` 불일치 시 경고 ✅
+  - 통계: `fast_path_success`, `fallback_used`, `parse_failures`, `unknown_market` ✅
+  - 검증: `tests/test_event_router.cpp` ✅
+  - 관련 파일:
+    - `src/app/EventRouter.h` (80줄)
+    - `src/app/EventRouter.cpp` (208줄)
 
 #### 1.5 MarketEngineManager (3일 예상)
 
-- **상태**: 미시작
-- **담당자**:
-- **시작일**:
-- **완료일**:
+- **상태**: ✅ 완료 (2026-02-13)
+- **담당자**: Claude
+- **시작일**: 2026-02-13
+- **완료일**: 2026-02-13
 - **노트**:
-  - `MarketContext` 생성/관리
-  - 워커 스레드 생명주기
-  - 이벤트 라우팅
-  - **멀티마켓 StartupRecovery 통합** ← 신규 (1일 추가)
-    - `syncAccountWithExchange()` 메서드 추가
-    - 초기화 시 각 마켓별 `StartupRecovery::run()` 호출
-    - `AccountManager.syncWithAccount()` 연동
-    - 미체결 주문 처리 (Cancel 정책)
-  - 검증: 3개 마켓 동시 실행 테스트
+  - `MarketContext` 구조체 정의 및 생명주기 관리 ✅
+  - `std::jthread + stop_token` 워커 스레드 ✅ (jthread 전환 완료)
+  - 초기화 3단계 ✅:
+    1. `syncAccountWithExchange_(throw=true)`: 1차 계좌 동기화 (실패 시 예외)
+    2. 마켓별 `MarketContext` 생성 + `recoverMarketState_()` 실행
+    3. `syncAccountWithExchange_(throw=false)`: 2차 동기화 (실패 시 경고)
+  - `recoverMarketState_()`: `StartupRecovery::run()` 호출 → 미체결 취소 + 포지션 복구 ✅
+  - `registerWith(EventRouter)`: 마켓별 큐 등록 ✅
+  - `workerLoop_()`: 이벤트 처리 루프 ✅
+  - 검증: `tests/test_market_engine_manager.cpp` ✅
+  - 관련 파일:
+    - `src/app/MarketEngineManager.h` (131줄)
+    - `src/app/MarketEngineManager.cpp` (534줄)
 
 #### 1.6 MarketContext + 통합 (2일 예상)
 
-- **상태**: 미시작
-- **담당자**:
-- **시작일**:
-- **완료일**:
+- **상태**: ✅ 완료 (2026-02-13)
+- **담당자**: Claude
+- **시작일**: 2026-02-13
+- **완료일**: 2026-02-13
 - **노트**:
-  - 기존 `EngineRunner` 로직 → `MarketEngineManager`로 이전
-  - `main()` 진입점 수정
-  - 설정 파일 (`config/markets.json`) 로딩
-  - 검증: 멀티마켓 End-to-End 테스트
-  - **재시작 시나리오 테스트** ← 신규
-    - 각 마켓별 포지션 복구 검증
-    - AccountManager 잔고 동기화 검증
-    - 미체결 주문 처리 검증
+  - `CoinBot.cpp` 멀티마켓 조립 완료 ✅
+    - `SharedOrderApi` → `AccountManager` → `MarketEngineManager` → `EventRouter` 순서 조립
+  - `main()` 진입점 수정 ✅
+  - 설정 파일(`config/markets.json`) 대신 하드코딩 마켓 목록으로 시작 (추후 개선 예정)
+  - 재시작 시나리오 ✅ (StartupRecovery가 MarketEngineManager 생성자에서 각 마켓 처리)
+  - 관련 파일:
+    - `src/app/CoinBot.cpp` (184줄)
 
 #### 1.7 멀티마켓 테스트 (2일 예상)
 
-- **상태**: 미시작
-- **담당자**:
-- **시작일**:
-- **완료일**:
+- **상태**: △ 1차 통합 테스트 완료 (2026-02-13), 부하 테스트 미시작
+- **담당자**: Claude
+- **시작일**: 2026-02-13
+- **완료일**: -
 - **노트**:
-  - 단위 테스트 작성
-  - 통합 테스트 작성
-  - 부하 테스트 (5마켓, 1시간)
-  - 검증: 모든 테스트 통과
+  - 단위 테스트 완료 ✅:
+    - `tests/test_market_engine.cpp` (24개 테스트)
+    - `tests/test_market_engine_manager.cpp`
+    - `tests/test_event_router.cpp`
+  - 1차 통합 테스트 완료 ✅ (커밋: 90f97bf, "MultiMarket First-Full Test 02/13")
+    - 멀티마켓 실거래 흐름 End-to-End 검증
+  - 부하 테스트 미시작 ❌ (5마켓, 1시간)
+  - 검증: 부하 테스트 통과 기준 미달 (완료 기준 1개 잔여)
 
 ### 완료 기준
 
-- [ ] 1~5개 마켓 동시 거래 가능
-- [ ] 마켓별 독립 KRW 할당
-- [ ] WS 이벤트 올바른 마켓으로 라우팅
-- [ ] 부분 체결 정확히 누적
-- [ ] 부하 테스트 통과 (CPU < 50%, 메모리 안정)
-- [ ] **재시작 시 각 마켓별 포지션 복구** ← 신규
-- [ ] **AccountManager와 실제 계좌 동기화** ← 신규
+- [x] 1~5개 마켓 동시 거래 가능 ✅ (1차 통합 테스트 확인)
+- [x] 마켓별 독립 KRW 할당 ✅ (AccountManager 전량 거래 모델)
+- [x] WS 이벤트 올바른 마켓으로 라우팅 ✅ (EventRouter Fast path)
+- [x] 부분 체결 정확히 누적 ✅ (AccountManager finalizeFillBuy 가중 평균)
+- [ ] 부하 테스트 통과 (CPU < 50%, 메모리 안정) ❌ **미완**
+- [x] **재시작 시 각 마켓별 포지션 복구** ✅ (MarketEngineManager + StartupRecovery)
+- [x] **AccountManager와 실제 계좌 동기화** ✅ (syncAccountWithExchange 2단계)
 
 ---
 
@@ -447,6 +465,10 @@
 
 | 날짜 | Phase | 작업 | 상태 | 비고 |
 |------|-------|------|------|------|
+| 2026-02-14 | 문서 | ROADMAP/IMPLEMENTATION_STATUS 동기화 | 완료 | Phase 1.3~1.6 완료 반영, 게이트 체크 업데이트 |
+| 2026-02-13 | Phase 1 | 1차 멀티마켓 통합 테스트 | 완료 | "MultiMarket First-Full Test" 커밋, End-to-End 검증 |
+| 2026-02-13 | Phase 1 | 1.4~1.6 MarketEngineManager/EventRouter/CoinBot 통합 | 완료 | jthread 전환, 3단계 초기화 플로우 완성 |
+| 2026-02-08 | Phase 1 | 1.3 MarketEngine | 완료 | 563줄, 24개 테스트, 전량 거래 모델 |
 | 2026-02-06 | 문서 | ROADMAP/ARCHITECTURE 업데이트 | 완료 | AccountManager 구현 기반 문서 동기화, rebalance 제거 |
 | 2026-02-06 | Phase 1 | 1.2 AccountManager 재확인 | 완료 | 전량 거래 모델 완전 구현 확인, Dust 이중 체크, 23개 테스트 |
 | 2026-02-03 | Phase 0 | 전체 재평가 | 완료 | 실제 코드 확인 결과 대부분 완료 상태 확인 |
@@ -476,12 +498,12 @@
 
 ### Phase 1 → Phase 2 게이트
 
-- [ ] 3개 마켓 동시 거래 성공
-- [ ] `AccountManager` 예약/체결 정상 동작
-- [ ] `EventRouter` fast path 성공률 > 99%
-- [ ] 부하 테스트 통과 (5마켓, 1시간)
-- [ ] **재시작 시 포지션 복구 정상 동작** ← 신규
-- [ ] **AccountManager 계좌 동기화 검증** ← 신규
+- [x] 3개 마켓 동시 거래 성공 ✅ (1차 통합 테스트)
+- [x] `AccountManager` 예약/체결 정상 동작 ✅ (23개 테스트)
+- [x] `EventRouter` fast path 성공률 > 99% ✅ (통계 카운터 확인)
+- [ ] 부하 테스트 통과 (5마켓, 1시간) ❌ **미완 → Phase 1 완료 최후 관문**
+- [x] **재시작 시 포지션 복구 정상 동작** ✅
+- [x] **AccountManager 계좌 동기화 검증** ✅
 
 ### Phase 2 → Phase 3 게이트
 

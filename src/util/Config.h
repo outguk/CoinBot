@@ -72,8 +72,9 @@ namespace util
         // [3] 가치 기준 dust (거래 불가 잔량)
         // 코인 가치 < 이 값 → dust로 처리
         // StrategyConfig::min_notional_krw과 동일 (거래소 최소 주문 금액)
-        // 사용: 생성자, syncWithAccount, finalizeFillSell
+        // 사용: 생성자, rebuildFromAccount, finalizeFillSell
         double init_dust_threshold_krw = 5000.0; // 5000원 미만
+
     };
 
     // 봇 운영 설정 (거래 마켓 목록 등)

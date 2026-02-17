@@ -73,6 +73,9 @@ private:
     // 등록된 마켓 → 큐 매핑 (WS 시작 전 세팅, 이후 읽기 전용)
     std::unordered_map<std::string, PrivateQueue*> routes_;
 
+    // true: 라우팅 허용, false: 종료 중 라우팅 차단
+    std::atomic<bool> accepting_{ true };
+
     Stats stats_;
 };
 

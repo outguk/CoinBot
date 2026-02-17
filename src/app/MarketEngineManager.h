@@ -8,6 +8,8 @@
 // 생명주기: 생성자(동기화+복구) → registerWith(EventRouter) → start() → stop()
 #pragma once
 
+#include <atomic>
+#include <chrono>
 #include <memory>
 #include <optional>
 #include <string>
@@ -39,6 +41,7 @@ public:
         trading::strategies::RsiMeanReversionStrategy::Params strategy_params;
         std::size_t queue_capacity = 5000;      // 마켓별 큐 최대 크기 (drop-oldest)
         int sync_retry = 3;                     // 초기 계좌 동기화 재시도 횟수
+        std::chrono::seconds pending_timeout{120}; // Pending 상태 타임아웃 (2분)
     };
 
     // 생성자: 계좌 동기화 + 마켓별 컨텍스트 생성 + 전략 복구
@@ -72,6 +75,10 @@ public:
     // 모든 워커 스레드 정지 + join
     void stop();
 
+    // [HYBRID v2 §4.3] WS 재연결 시 복구 요청 (WS 스레드에서 호출 가능)
+    // atomic flag로 우선 처리 — 일반 큐 drop-oldest 영향 없음
+    void requestReconnectRecovery();
+
 private:
     // 마켓별 독립 컨텍스트 (스레드 + 엔진 + 전략 + 큐)
     struct MarketContext {
@@ -87,15 +94,24 @@ private:
         // 다음 분봉이 들어오면 이전 분봉(최종 close)을 확정 처리한다.
         std::optional<core::Candle> pending_candle;
 
+        // Pending 상태 타임아웃 추적 (Solution 2)
+        bool tracking_pending{false};
+        std::chrono::steady_clock::time_point pending_entered_at{};
+        bool pending_timeout_fired{false};
+
+        // [HYBRID v2 §4.3] 복구 요청 제어 채널
+        // atomic flag로 큐 drop-oldest와 무관하게 우선 처리
+        std::atomic<bool> recovery_requested{false};
+
         explicit MarketContext(std::string m, std::size_t queue_capacity)
             : market(std::move(m))
             , event_queue(queue_capacity)
         {}
     };
 
-    // 생성자에서 호출: 거래소 계좌 조회 → AccountManager 동기화
-    // throw_on_fail=true 시 실패하면 예외 발생
-    void syncAccountWithExchange_(bool throw_on_fail);
+    // [HYBRID v2 §4.2] 시작 시점에만 사용: 거래소 계좌 조회 → AccountManager 전체 재구축
+    // 런타임 복구 경로에서는 호출 금지
+    bool rebuildAccountOnStartup_(bool throw_on_fail);
 
     // 생성자에서 호출: StartupRecovery로 시작 시점에 마켓 상태 복구
     void recoverMarketState_(MarketContext& ctx);
@@ -107,8 +123,23 @@ private:
     void handleOne_(MarketContext& ctx, const engine::input::EngineInput& in);
     void handleMyOrder_(MarketContext& ctx, const engine::input::MyOrderRaw& raw);
     void handleMarketData_(MarketContext& ctx, const engine::input::MarketDataRaw& raw);
-        // 엔진 출력을 전략으로 전달
+    // 엔진 출력을 전략으로 전달
     void handleEngineEvents_(MarketContext& ctx, const std::vector<engine::EngineEvent>& evs);
+
+    // [HYBRID v2 §4.6] 재연결/타임아웃 복구: 주문 단건 조회 기반
+    // 런타임에서 rebuildFromAccount 호출 금지 — 타 마켓 KRW 재분배 없음
+    void runRecovery_(MarketContext& ctx);
+
+    // [HYBRID v2 §4.7] 복구 헬퍼: getOrder 재시도
+    std::optional<core::Order> queryOrderWithRetry_(
+        std::string_view uuid, int max_retries);
+
+    // [HYBRID v2 §4.7] 복구 헬퍼: getOpenOrders에서 특정 주문 탐색
+    std::optional<core::Order> findOrderInOpenOrders_(
+        std::string_view market, std::string_view order_id);
+
+    // Pending 상태 타임아웃 감시 (workerLoop_ 내에서 매 반복마다 호출)
+    void checkPendingTimeout_(MarketContext& ctx);
 
     // AccountManager에서 마켓별 예산 조회 → 전략용 AccountSnapshot 변환
     trading::AccountSnapshot buildAccountSnapshot_(std::string_view market) const;
@@ -125,6 +156,10 @@ private:
 
     // 전체 시작 여부 (재진입 방지 플래그)
     bool started_{false};
+
+    // REST 계좌 동기화 중복 방지 (여러 워커가 동시에 호출해도 1회만 실행)
+    //std::atomic<bool> sync_in_progress_{false};
+    //std::atomic<bool> last_sync_ok_{false};  // 동기화 결과 전파 (대기 워커용)
 };
 
 } // namespace app

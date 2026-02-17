@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <optional>
+#include <iostream>
 #include <json.hpp>
 
 // Upbit 내 자산과 주문 관련 JSON 데이터를 그대로 받는 구조체(Dto) 정의
@@ -227,6 +228,7 @@ namespace api::upbit::dto
 
 		std::optional<std::string>		remaining_volume;		// 체결 후 남은 주문 양
 		std::string						executed_volume;		// 체결된 양
+		std::optional<std::string>		executed_funds;			// 현재까지 체결된 금액(응답 누락 가능)
 		std::string						reserved_fee;			// 수수료로 예약된 비용
 		std::string						remaining_fee;			// 남은 수수료
 		std::string						paid_fee;				// 사용된 수수료
@@ -239,6 +241,7 @@ namespace api::upbit::dto
 		std::optional<std::string>		prevented_locked;		// 자전거래 방지로 인해 해제된 자산
 
 		int								trades_count{ 0 };			// 해당 주문에 대한 체결 건수
+		std::optional<std::string>		identifier;				// 주문 생성시 클라이언트가 지정한 주문 식별자
 
 		struct ArrayOfTrade
 		{
@@ -254,6 +257,90 @@ namespace api::upbit::dto
 		};
 		ArrayOfTrade					trades;					// 주문의 체결 목록
 	};
+	inline void from_json(const nlohmann::json& j, OrderResponseDto& o)
+	{
+		j.at("market").get_to(o.market);
+		j.at("uuid").get_to(o.uuid);
+		j.at("side").get_to(o.side);
+		j.at("ord_type").get_to(o.ord_type);
+		j.at("state").get_to(o.state);
+		j.at("created_at").get_to(o.created_at);
+
+		if (j.contains("price") && !j.at("price").is_null()) j.at("price").get_to(o.price);
+		else o.price.reset();
+
+		if (j.contains("volume") && !j.at("volume").is_null()) j.at("volume").get_to(o.volume);
+		else o.volume.reset();
+
+		if (j.contains("remaining_volume") && !j.at("remaining_volume").is_null())
+			j.at("remaining_volume").get_to(o.remaining_volume);
+		else
+			o.remaining_volume.reset();
+
+		if (j.contains("executed_volume") && !j.at("executed_volume").is_null())
+			j.at("executed_volume").get_to(o.executed_volume);
+		else
+			o.executed_volume = "0";
+
+		// 누락 시 nullopt 유지하되 경고 — 정산 시 0으로 해석될 수 있음
+		if (j.contains("executed_funds") && !j.at("executed_funds").is_null())
+			j.at("executed_funds").get_to(o.executed_funds);
+		else {
+			o.executed_funds.reset();
+			std::cerr << "[DTO] WARN: executed_funds missing in WaitOrderResponse"
+				" uuid=" << o.uuid << "\n";
+		}
+
+		if (j.contains("reserved_fee") && !j.at("reserved_fee").is_null())
+			j.at("reserved_fee").get_to(o.reserved_fee);
+		else
+			o.reserved_fee = "0";
+
+		if (j.contains("remaining_fee") && !j.at("remaining_fee").is_null())
+			j.at("remaining_fee").get_to(o.remaining_fee);
+		else
+			o.remaining_fee = "0";
+
+		if (j.contains("paid_fee") && !j.at("paid_fee").is_null())
+			j.at("paid_fee").get_to(o.paid_fee);
+		else
+			o.paid_fee = "0";
+
+		if (j.contains("locked") && !j.at("locked").is_null())
+			j.at("locked").get_to(o.locked);
+		else
+			o.locked = "0";
+
+		if (j.contains("time_in_force") && !j.at("time_in_force").is_null())
+			j.at("time_in_force").get_to(o.time_in_force);
+		else
+			o.time_in_force.reset();
+
+		if (j.contains("smp_type") && !j.at("smp_type").is_null())
+			j.at("smp_type").get_to(o.smp_type);
+		else
+			o.smp_type.reset();
+
+		if (j.contains("prevented_volume") && !j.at("prevented_volume").is_null())
+			j.at("prevented_volume").get_to(o.prevented_volume);
+		else
+			o.prevented_volume = "0";
+
+		if (j.contains("prevented_locked") && !j.at("prevented_locked").is_null())
+			j.at("prevented_locked").get_to(o.prevented_locked);
+		else
+			o.prevented_locked.reset();
+
+		if (j.contains("trades_count") && !j.at("trades_count").is_null())
+			j.at("trades_count").get_to(o.trades_count);
+		else
+			o.trades_count = 0;
+
+		if (j.contains("identifier") && !j.at("identifier").is_null())
+			j.at("identifier").get_to(o.identifier);
+		else
+			o.identifier.reset();
+	}
 	// 개별 주문 목록 조회 (조회 시 uuid 또는 identifier 중 하나는 반드시 파라미터로 포함해야 조회됨
 	struct OrdersResponseDto
 	{
@@ -310,17 +397,36 @@ namespace api::upbit::dto
 		j.at("state").get_to(o.state);
 		j.at("created_at").get_to(o.created_at);
 
-		j.at("remaining_volume").get_to(o.remaining_volume);
-		j.at("executed_volume").get_to(o.executed_volume);
+		// 단건 주문 조회(/v1/order)에서 간헐적으로 누락될 수 있어 방어
+		if (j.contains("remaining_volume") && !j.at("remaining_volume").is_null())
+			j.at("remaining_volume").get_to(o.remaining_volume);
+		else
+			o.remaining_volume = "0";
+
+		if (j.contains("executed_volume") && !j.at("executed_volume").is_null())
+			j.at("executed_volume").get_to(o.executed_volume);
+		else
+			o.executed_volume = "0";
 
 		// executed_funds는 스펙상 존재(없을 수도 있으니 방어)
+		// 누락 시 0 치환하되 경고 — 정산 delta 계산에 영향을 줄 수 있음
 		if (j.contains("executed_funds") && !j.at("executed_funds").is_null())
 			j.at("executed_funds").get_to(o.executed_funds);
-		else
+		else {
 			o.executed_funds = "0";
+			std::cerr << "[DTO] WARN: executed_funds missing in SingleOrderResponse"
+				" uuid=" << o.uuid << "\n";
+		}
 
-		j.at("reserved_fee").get_to(o.reserved_fee);
-		j.at("locked").get_to(o.locked);
+		if (j.contains("reserved_fee") && !j.at("reserved_fee").is_null())
+			j.at("reserved_fee").get_to(o.reserved_fee);
+		else
+			o.reserved_fee = "0";
+
+		if (j.contains("locked") && !j.at("locked").is_null())
+			j.at("locked").get_to(o.locked);
+		else
+			o.locked = "0";
 
 		// ★ 누락 보완: remaining_fee / paid_fee
 		if (j.contains("remaining_fee") && !j.at("remaining_fee").is_null())
@@ -355,7 +461,10 @@ namespace api::upbit::dto
 		else
 			o.prevented_locked.reset();
 
-		j.at("trades_count").get_to(o.trades_count);
+		if (j.contains("trades_count") && !j.at("trades_count").is_null())
+			j.at("trades_count").get_to(o.trades_count);
+		else
+			o.trades_count = 0;
 
 		if (j.contains("identifier") && !j.at("identifier").is_null())
 			j.at("identifier").get_to(o.identifier);

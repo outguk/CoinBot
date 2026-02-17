@@ -271,9 +271,11 @@ namespace trading::strategies {
         if (!(s.rsi.v <= params_.oversold))
             return Decision::noAction();
 
-        // 실제 매수 금액 = krw_available * riskPercent
-        const double pct = std::clamp(params_.riskPercent, 0.0, 100.0);
-        const double krw_to_use = account.krw_available * (pct / 100.0);
+        // [HYBRID v2 §4.9] 매수 금액 = available / reserve_margin * utilization
+        // 엔진 예약 시 reserve = krw_to_use * reserve_margin → reserve ≈ available * utilization
+        const auto& engine_cfg = util::AppConfig::instance().engine;
+        const double krw_to_use =
+            account.krw_available / engine_cfg.reserve_margin * params_.utilization;
 
         if (krw_to_use < util::AppConfig::instance().strategy.min_notional_krw)
             return Decision::noAction();

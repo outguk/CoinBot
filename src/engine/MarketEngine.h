@@ -61,6 +61,24 @@ namespace engine
         // 주문 조회
         std::optional<core::Order> get(std::string_view order_id) const;
 
+        // [HYBRID v2 4.5] 현재 활성 pending 주문 ID 반환 (복구 시 조회 대상 결정용)
+        struct PendingIds {
+            std::string buy_id;
+            std::string sell_id;
+        };
+        PendingIds activePendingIds() const noexcept;
+
+        // [HYBRID v2 4.5] REST snapshot으로 유실된 체결분(delta)만 정산
+        // OrderStore 누적값과 snapshot 누적값의 차이를 계산하여 반영
+        // 멱등성: 동일 snapshot 재주입 시 delta=0이므로 무동작
+        // 중요: delta 정산 → onOrderSnapshot 순서 (터미널 시 토큰 보호)
+        bool reconcileFromSnapshot(const core::Order& snapshot);
+
+        // 재연결/타임아웃 복구용: 활성 토큰 및 주문 ID를 안전하게 정리
+        // reconciled=true: reconcileFromSnapshot 성공 (토큰은 이미 정산됨, deactivate만)
+        // reconciled=false: reconcileFromSnapshot 실패 (reserved_krw를 release로 복구)
+        void clearPendingState(bool reconciled = true);
+
         const std::string& market() const noexcept { return market_; }
 
     private:

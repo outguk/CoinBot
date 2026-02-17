@@ -10,12 +10,12 @@
 #include "../src/api/rest/RestClient.h"
 #include "../src/api/upbit/UpbitPublicRestClient.h"
 
-// ====== (Àü·«) ======
+// ====== (ï¿½ï¿½ï¿½ï¿½) ======
 #include "trading/strategies/RsiMeanReversionStrategy.h"
 #include "trading/strategies/StrategyTypes.h"
 
 
-// °á°ú Ãâ·Â À¯Æ¿
+// ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½Æ¿
 static void printError(const api::rest::RestError& e)
 {
     std::cout << "[RestError]\n";
@@ -24,10 +24,10 @@ static void printError(const api::rest::RestError& e)
     std::cout << "  msg : " << e.message << "\n";
 }
 
-// (start_timestamp ±âÁØ) ¿À·¡µÈ->ÃÖ½ÅÀ¸·Î Á¤·Ä
+// (start_timestamp ï¿½ï¿½ï¿½ï¿½) ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½->ï¿½Ö½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 static void CandlesOldToNew(std::vector<core::Candle>& src)
 {
-    // ¾÷ºñÆ® ÀÀ´äÀÌ ÃÖ½Å ¿ì¼±ÀÏ ¼ö ÀÖÀ¸´Ï ¾ÈÀüÇÏ°Ô timestamp·Î Á¤·Ä º¸Àå
+    // ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ö½ï¿½ ï¿½ì¼±ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï°ï¿½ timestampï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     std::sort(src.begin(), src.end(),
         [](const core::Candle& a, const core::Candle& b) {
             return a.start_timestamp < b.start_timestamp;
@@ -36,31 +36,31 @@ static void CandlesOldToNew(std::vector<core::Candle>& src)
 
 int TestCandleWebUpdate()
 {
-    // ÇÑ±Û ±úÁü ¹æÁö
+    // ï¿½Ñ±ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     SetConsoleOutputCP(CP_UTF8);
     SetConsoleCP(CP_UTF8);
 
-    // 1) ³×Æ®¿öÅ© ÄÁÅØ½ºÆ® ÁØºñ
+    // 1) ï¿½ï¿½Æ®ï¿½ï¿½Å© ï¿½ï¿½ï¿½Ø½ï¿½Æ® ï¿½Øºï¿½
     boost::asio::io_context ioc;
     boost::asio::ssl::context ssl_ctx(boost::asio::ssl::context::tls_client);
 
-    // (±ÇÀå) ÀÎÁõ¼­ °ËÁõÀ» Á¦´ë·Î ÇÏ·Á¸é verify path ¼³Á¤ÀÌ ÇÊ¿äÇÒ ¼ö ÀÖÀ½.
-    // Áö±ÝÀº "¿¬µ¿ Å×½ºÆ®" ¸ñÀûÀÌ¶ó ±âº» ¼³Á¤À¸·Î ½ÃÀÛ.
+    // (ï¿½ï¿½ï¿½ï¿½) ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ï·ï¿½ï¿½ï¿½ verify path ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ê¿ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½.
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ "ï¿½ï¿½ï¿½ï¿½ ï¿½×½ï¿½Æ®" ï¿½ï¿½ï¿½ï¿½ï¿½Ì¶ï¿½ ï¿½âº» ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½.
     // ssl_ctx.set_default_verify_paths(); 
     // ssl_ctx.set_verify_mode(boost::asio::ssl::verify_peer);
 
-    // 2) RestClient »ý¼º
+    // 2) RestClient ï¿½ï¿½ï¿½ï¿½
     api::rest::RestClient rest{ ioc, ssl_ctx };
 
-    // 3) UpbitPublicRestClient »ý¼º
+    // 3) UpbitPublicRestClient ï¿½ï¿½ï¿½ï¿½
     api::upbit::UpbitPublicRestClient upbit{ rest };
 
-    // 4) REST·Î Äµµé N°³ ¹Þ±â
+    // 4) RESTï¿½ï¿½ Äµï¿½ï¿½ Nï¿½ï¿½ ï¿½Þ±ï¿½
     constexpr int kSeedCount = 14;
     const std::string market = "KRW-BTC";
     const int unitMinutes = 15;
 
-    // 4) Candles È£Ãâ
+    // 4) Candles È£ï¿½ï¿½
     auto rc = upbit.getCandlesMinutes(market, /*unit*/unitMinutes, /*count*/kSeedCount);
     if (std::holds_alternative<api::rest::RestError>(rc))
     {
@@ -69,7 +69,7 @@ int TestCandleWebUpdate()
     }
     auto& seed = std::get<std::vector<core::Candle>>(rc);
 
-    // 5) seed¿ë Äµµé Á¤·Ä(¿À·¡µÈ -> ÃÖ½Å)
+    // 5) seedï¿½ï¿½ Äµï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½(ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ -> ï¿½Ö½ï¿½)
     CandlesOldToNew(seed);
 
     std::cout << "\nCandles count: " << seed.size() << " (" << market << ")\n";
@@ -87,22 +87,22 @@ int TestCandleWebUpdate()
             << "\n";
     }
 
-    // (4) Àü·« warm-up: seed¸¦ Àü·«¿¡ ¼øÂ÷ ÁÖÀÔ
+    // (4) ï¿½ï¿½ï¿½ï¿½ warm-up: seedï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     trading::strategies::RsiMeanReversionStrategy::Params p{};
     p.rsiLength = 5;
     p.trendLookWindow = 14;
     p.volatilityWindow = 14;
-    p.maxTrendStrength = 0.03;   // ¿¹½Ã(3%) - ÇÁ·ÎÁ§Æ®¿¡¼­ ¾²´ø °ªÀ¸·Î ¸ÂÃçµµ µÊ
-    p.minVolatility = 0.01;   // ¿¹½Ã(1%)
+    p.maxTrendStrength = 0.03;   // ï¿½ï¿½ï¿½ï¿½(3%) - ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½çµµ ï¿½ï¿½
+    p.minVolatility = 0.01;   // ï¿½ï¿½ï¿½ï¿½(1%)
     p.oversold = 30.0;
     p.overbought = 70.0;
-    p.riskPercent = 10.0;   // seed ´Ü°è¿¡¼­´Â °èÁÂ¸¦ 0À¸·Î Áà¼­ ÁÖ¹®ÀÌ ¾È ³ª°¡°Ô ÇÔ
+    p.utilization = 0.1;    // seed ï¿½Ü°è¿¡ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Â¸ï¿½ 0ï¿½ï¿½ï¿½ï¿½ ï¿½à¼­ ï¿½Ö¹ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½
     p.stopLossPct = 1.0;
     p.profitTargetPct = 1.5;
 
     trading::strategies::RsiMeanReversionStrategy strat{ market, p };
 
-    // seed ´Ü°è¿¡¼­´Â ÁÖ¹®ÀÌ ³ª°¡¸é ¾È µÇ´Ï±î °èÁÂ¸¦ 0À¸·Î ÁÜ
+    // seed ï¿½Ü°è¿¡ï¿½ï¿½ï¿½ï¿½ ï¿½Ö¹ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½Ç´Ï±ï¿½ ï¿½ï¿½ï¿½Â¸ï¿½ 0ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½
     trading::AccountSnapshot seedAccount{};
     seedAccount.krw_available = 0.0;  // canBuy() = false
     seedAccount.coin_available = 0.0;  // canSell() = false
@@ -114,13 +114,13 @@ int TestCandleWebUpdate()
     {
         const auto& c = seed[i];
 
-        // Àü·« ¾÷µ¥ÀÌÆ®(ÁöÇ¥/ÇÊÅÍ warm-up Æ÷ÇÔ)
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®(ï¿½ï¿½Ç¥/ï¿½ï¿½ï¿½ï¿½ warm-up ï¿½ï¿½ï¿½ï¿½)
         const trading::Decision d = strat.onCandle(c, seedAccount);
 
-        // ¸¶Áö¸· Äµµé ±âÁØ ½º³À¼¦ Á¶È¸
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Äµï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½È¸
         const auto& snap = strat.lastSnapshot();
 
-        // seedAccount°¡ 0ÀÌ¹Ç·Î Á¤»óÀÌ¶ó¸é ÁÖ¹®Àº Àý´ë ³ª¿ÀÁö ¾Ê¾Æ¾ß ÇÔ
+        // seedAccountï¿½ï¿½ 0ï¿½Ì¹Ç·ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ì¶ï¿½ï¿½ ï¿½Ö¹ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ê¾Æ¾ï¿½ ï¿½ï¿½
         if (d.hasOrder())
         {
             ++orderCount;
@@ -129,7 +129,7 @@ int TestCandleWebUpdate()
                 << " (this should normally be blocked by seedAccount)\n";
         }
 
-        // ÁøÇà ·Î±×(¿øÇÏ¸é ´õ ÁÙ¿©µµ µÊ)
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½Î±ï¿½(ï¿½ï¿½ï¿½Ï¸ï¿½ ï¿½ï¿½ ï¿½Ù¿ï¿½ï¿½ï¿½ ï¿½ï¿½)
         std::cout << "  i=" << i
             << " ts=" << c.start_timestamp
             << " rsi=" << (snap.rsi.ready ? std::to_string(snap.rsi.v) : "N/A")
