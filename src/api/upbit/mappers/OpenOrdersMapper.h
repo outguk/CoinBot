@@ -58,8 +58,9 @@ namespace api::upbit::mapper
 
 	inline core::OrderType toDomainOrderType(std::string_view ord_type) noexcept
 	{
-		// 도메인 최소 구분: limit vs (그 외) market
-		if (ord_type == "limit") return core::OrderType::Limit;
+		// Upbit: limit | price(시장가매수) | market(시장가매도) | best(최유리)
+		// best는 지정가 방식(호가 기반)이므로 Limit으로 매핑 (MyOrderMapper와 통일)
+		if (ord_type == "limit" || ord_type == "best") return core::OrderType::Limit;
 		return core::OrderType::Market;
 	}
 
@@ -106,6 +107,44 @@ namespace api::upbit::mapper
 		o.executed_funds = parseDoubleOr(dto.executed_funds, 0.0);
 
 		// 수수료/잠금
+		o.reserved_fee = parseDoubleOr(dto.reserved_fee, 0.0);
+		o.remaining_fee = parseDoubleOr(dto.remaining_fee, 0.0);
+		o.paid_fee = parseDoubleOr(dto.paid_fee, 0.0);
+		o.locked = parseDoubleOr(dto.locked, 0.0);
+
+		return o;
+	}
+
+	// -----------------------------
+	// OrderResponseDto(/v1/order) -> core::Order
+	// -----------------------------
+	inline core::Order toDomain(const api::upbit::dto::OrderResponseDto& dto) noexcept
+	{
+		core::Order o;
+
+		o.market = dto.market;
+		o.id = dto.uuid;
+		o.identifier = dto.identifier;
+
+		o.position = toDomainPosition(dto.side);
+		o.type = toDomainOrderType(dto.ord_type);
+		o.status = toDomainStatus(dto.state);
+
+		o.created_at = dto.created_at;
+
+		o.price = parseOptDouble(dto.price);
+		o.volume = parseOptDouble(dto.volume);
+
+		o.executed_volume = parseDoubleOr(dto.executed_volume, 0.0);
+		o.remaining_volume = dto.remaining_volume.has_value()
+			? parseDoubleOr(*dto.remaining_volume, 0.0)
+			: 0.0;
+		o.trades_count = dto.trades_count;
+
+		o.executed_funds = dto.executed_funds.has_value()
+			? parseDoubleOr(*dto.executed_funds, 0.0)
+			: 0.0;
+
 		o.reserved_fee = parseDoubleOr(dto.reserved_fee, 0.0);
 		o.remaining_fee = parseDoubleOr(dto.remaining_fee, 0.0);
 		o.paid_fee = parseDoubleOr(dto.paid_fee, 0.0);

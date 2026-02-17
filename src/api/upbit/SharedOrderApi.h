@@ -78,6 +78,11 @@ namespace api::upbit {
             cancelOrder(const std::optional<std::string>& uuid,
                         const std::optional<std::string>& identifier) override;
 
+        // [HYBRID v2 §4.4] GET /v1/order?uuid=...
+        // - 단건 주문 조회
+        std::variant<core::Order, api::rest::RestError>
+            getOrder(std::string_view uuid) override;
+
         // POST /v1/orders
         // - 주문 제출 (매수/매도)
         // - 반환값: Upbit 주문 UUID (Order.id로 사용)

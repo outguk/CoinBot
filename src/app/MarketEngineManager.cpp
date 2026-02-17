@@ -90,7 +90,7 @@ MarketEngineManager::MarketEngineManager(
 
     // 1) 계좌 동기화 (1차: 실패 시 예외)
     logger.info("[MarketEngineManager] Syncing account with exchange...");
-    syncAccountWithExchange_(/*throw_on_fail=*/true);
+    rebuildAccountOnStartup_(/*throw_on_fail=*/true);
 
     // 2) 마켓별 컨텍스트 생성 + 전략 복구
     for (const auto& market : markets)
@@ -124,7 +124,7 @@ MarketEngineManager::MarketEngineManager(
 
     // 3) 미체결 취소 후 최종 계좌 동기화 (2차: 실패 시 경고만)
     logger.info("[MarketEngineManager] Final account sync after recovery...");
-    syncAccountWithExchange_(/*throw_on_fail=*/false);
+    rebuildAccountOnStartup_(/*throw_on_fail=*/false);
 
     // 2차 동기화 후 최종 분배 상태 확인 로그
     logBudgets("after_final_sync");
@@ -197,8 +197,8 @@ void MarketEngineManager::stop()
     logger.info("[MarketEngineManager] All workers stopped");
 }
 
-// ========== syncAccountWithExchange_ ==========
-void MarketEngineManager::syncAccountWithExchange_(bool throw_on_fail)
+// ========== rebuildAccountOnStartup_ ==========
+bool MarketEngineManager::rebuildAccountOnStartup_(bool throw_on_fail)
 {
     auto& logger = util::Logger::instance();
 
@@ -208,9 +208,9 @@ void MarketEngineManager::syncAccountWithExchange_(bool throw_on_fail)
 
         if (std::holds_alternative<core::Account>(result))
         {
-            account_mgr_.syncWithAccount(std::get<core::Account>(result));
+            account_mgr_.rebuildFromAccount(std::get<core::Account>(result));
             logger.info("[MarketEngineManager] Account synced (attempt ", attempt, ")");
-            return;
+            return true;
         }
 
         const auto& err = std::get<api::rest::RestError>(result);
@@ -230,6 +230,7 @@ void MarketEngineManager::syncAccountWithExchange_(bool throw_on_fail)
     }
 
     logger.warn("[MarketEngineManager] Account sync failed, continuing with stale data");
+    return false;
 }
 
 // ========== recoverMarketState_ ==========
@@ -284,6 +285,10 @@ void MarketEngineManager::workerLoop_(MarketContext& ctx, std::stop_token stoken
     {
         try
         {
+            // [HYBRID v2 §4.3] 복구 요청은 일반 이벤트보다 먼저 처리
+            if (ctx.recovery_requested.exchange(false, std::memory_order_acq_rel))
+                runRecovery_(ctx);
+
             // 큐에서 이벤트 대기 (종료 반응성/CPU 균형값)
             auto maybe = ctx.event_queue.pop_for(50ms);
 
@@ -294,6 +299,9 @@ void MarketEngineManager::workerLoop_(MarketContext& ctx, std::stop_token stoken
             auto out = ctx.engine->pollEvents();
             if (!out.empty())
                 handleEngineEvents_(ctx, out);
+
+            // Pending 상태 타임아웃 감시
+            checkPendingTimeout_(ctx);
         }
         catch (const std::exception& e)
         {
@@ -316,7 +324,6 @@ void MarketEngineManager::workerLoop_(MarketContext& ctx, std::stop_token stoken
 void MarketEngineManager::handleOne_(MarketContext& ctx,
     const engine::input::EngineInput& in)
 {
-    // 코드 설명 필요
     std::visit([&](const auto& x)
     {
         using T = std::decay_t<decltype(x)>;
@@ -325,6 +332,12 @@ void MarketEngineManager::handleOne_(MarketContext& ctx,
             handleMyOrder_(ctx, x);
         else if constexpr (std::is_same_v<T, engine::input::MarketDataRaw>)
             handleMarketData_(ctx, x);
+        else if constexpr (std::is_same_v<T, engine::input::AccountSyncRequest>)
+        {
+            // [HYBRID v2] 기본 경로는 atomic flag(§4.3)로 전환됨.
+            // 큐에 남아있는 기존 이벤트 호환용으로 유지
+            runRecovery_(ctx);
+        }
 
     }, in);
 }
@@ -358,24 +371,62 @@ void MarketEngineManager::handleMyOrder_(MarketContext& ctx,
     // 2) DTO -> (Order snapshot, MyTrade) 이벤트 분해
     const auto events = api::upbit::mappers::toEvents(dto);
 
-    // 3) 엔진 상태 반영
+    // 3) MyTrade 존재 여부 사전 확인 (done-only 감지용)
+    bool has_trade = false;
     for (const auto& ev : events)
     {
-        if (std::holds_alternative<core::Order>(ev))
+        if (std::holds_alternative<core::MyTrade>(ev))
         {
-            const auto& o = std::get<core::Order>(ev);
-            ctx.engine->onOrderSnapshot(o);
-
-            logger.info("[Manager][", ctx.market, "][OrderEvent] status=",
-                static_cast<int>(o.status), " uuid=", o.id);
+            has_trade = true;
+            break;
         }
-        else
+    }
+
+    // 4) 엔진 상태 반영
+    for (const auto& ev : events)
+    {
+        if (std::holds_alternative<core::MyTrade>(ev))
         {
             const auto& t = std::get<core::MyTrade>(ev);
             ctx.engine->onMyTrade(t);
 
             logger.info("[Manager][", ctx.market, "][TradeEvent] uuid=",
                 t.order_id, " price=", t.price, " vol=", t.volume);
+        }
+        else
+        {
+            const auto& o = std::get<core::Order>(ev);
+
+            // done-only 케이스: MyTrade 없이 터미널 상태 도달 (4-1)
+            // state="done"이 trade 없이 단독 수신되면 onOrderSnapshot만으로는
+            // 자산 정산(finalizeFillBuy/Sell)이 누락됨
+            // reconcileFromSnapshot은 delta 정산 후 내부에서 onOrderSnapshot을 호출함
+            const bool isTerminal =
+                o.status == core::OrderStatus::Filled ||
+                o.status == core::OrderStatus::Canceled ||
+                o.status == core::OrderStatus::Rejected;
+
+            if (!has_trade && isTerminal)
+            {
+                logger.info("[Manager][", ctx.market,
+                    "][OrderEvent] done-only detected, using reconcile path: "
+                    "status=", static_cast<int>(o.status), " uuid=", o.id);
+
+                if (!ctx.engine->reconcileFromSnapshot(o))
+                {
+                    // reconcile 실패 시 (store 미등록 등) 기본 경로로 fallback
+                    logger.warn("[Manager][", ctx.market,
+                        "][OrderEvent] reconcile failed, falling back to onOrderSnapshot");
+                    ctx.engine->onOrderSnapshot(o);
+                }
+            }
+            else
+            {
+                ctx.engine->onOrderSnapshot(o);
+            }
+
+            logger.info("[Manager][", ctx.market, "][OrderEvent] status=",
+                static_cast<int>(o.status), " uuid=", o.id);
         }
     }
 }
@@ -446,13 +497,13 @@ void MarketEngineManager::handleMarketData_(MarketContext& ctx,
     // 전략 반영 여부 검증용 로그
     logger.info("[Manager][", ctx.market, "][Strategy] state=",
         toStringState(ctx.strategy->state()));
-    logger.info("[Manager][", ctx.market, "][Signal] marketOk=", snap.marketOk,
-        //" rsi=", snap.rsi.v,
-        " rsi_ready=", snap.rsi.ready,
-        //" trend_strength=", snap.trendStrength,
-        " trend_ready=", snap.trendReady,
-        //" vol=", snap.volatility.v,
-        " vol_ready=", snap.volatility.ready);
+    //logger.info("[Manager][", ctx.market, "][Signal] marketOk=", snap.marketOk,
+    //    //" rsi=", snap.rsi.v,
+    //    " rsi_ready=", snap.rsi.ready,
+    //    //" trend_strength=", snap.trendStrength,
+    //    " trend_ready=", snap.trendReady,
+    //    //" vol=", snap.volatility.v,
+    //    " vol_ready=", snap.volatility.ready);
 
     // 5) 주문 의도가 있으면 엔진에 submit
     if (d.hasOrder())
@@ -529,6 +580,198 @@ trading::AccountSnapshot MarketEngineManager::buildAccountSnapshot_(
     }
 
     return snap;
+}
+
+// [HYBRID v2 §4.3] 복구 요청: atomic flag로 우선 처리
+// 일반 큐 push 대신 flag → workerLoop_ 매 반복 시작에서 체크
+// 중복 요청은 자동 병합 (flag이므로 여러 번 set해도 1회만 실행)
+void MarketEngineManager::requestReconnectRecovery()
+{
+    util::Logger::instance().info(
+        "[MarketEngineManager] Reconnect recovery requested (all markets)");
+
+    for (auto& [market, ctx] : contexts_)
+        ctx->recovery_requested.store(true, std::memory_order_release);
+}
+
+// [HYBRID v2 §4.6] 주문 단건 조회 기반 복구
+// 런타임에서 rebuildFromAccount 호출 금지 — 타 마켓 KRW 재분배 없음
+// 복구 흐름:
+//   1. pending 주문 ID 확보 → 없으면 즉시 종료
+//   2. getOrder(uuid) 1차 → getOpenOrders 2차 fallback
+//   3. reconcileFromSnapshot으로 delta 정산
+//   4. 터미널이면 clearPendingState + 전략 재설정, open이면 pending 유지
+void MarketEngineManager::runRecovery_(MarketContext& ctx)
+{
+    auto& logger = util::Logger::instance();
+    logger.info("[MarketEngineManager][", ctx.market, "] Running recovery...");
+
+    // 1) pending 주문 ID 확보
+    const auto [buy_id, sell_id] = ctx.engine->activePendingIds();
+    if (buy_id.empty() && sell_id.empty())
+    {
+        logger.info("[MarketEngineManager][", ctx.market,
+            "] No pending orders, recovery skipped");
+        ctx.tracking_pending = false;
+        ctx.pending_timeout_fired = false;
+        return;
+    }
+
+    // 2) 각 pending 주문에 대해 복구 시도
+    for (const auto& order_id : { buy_id, sell_id })
+    {
+        if (order_id.empty()) continue;
+
+        // 1차: getOrder(uuid) 직접 조회 (최대 3회 재시도)
+        std::optional<core::Order> order = queryOrderWithRetry_(order_id, 3);
+
+        // 2차 fallback: getOpenOrders에서 동일 uuid 탐색
+        if (!order.has_value())
+            order = findOrderInOpenOrders_(ctx.market, order_id);
+
+        // [§4.7] 3차: 모든 조회 실패 → 상태 유지, 다음 recovery 주기에서 재시도
+        // 오정산보다 미정산이 안전 — KRW/예약 불변식 보호
+        if (!order.has_value())
+        {
+            // 진단용 계좌 로그 (상태 변경 없음)
+            auto diag = api_.getMyAccount();
+            if (std::holds_alternative<core::Account>(diag))
+            {
+                const auto& acct = std::get<core::Account>(diag);
+                logger.warn("[MarketEngineManager][", ctx.market,
+                    "] Recovery fallback: order query failed, "
+                    "actual_krw=", acct.krw_free,
+                    " positions=", acct.positions.size(),
+                    " keeping pending state for order=", order_id);
+            }
+            else
+            {
+                logger.warn("[MarketEngineManager][", ctx.market,
+                    "] All recovery methods failed for order=", order_id);
+            }
+            continue;
+        }
+
+        // delta 정산 (MarketEngine 단일 경로)
+        const bool reconciled = ctx.engine->reconcileFromSnapshot(*order);
+
+        const bool isTerminal =
+            order->status == core::OrderStatus::Filled ||
+            order->status == core::OrderStatus::Canceled ||
+            order->status == core::OrderStatus::Rejected;
+
+        if (isTerminal)
+        {
+            // 터미널: 토큰 정리 + 전략 상태 재설정
+            // reconcile 실패 시 reserved_krw를 release로 복구
+            ctx.engine->clearPendingState(reconciled);
+
+            auto budget = account_mgr_.getBudget(ctx.market);
+            trading::PositionSnapshot pos;
+            if (budget.has_value())
+            {
+                pos.coin = budget->coin_balance;
+                pos.avg_entry_price = budget->avg_entry_price;
+            }
+            ctx.strategy->syncOnStart(pos);
+
+            logger.info("[MarketEngineManager][", ctx.market,
+                "] Recovery done: state=", toStringState(ctx.strategy->state()),
+                " coin=", pos.coin, " entry=", pos.avg_entry_price);
+        }
+        else
+        {
+            // open: 부분 체결분은 reconcileFromSnapshot에서 이미 delta 정산됨
+            // pending 유지 → WS 재연결 후 이벤트로 자연 완결
+            logger.info("[MarketEngineManager][", ctx.market,
+                "] Order still open (partial fill reconciled), "
+                "waiting for WS events, order=", order_id);
+        }
+    }
+
+    ctx.tracking_pending = false;
+    ctx.pending_timeout_fired = false;
+}
+
+// [HYBRID v2 §4.7] getOrder 재시도 (1초 간격)
+std::optional<core::Order> MarketEngineManager::queryOrderWithRetry_(
+    std::string_view uuid, int max_retries)
+{
+    auto& logger = util::Logger::instance();
+
+    for (int i = 1; i <= max_retries; ++i)
+    {
+        auto result = api_.getOrder(uuid);
+        if (std::holds_alternative<core::Order>(result))
+            return std::get<core::Order>(result);
+
+        const auto& err = std::get<api::rest::RestError>(result);
+        logger.warn("[MarketEngineManager] getOrder failed (attempt ",
+            i, "/", max_retries, "): ", err.message);
+
+        if (i < max_retries)
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+    return std::nullopt;
+}
+
+// [HYBRID v2 §4.7] getOpenOrders에서 특정 uuid 탐색
+std::optional<core::Order> MarketEngineManager::findOrderInOpenOrders_(
+    std::string_view market, std::string_view order_id)
+{
+    auto result = api_.getOpenOrders(market);
+    if (!std::holds_alternative<std::vector<core::Order>>(result))
+        return std::nullopt;
+
+    const auto& orders = std::get<std::vector<core::Order>>(result);
+    for (const auto& o : orders)
+    {
+        if (o.id == order_id)
+            return o;
+    }
+    return std::nullopt;
+}
+
+// ========== checkPendingTimeout_ ==========
+// Pending 상태가 cfg_.pending_timeout 이상 지속되면 runRecovery_ 실행
+void MarketEngineManager::checkPendingTimeout_(MarketContext& ctx)
+{
+    using State = trading::strategies::RsiMeanReversionStrategy::State;
+    const auto state = ctx.strategy->state();
+    const bool is_pending = (state == State::PendingEntry || state == State::PendingExit);
+
+    // Pending 진입 시점 기록
+    if (is_pending && !ctx.tracking_pending)
+    {
+        ctx.tracking_pending = true;
+        ctx.pending_entered_at = std::chrono::steady_clock::now();
+        ctx.pending_timeout_fired = false;
+    }
+
+    // Pending 해제 시 추적 리셋
+    if (!is_pending)
+    {
+        ctx.tracking_pending = false;
+        ctx.pending_timeout_fired = false;
+        return;
+    }
+
+    // 이미 타임아웃 처리됨 → 다음 상태 변화까지 대기
+    if (ctx.pending_timeout_fired)
+        return;
+
+    // 타임아웃 체크
+    const auto elapsed = std::chrono::steady_clock::now() - ctx.pending_entered_at;
+    if (elapsed >= cfg_.pending_timeout)
+    {
+        util::Logger::instance().warn(
+            "[MarketEngineManager][", ctx.market,
+            "] Pending timeout (", cfg_.pending_timeout.count(),
+            "s) exceeded, state=", toStringState(state));
+
+        ctx.pending_timeout_fired = true;
+        runRecovery_(ctx);
+    }
 }
 
 } // namespace app

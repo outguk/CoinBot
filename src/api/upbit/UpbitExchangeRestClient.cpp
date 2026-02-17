@@ -311,6 +311,50 @@ namespace api::rest {
         return api::upbit::mapper::toDomain(dtoList);
     }
 
+    // [HYBRID v2 §4.4] GET /v1/order?uuid=...
+    // 단건 주문 조회 — reconnect 복구 시 pending 주문 상태 확인용
+    // /v1/orders/open DTO 재사용 대신 /v1/order 전용 DTO로 파싱한다.
+    std::variant<core::Order, api::rest::RestError>
+        UpbitExchangeRestClient::getOrder(std::string_view uuid)
+    {
+        const auto qs = makeQueryStrings({ {"uuid", uuid} });
+
+        api::rest::HttpRequest req;
+        req.host = "api.upbit.com";
+        req.port = "443";
+        req.method = api::rest::HttpMethod::Get;
+        req.target = std::string("/v1/order?") + qs.encoded;
+
+        req.headers.emplace("Accept", "application/json");
+        req.headers.emplace("Authorization", signer_.makeBearerToken(qs.hash));
+
+        auto r = rest_.perform(req);
+        if (std::holds_alternative<api::rest::RestError>(r))
+            return std::get<api::rest::RestError>(r);
+
+        const auto& resp = std::get<api::rest::HttpResponse>(r);
+        if (!isSuccessStatus(resp.status))
+            return makeHttpStatusError(resp.status, "Upbit GET /v1/order", resp.body);
+
+        nlohmann::json j;
+        try {
+            j = nlohmann::json::parse(resp.body);
+        }
+        catch (const std::exception& ex) {
+            return makeParseError(resp.status, "Upbit GET /v1/order", ex.what(), resp.body);
+        }
+
+        api::upbit::dto::OrderResponseDto dto;
+        try {
+            dto = j.get<api::upbit::dto::OrderResponseDto>();
+        }
+        catch (const std::exception& ex) {
+            return makeParseError(resp.status, "Upbit GET /v1/order (DTO)", ex.what(), resp.body);
+        }
+
+        return api::upbit::mapper::toDomain(dto);
+    }
+
     // DELETE /v1/order?uuid=... 또는 identifier=...
     std::variant<bool, api::rest::RestError>
         UpbitExchangeRestClient::cancelOrder(const std::optional<std::string>& uuid,
@@ -378,22 +422,11 @@ namespace api::rest {
             return e;
         }
 
-        // 1) Upbit 파라미터 생성 (항상 같은 순서로 넣어서 query_hash가 같은 값으로 계산되게 함)
+        // 1) 주문 필드 계산
         const std::string side = toUpbitSide(reqIn.position);
         const std::string ordType = toUpbitOrdType(reqIn);
-
-        std::string q; // key=value&key2=value2 ... (URL-encoded values)
-        q.reserve(256);
-
-        appendQueryParam(q, "market", reqIn.market);
-        appendQueryParam(q, "side", side);
-        appendQueryParam(q, "ord_type", ordType);
-
-        // identifier(client_order_id)는 선택. 사용 시 다음 것들을 가능하게 해준다.
-        // - WS 내 주문/체결 이벤트를 전략과 매칭
-        // - 재시작 후 복구(StartupRecovery) 시 보조 키로 사용
-        if (!reqIn.identifier.empty())
-            appendQueryParam(q, "identifier", reqIn.identifier);
+        std::optional<std::string> price_field;
+        std::optional<std::string> volume_field;
 
         // 2) 주문 타입 별 필수 필드
         // - limit  : price + volume
@@ -429,8 +462,8 @@ namespace api::rest {
                 return e;
             }
 
-            appendQueryParam(q, "price", formatDecimalFloor(*reqIn.price, 0));
-            appendQueryParam(q, "volume", formatDecimalFloor(vol, 8));
+            price_field = formatDecimalFloor(*reqIn.price, 0);
+            volume_field = formatDecimalFloor(vol, 8);
         }
         else if (ordType == "price")
         {
@@ -454,7 +487,7 @@ namespace api::rest {
                 return e;
             }
 
-            appendQueryParam(q, "price", formatDecimalFloor(amount, 0));
+            price_field = formatDecimalFloor(amount, 0);
         }
         else // ordType == "market"
         {
@@ -478,10 +511,36 @@ namespace api::rest {
                 return e;
             }
 
-            appendQueryParam(q, "volume", formatDecimalFloor(vol, 8));
+            volume_field = formatDecimalFloor(vol, 8);
         }
 
-        // 3) HTTP request
+        // 3) JSON body 구성 (현재 Upbit 공식 문서 기준: 주문 생성은 JSON body 사용)
+        nlohmann::json jsonBody;
+        jsonBody["market"] = reqIn.market;
+        jsonBody["side"] = side;
+        jsonBody["ord_type"] = ordType;
+
+        if (!reqIn.identifier.empty())
+            jsonBody["identifier"] = reqIn.identifier;
+
+        if (price_field.has_value())
+            jsonBody["price"] = *price_field;
+        if (volume_field.has_value())
+            jsonBody["volume"] = *volume_field;
+
+        // query_hash 입력 문자열은 body 파라미터와 완전히 동일해야 한다.
+        // JSON body를 만든 동일 객체에서 query string을 생성해 순서 불일치를 방지한다.
+        std::string q;
+        q.reserve(256);
+        for (const auto& [k, v] : jsonBody.items())
+        {
+            if (v.is_string())
+                appendQueryParam(q, k, v.get_ref<const std::string&>());
+            else
+                appendQueryParam(q, k, v.dump());
+        }
+
+        // 4) HTTP request
         api::rest::HttpRequest http;
         http.host = "api.upbit.com";
         http.port = "443";
@@ -489,15 +548,14 @@ namespace api::rest {
         http.target = "/v1/orders";
 
         http.headers.emplace("Accept", "application/json");
-        http.headers.emplace("Content-Type", "application/x-www-form-urlencoded");
+        http.headers.emplace("Content-Type", "application/json; charset=utf-8");
         // JWT query_hash는 "percent-decode된 query_string"을 입력으로 사용해야 한다.
-        // (Upbit 예제의 unquote(urlencode(params)) / decodeURIComponent(...) 흐름)
+        // q 문자열(key=value&...)은 query_hash 계산용으로만 유지
         const std::string q_hash = percentDecodeForHash(q);
         http.headers.emplace("Authorization", signer_.makeBearerToken(q_hash));
 
-        // Upbit는 POST 파라미터를 body로 받는다.
-        // (query_hash가 body 파라미터와 동일해야 하므로, q를 그대로 body로 넣는다.)
-        http.body = q;
+        // body는 JSON으로 전송
+        http.body = jsonBody.dump();
 
         // 요청이 어떤 ord_type/size로 만들어졌는지 확인
         std::cout << "[UpbitExchangeRestClient][postOrder] REQ target=" << http.target

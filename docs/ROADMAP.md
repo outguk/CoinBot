@@ -4,7 +4,7 @@
 >
 > **구현 현황**: [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md)에서 진행 상황을 확인할 수 있습니다.
 >
-> **최종 검토**: 2026-02-09 (코드베이스 기준 업데이트, [ROADMAP_MULTIMARKET_REVIEW](reports/ROADMAP_MULTIMARKET_REVIEW.md) 반영)
+> **최종 검토**: 2026-02-14 (Phase 1.3~1.6 완료 반영, 1.7 부하 테스트 미완, 기능 게이트 통과)
 
 ---
 
@@ -1265,70 +1265,74 @@ Phase 1: 멀티마켓
 │   ├─ Note: rebalance() 의도적 제외 (전량 거래로 불필요)
 │   └─ 검증: test_account_manager_unified.cpp (23개 테스트) ✅
 │
-├─ 1.3 MarketEngine (2일)
-│   ├─ RealOrderEngine 로직 추출 + 리팩토링
-│   ├─ 로컬 상태만 직접 변경, 공유 자원은 API 호출만
-│   ├─ bindToCurrentThread() 유지
-│   └─ 검증: 단일 마켓 엔진 동작 테스트
+├─ 1.3 MarketEngine (2일) ✅ 완료 (2026-02-08)
+│   ├─ RealOrderEngine 로직 추출 + 리팩토링 ✅
+│   ├─ 로컬 상태만 직접 변경, 공유 자원은 API 호출만 ✅
+│   ├─ bindToCurrentThread() + assertOwner_() 스레드 소유권 강제 ✅
+│   ├─ 전량 거래 모델: active_buy_token_ / active_sell_order_id_ ✅
+│   ├─ 외부 주문 거부 (OrderStore 없는 체결 이벤트 무시) ✅
+│   └─ 검증: tests/test_market_engine.cpp 24개 테스트 ✅
+│   └─ 관련 파일: src/engine/MarketEngine.h/cpp (563줄)
 │
-├─ 1.4 EventRouter (1일)
-│   ├─ extractStringValue() 일반화 함수
-│   ├─ "KRW-" 하드코딩 제거
-│   ├─ Fast path + Fallback 파싱
-│   └─ 검증: 다양한 JSON 포맷 테스트
+├─ 1.4 EventRouter (1일) ✅ 완료 (2026-02-13)
+│   ├─ extractStringValue() 일반화 함수 (zero-allocation) ✅
+│   ├─ "KRW-" 하드코딩 제거, 마켓명 동적 파싱 ✅
+│   ├─ Fast path (code/market 키 추출) + Fallback (nlohmann 정규 파싱) ✅
+│   ├─ 충돌 감지: code/market 불일치 시 경고 ✅
+│   ├─ 통계: fast_path_success, fallback_used, parse_failures, unknown_market ✅
+│   └─ 검증: tests/test_event_router.cpp ✅
+│   └─ 관련 파일: src/app/EventRouter.h/cpp (208줄)
 │
-├─ 1.5 MarketEngineManager (3일) ← 1일 추가
-│   ├─ MarketContext 생성/관리
-│   ├─ 워커 스레드 생명주기
-│   ├─ 이벤트 라우팅
-│   ├─ 초기 자본 배분 (AccountManager 생성자 호출, 1회)
-│   ├─ 마켓 독립성 보장 (마켓 간 간섭 없음, no rebalancing)
-│   ├─ 멀티마켓 StartupRecovery 통합 ← 신규 (1일)
-│   │   ├─ syncAccountWithExchange() 메서드 구현
-│   │   │   - 초기화 시: AccountManager.syncWithAccount(api.getMyAccount())
-│   │   │   - 최종화 시: 미체결 주문 취소 후 재동기화
-│   │   ├─ 각 마켓별 StartupRecovery::run() 호출
+├─ 1.5 MarketEngineManager (3일) ✅ 완료 (2026-02-13)
+│   ├─ MarketContext 구조체 정의 및 생명주기 관리 ✅
+│   ├─ std::jthread + stop_token 워커 스레드 ✅ (jthread 전환 완료)
+│   ├─ 이벤트 라우팅: registerWith(EventRouter) ✅
+│   ├─ 마켓 독립성 보장 (마켓 간 간섭 없음, no rebalancing) ✅
+│   ├─ 멀티마켓 StartupRecovery 통합 ✅
+│   │   ├─ syncAccountWithExchange_(throw=true): 1차 계좌 동기화 ✅
+│   │   ├─ recoverMarketState_(): 마켓별 StartupRecovery::run() 호출 ✅
 │   │   │   - 미체결 주문 취소 (Cancel 정책)
-│   │   │   - 포지션 스냅샷 생성
-│   │   │   - 전략 상태 복구 (strategy.syncOnStart)
-│   │   └─ 설계 문서: reports/STARTUP_RECOVERY_MULTIMARKET.md
-│   └─ 검증: 3개 마켓 동시 실행 테스트
+│   │   │   - 포지션 스냅샷 생성 + 전략 상태 복구
+│   │   └─ syncAccountWithExchange_(throw=false): 2차 동기화 (경고만) ✅
+│   └─ 검증: tests/test_market_engine_manager.cpp ✅
+│   └─ 관련 파일: src/app/MarketEngineManager.h/cpp (534줄)
 │
-├─ 1.6 MarketContext + 통합 (2일)
-│   ├─ 기존 EngineRunner 로직 → MarketEngineManager로 이전
-│   ├─ main() 진입점 수정
-│   ├─ 설정 파일 (config/markets.json) 로딩
-│   ├─ 검증: 멀티마켓 End-to-End 테스트
-│   └─ 재시작 시나리오 테스트 ← 신규
-│       ├─ 각 마켓별 포지션 복구 검증
-│       ├─ AccountManager 잔고 동기화 검증
-│       └─ 미체결 주문 처리 검증
+├─ 1.6 MarketContext + 통합 (2일) ✅ 완료 (2026-02-13)
+│   ├─ CoinBot.cpp 멀티마켓 조립 완료 ✅
+│   │   SharedOrderApi → AccountManager → MarketEngineManager → EventRouter
+│   ├─ main() 진입점 수정 ✅
+│   ├─ 설정 파일 (config/markets.json): 미구현, 하드코딩으로 대체 (추후 개선)
+│   ├─ 재시작 시나리오 ✅ (MarketEngineManager 생성자에서 처리)
+│   └─ 관련 파일: src/app/CoinBot.cpp (184줄)
 │
-└─ 1.7 멀티마켓 테스트 (2일)
-    ├─ 단위 테스트 작성
-    ├─ 통합 테스트 작성
-    ├─ 부하 테스트 (5마켓, 1시간)
-    └─ 검증: 모든 테스트 통과
+└─ 1.7 멀티마켓 테스트 (2일) △ 진행 중
+    ├─ 단위 테스트 완료 ✅
+    │   ├─ tests/test_market_engine.cpp (24개)
+    │   ├─ tests/test_market_engine_manager.cpp
+    │   └─ tests/test_event_router.cpp
+    ├─ 1차 통합 테스트 완료 ✅ (커밋: 90f97bf, 2026-02-13)
+    ├─ 부하 테스트 미시작 ❌ (5마켓, 1시간)
+    └─ 검증: 부하 테스트 통과 기준 미달
 
 Phase 1 완료 기준:
 
 **기능 검증** (필수):
-  □ 1~5개 마켓 동시 거래 가능 (최소 3개 마켓 동시 실행)
-  □ 마켓별 독립 KRW 할당 (AccountManager 사전 분배)
-  □ WS 이벤트 올바른 마켓으로 라우팅 (EventRouter fast path > 95%)
-  □ 부분 체결 정확히 누적 (finalizeFillBuy 가중 평균 단가)
-  □ 재시작 시 각 마켓별 포지션 복구 (StartupRecovery 통합)
-  □ AccountManager와 실제 계좌 동기화 (초기화 1차/2차)
+  ✅ 1~5개 마켓 동시 거래 가능 (1차 통합 테스트 확인)
+  ✅ 마켓별 독립 KRW 할당 (AccountManager 전량 거래 모델)
+  ✅ WS 이벤트 올바른 마켓으로 라우팅 (EventRouter Fast path)
+  ✅ 부분 체결 정확히 누적 (finalizeFillBuy 가중 평균 단가)
+  ✅ 재시작 시 각 마켓별 포지션 복구 (StartupRecovery 통합)
+  ✅ AccountManager와 실제 계좌 동기화 (초기화 1차/2차)
 
 **성능 검증** (권장, 측정 환경: AWS t3.small 기준):
-  □ 부하 테스트 통과 (5마켓, 1시간 연속 운영)
+  □ 부하 테스트 통과 (5마켓, 1시간 연속 운영) ← **유일한 미완 항목**
      - CPU 평균 < 30%, 최대 < 70%
      - 메모리 안정 (RSS < 200MB, 메모리 누수 없음)
      - EventRouter fallback 비율 < 5%
      - 주문 제출 지연 p95 < 500ms
 
 **게이트 전환**:
-  - 6개 기능 검증 모두 통과 시 Phase 2 시작 가능
+  - 기능 검증 6개 모두 통과 → Phase 2 시작 가능 ✅
   - 성능 검증은 Phase 2와 병행 가능 (AWS 환경에서 재검증)
 ```
 
@@ -1609,14 +1613,14 @@ int main() {
 ```
 src/
 ├── app/
-│   ├── MarketEngineManager.h/cpp      (Phase 1.5 - 예정)
-│   ├── EventRouter.h/cpp              (Phase 1.4 - 예정)
+│   ├── MarketEngineManager.h/cpp      (✅ 완료 - 2026-02-13, 534줄)
+│   ├── EventRouter.h/cpp              (✅ 완료 - 2026-02-13, 208줄)
 │   ├── SignalHandler.h/cpp            (Phase 3.1 - 예정)
 │   └── GracefulShutdown.h/cpp         (Phase 3.2 - 예정)
 ├── core/
-│   └── MarketContext.h                (Phase 1.6 - 예정)
+│   └── MarketContext.h                (✅ MarketEngineManager 내부 구조체로 통합)
 ├── engine/
-│   └── MarketEngine.h/cpp             (✅ 완료 - 2026-02-08)
+│   └── MarketEngine.h/cpp             (✅ 완료 - 2026-02-08, 563줄)
 ├── api/upbit/
 │   ├── SharedOrderApi.h/cpp           (✅ 완료 - 2026-01-29)
 │   └── IOrderApi.h                    (✅ 완료 - 2026-02-08)

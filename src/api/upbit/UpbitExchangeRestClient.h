@@ -31,6 +31,11 @@ namespace api::rest {
             cancelOrder(const std::optional<std::string>& uuid,
                 const std::optional<std::string>& identifier);
 
+        // [HYBRID v2 §4.4] GET /v1/order?uuid=...
+        // - 단건 주문 조회 (reconnect 복구용)
+        std::variant<core::Order, api::rest::RestError>
+            getOrder(std::string_view uuid);
+
         // POST /v1/orders
         // - core::OrderRequest -> Upbit order create
         // - 반환 core::Order.id 는 Upbit uuid

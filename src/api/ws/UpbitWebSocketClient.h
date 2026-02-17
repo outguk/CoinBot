@@ -1,4 +1,4 @@
-// api/ws/UpbitWebSocketClient.h
+﻿// api/ws/UpbitWebSocketClient.h
 //
 // 업비트 WebSocket 클라이언트
 // - TLS 연결, 캔들/myOrder 구독, raw JSON 수신
@@ -37,7 +37,8 @@ namespace api::ws
     {
     public:
         using WsStream       = websocket::stream<beast::ssl_stream<beast::tcp_stream>>;
-        using MessageHandler = std::function<void(std::string_view)>; // raw JSON
+        using MessageHandler    = std::function<void(std::string_view)>; // raw JSON
+        using ReconnectCallback = std::function<void()>;  // 재연결 성공 후 호출
 
         UpbitWebSocketClient(boost::asio::io_context& ioc,
                              boost::asio::ssl::context& ssl_ctx);
@@ -78,6 +79,9 @@ namespace api::ws
 
         // start() 전에 설정 권장
         void setMessageHandler(MessageHandler cb);
+
+        // 재연결 성공 + 재구독 완료 후 호출되는 콜백 (계좌 동기화 트리거 등)
+        void setReconnectCallback(ReconnectCallback cb);
 
         // ---- 생명주기 ----
 
@@ -156,6 +160,9 @@ namespace api::ws
         // WebSocket stream (재연결 시 새로 생성하므로 포인터 보관)
         std::unique_ptr<WsStream> ws_;
 
+        // ws_ 수명 보호 (stop_callback의 cancel과 reconnect의 reset 동기화)
+        std::mutex ws_mu_;
+
         // 내부 수신 스레드 (stop_token 내장)
         std::jthread thread_;
 
@@ -182,6 +189,9 @@ namespace api::ws
 
         // 수신 콜백
         MessageHandler on_msg_;
+
+        // 재연결 성공 콜백
+        ReconnectCallback on_reconnect_;
     };
 
 } // namespace api::ws

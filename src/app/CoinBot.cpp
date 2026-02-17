@@ -129,6 +129,11 @@ static int run(const std::string& access_key,
     ws_private.setMessageHandler([&router](std::string_view json) {
         router.routeMyOrder(json);
     });
+    // [HYBRID v2 §4.3] Private WS 재연결 시 주문 단위 복구 트리거
+    // atomic flag로 우선 처리 — 전체 계좌 재분배 없이 pending 주문만 복구
+    ws_private.setReconnectCallback([&engine_mgr]() {
+        engine_mgr.requestReconnectRecovery();
+    });
     ws_private.connectPrivate("api.upbit.com", "443", "/websocket/v1/private", ws_bearer);
     ws_private.subscribeMyOrder(markets, true);
 
@@ -143,11 +148,13 @@ static int run(const std::string& access_key,
     while (!g_stop_requested)
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
 
-    // ---- 정지 (역순) ----
+    // ---- 정지 ----
+    // 주문 경로를 먼저 멈춰 종료 중 추가 주문 가능성을 줄인다.
+    engine_mgr.stop();
+    // WS는 이후 정리한다. (read 루프는 내부 timeout으로 빠르게 탈출)
     logger.info("[CoinBot] Stopping...");
     ws_private.stop();
     ws_public.stop();
-    engine_mgr.stop();
 
     logger.info("[CoinBot] Goodbye.");
     return 0;

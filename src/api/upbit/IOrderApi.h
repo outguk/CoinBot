@@ -68,6 +68,13 @@ namespace api::upbit
                         const std::optional<std::string>& identifier) = 0;
 
         /*
+         * [HYBRID v2 §4.4] GET /v1/order?uuid=...
+         * 단건 주문 조회 (reconnect 복구 시 pending 주문 상태 확인용)
+         */
+        virtual std::variant<core::Order, api::rest::RestError>
+            getOrder(std::string_view uuid) = 0;
+
+        /*
          * POST /v1/orders
          * 주문 제출 (매수/매도)
          * @return Upbit 주문 UUID (Order.id로 사용)

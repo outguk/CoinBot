@@ -4,7 +4,7 @@
 
 namespace api::auth {
 
-    // Upbit REST 인증 토큰 생성기(HS256 JWT)
+    // Upbit REST 인증 토큰 생성기(HS512 JWT)
     class UpbitJwtSigner {
     public:
         UpbitJwtSigner(std::string accessKey, std::string secretKey);

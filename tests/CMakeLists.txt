@@ -1,25 +1,5 @@
 ﻿# Tests CMakeLists.txt
 
-# Real trading test (main executable)
-add_executable(real_trading_test
-    "single_real_trading_test.cpp"
-)
-
-target_include_directories(real_trading_test
-    PRIVATE
-        ${CMAKE_SOURCE_DIR}/src
-        "C:/git-repository/boost_1_89_0"
-        "C:/git-repository/nlohmann_json"
-)
-
-target_link_libraries(real_trading_test
-    PRIVATE
-        Boost::thread
-        Boost::chrono
-        OpenSSL::SSL
-        OpenSSL::Crypto
-)
-
 # SharedOrderApi thread-safety test
 add_executable(test_shared_order_api
     

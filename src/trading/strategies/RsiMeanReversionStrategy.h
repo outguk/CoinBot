@@ -47,9 +47,10 @@ namespace trading::strategies {
             std::size_t volatilityWindow{ 5 };
             double minVolatility{ 0 };    // 1% 이상이면 거래하기 적당
 
-            // 포지션/리스크
-            double riskPercent{ 90 };       // 매수에 사용할 KRW 비율(계좌의 krw_available 기준)
-            double stopLossPct{ 2.0 };        // 진입가 대비 손절 %
+            // [HYBRID v2 §4.9] 배분 자본 사용 비율
+            // krw_to_use = account.krw_available / reserve_margin * utilization
+            double utilization{ 1.0 };
+            double stopLossPct{ 1.0 };        // 진입가 대비 손절 %
             double profitTargetPct{ 2 };    // 진입가 대비 익절 %
         };
 
