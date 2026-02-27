@@ -45,7 +45,7 @@ namespace trading::indicators {
         void clear() noexcept;
 
         // N 값(몇 개 이전 종가를 볼지)
-        [[nodiscard]] std::size_t delay() const noexcept { return delay_; }
+        [[nodiscard]] std::size_t delay() const noexcept { return length_; }
 
         // 현재까지 쌓인 샘플 개수(0..delay_+1)
         [[nodiscard]] std::size_t count() const noexcept { return window_.size(); }
@@ -75,8 +75,8 @@ namespace trading::indicators {
         [[nodiscard]] trading::Value<double> closeN() const noexcept;
 
     private:
-        std::size_t delay_{ 0 };          // N
-        RingBuffer<double> window_{};     // capacity = delay_ + 1
+        std::size_t length_{ 0 };          // N
+        RingBuffer<double> window_{};     // capacity = length_ + 1
     };
 
 } // namespace trading::indicators

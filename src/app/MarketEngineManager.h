@@ -75,7 +75,7 @@ public:
     // 모든 워커 스레드 정지 + join
     void stop();
 
-    // [HYBRID v2 §4.3] WS 재연결 시 복구 요청 (WS 스레드에서 호출 가능)
+    // WS 재연결 시 복구 요청 (WS 스레드에서 호출 가능)
     // atomic flag로 우선 처리 — 일반 큐 drop-oldest 영향 없음
     void requestReconnectRecovery();
 
@@ -94,12 +94,12 @@ private:
         // 다음 분봉이 들어오면 이전 분봉(최종 close)을 확정 처리한다.
         std::optional<core::Candle> pending_candle;
 
-        // Pending 상태 타임아웃 추적 (Solution 2)
+        // Pending 상태 타임아웃 추적
         bool tracking_pending{false};
         std::chrono::steady_clock::time_point pending_entered_at{};
         bool pending_timeout_fired{false};
 
-        // [HYBRID v2 §4.3] 복구 요청 제어 채널
+        // 복구 요청 제어 채널
         // atomic flag로 큐 drop-oldest와 무관하게 우선 처리
         std::atomic<bool> recovery_requested{false};
 
@@ -109,14 +109,14 @@ private:
         {}
     };
 
-    // [HYBRID v2 §4.2] 시작 시점에만 사용: 거래소 계좌 조회 → AccountManager 전체 재구축
+    // 시작 시점에만 사용: 거래소 계좌 조회 → AccountManager 전체 재구축
     // 런타임 복구 경로에서는 호출 금지
     bool rebuildAccountOnStartup_(bool throw_on_fail);
 
     // 생성자에서 호출: StartupRecovery로 시작 시점에 마켓 상태 복구
     void recoverMarketState_(MarketContext& ctx);
 
-    // 워커 스레드 메인 루프 (EngineRunner::run() 패턴 미러링)
+    // 워커 스레드(각 마켓 스레드) 메인 루프 
     void workerLoop_(MarketContext& ctx, std::stop_token stoken);
 
 	// 이벤트 핸들러 (타입별로 분기)
@@ -126,17 +126,17 @@ private:
     // 엔진 출력을 전략으로 전달
     void handleEngineEvents_(MarketContext& ctx, const std::vector<engine::EngineEvent>& evs);
 
-    // [HYBRID v2 §4.6] 재연결/타임아웃 복구: 주문 단건 조회 기반
+    // 재연결/타임아웃 복구: 주문 단건 조회 기반
     // 런타임에서 rebuildFromAccount 호출 금지 — 타 마켓 KRW 재분배 없음
     void runRecovery_(MarketContext& ctx);
 
-    // [HYBRID v2 §4.7] 복구 헬퍼: getOrder 재시도
+    // 복구 헬퍼: getOrder 재시도
     std::optional<core::Order> queryOrderWithRetry_(
-        std::string_view uuid, int max_retries);
+        std::string_view order_uuid, int max_retries);
 
-    // [HYBRID v2 §4.7] 복구 헬퍼: getOpenOrders에서 특정 주문 탐색
+    // 복구 헬퍼: getOpenOrders에서 특정 주문 탐색
     std::optional<core::Order> findOrderInOpenOrders_(
-        std::string_view market, std::string_view order_id);
+        std::string_view market, std::string_view order_uuid);
 
     // Pending 상태 타임아웃 감시 (workerLoop_ 내에서 매 반복마다 호출)
     void checkPendingTimeout_(MarketContext& ctx);
@@ -156,10 +156,8 @@ private:
 
     // 전체 시작 여부 (재진입 방지 플래그)
     bool started_{false};
-
-    // REST 계좌 동기화 중복 방지 (여러 워커가 동시에 호출해도 1회만 실행)
-    //std::atomic<bool> sync_in_progress_{false};
-    //std::atomic<bool> last_sync_ok_{false};  // 동기화 결과 전파 (대기 워커용)
 };
 
 } // namespace app
+
+

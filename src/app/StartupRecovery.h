@@ -27,8 +27,8 @@ namespace app {
             // strategy_id + ":" + market + ":" 형태로 고정
             std::string bot_identifier_prefix;
 
-            int cancel_retry = 3;
-            int verify_retry = 3;
+            int cancel_retry = 1;
+            int verify_retry = 1;
 
             // (보완 포인트) verify_retry 사이에 잠깐 sleep/backoff가 있으면
             // Upbit 반영 지연/레이트리밋에 더 안정적

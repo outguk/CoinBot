@@ -1,5 +1,5 @@
 ﻿// app/EventRouter.h
-// WS JSON 메시지에서 마켓 코드를 추출하여 해당 마켓 큐로 라우팅
+// WS 메시지에서 마켓 코드를 추출하여 해당 마켓 큐로 라우팅
 #pragma once
 
 #include <atomic>

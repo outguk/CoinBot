@@ -1,4 +1,4 @@
-// core/concurrency/BlockingQueue.h
+﻿// core/concurrency/BlockingQueue.h
 #pragma once
 
 #include <condition_variable>
@@ -52,14 +52,14 @@ namespace core
         }
 
         // 블로킹 pop: 데이터가 들어올 때까지 대기 후 1개 반환
-        T pop()
+        /*T pop()
         {
             std::unique_lock<std::mutex> lk(mu_);
             cv_.wait(lk, [&] { return !q_.empty(); });
             T v = std::move(q_.front());
             q_.pop_front();
             return v;
-        }
+        }*/
 
         // 제한 시간 동안만 대기하는 pop
         // - timeout 안에 데이터가 들어오면 값을 반환

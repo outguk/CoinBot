@@ -311,13 +311,13 @@ namespace api::rest {
         return api::upbit::mapper::toDomain(dtoList);
     }
 
-    // [HYBRID v2 §4.4] GET /v1/order?uuid=...
+    // GET /v1/order?uuid=...
     // 단건 주문 조회 — reconnect 복구 시 pending 주문 상태 확인용
     // /v1/orders/open DTO 재사용 대신 /v1/order 전용 DTO로 파싱한다.
     std::variant<core::Order, api::rest::RestError>
-        UpbitExchangeRestClient::getOrder(std::string_view uuid)
+        UpbitExchangeRestClient::getOrder(std::string_view order_uuid)
     {
-        const auto qs = makeQueryStrings({ {"uuid", uuid} });
+        const auto qs = makeQueryStrings({ {"uuid", order_uuid} });
 
         api::rest::HttpRequest req;
         req.host = "api.upbit.com";
@@ -357,22 +357,22 @@ namespace api::rest {
 
     // DELETE /v1/order?uuid=... 또는 identifier=...
     std::variant<bool, api::rest::RestError>
-        UpbitExchangeRestClient::cancelOrder(const std::optional<std::string>& uuid,
+        UpbitExchangeRestClient::cancelOrder(const std::optional<std::string>& order_uuid,
             const std::optional<std::string>& identifier)
     {
         // Upbit: uuid 또는 identifier 중 하나는 필수
-        if (!uuid.has_value() && !identifier.has_value()) {
+        if (!order_uuid.has_value() && !identifier.has_value()) {
             RestError e{};
             e.code = RestErrorCode::InvalidArgument;
             e.http_status = 0;
-            e.message = "cancelOrder requires uuid or identifier";
+            e.message = "cancelOrder requires order_uuid or identifier";
             return e;
         }
 
         // query 생성: uuid 우선, 없으면 identifier
         QueryStrings qs;
-        if (uuid.has_value()) {
-            qs = makeQueryStrings({ {"uuid", *uuid} });
+        if (order_uuid.has_value()) {
+            qs = makeQueryStrings({ {"uuid", *order_uuid} });
         }
         else {
             qs = makeQueryStrings({ {"identifier", *identifier} });
@@ -590,7 +590,7 @@ namespace api::rest {
 
 
         // 4) 최소한의 필드만 파싱해서 domain order로 반환
-        // - engine/order store에서는 id(uuid), market, status 정도만 있어도 추적이 가능
+        // - engine/order store에서는 id(order_uuid), market, status 정도만 있어도 추적이 가능
         nlohmann::json j;
         try {
             j = nlohmann::json::parse(resp.body);
@@ -599,20 +599,20 @@ namespace api::rest {
             return makeParseError(resp.status, "Upbit POST /v1/orders", ex.what(), resp.body);
         }
 
-        std::string uuid;
+        std::string order_uuid;
         try {
-            uuid = j.value("uuid", "");
+            order_uuid = j.value("uuid", "");
         }
         catch (const std::exception& ex) {
-            return makeParseError(resp.status, "Upbit POST /v1/orders (map uuid)", ex.what(), resp.body);
+            return makeParseError(resp.status, "Upbit POST /v1/orders (map order_uuid)", ex.what(), resp.body);
         }
 
-        if (uuid.empty())
+        if (order_uuid.empty())
         {
-            return makeParseError(resp.status, "Upbit POST /v1/orders (missing uuid)", "uuid is empty", resp.body);
+            return makeParseError(resp.status, "Upbit POST /v1/orders (missing order_uuid)", "order_uuid is empty", resp.body);
         }
 
-        return uuid;
+        return order_uuid;
     }
 
 } // namespace api::rest

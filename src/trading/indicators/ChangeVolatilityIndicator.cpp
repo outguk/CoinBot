@@ -7,9 +7,9 @@
 namespace trading::indicators {
 
     // 크기부터 전체를 비움
-    void ChangeVolatilityIndicator::reset(std::size_t window) {
-        window_ = (window < 2) ? 2 : window;    // 윈도우 설정
-        returns_.reset(window_);    // 버퍼도 윈도우로 맞춤
+    void ChangeVolatilityIndicator::reset(std::size_t length) {
+        length_ = (length < 2) ? 2 : length;    // 윈도우 설정
+        window_.reset(length_);    // 버퍼도 윈도우로 맞춤
         sum_ = 0.0;
         sumsq_ = 0.0;
         prevClose_.reset();
@@ -17,7 +17,7 @@ namespace trading::indicators {
 
     // 데이터만 비운다
     void ChangeVolatilityIndicator::clear() noexcept {
-        returns_.clear();
+        window_.clear();
         sum_ = 0.0;
         sumsq_ = 0.0;
         prevClose_.reset();
@@ -27,7 +27,7 @@ namespace trading::indicators {
         trading::Value<double> out{};
 
         // 비활성
-        if (window_ == 0) {
+        if (length_ == 0) {
             out.ready = false;
             out.v = 0.0;
             return out;
@@ -55,8 +55,8 @@ namespace trading::indicators {
         // 퍼센트 변화율
         const double r = (close - prev) / prev;
 
-        // returns_에 push하고, 덮어쓴 값이 있으면 sum/sumsq에서 제거
-        const auto overwritten = returns_.push(r);
+        // window_에 push하고, 덮어쓴 값이 있으면 sum/sumsq에서 제거
+        const auto overwritten = window_.push(r);
         if (overwritten.has_value()) {
             const double old = *overwritten;
             sum_ -= old;
@@ -68,7 +68,7 @@ namespace trading::indicators {
         sumsq_ += r * r;
 
         // 윈도우가 꽉 찼을 때만 변동성(stdev)을 신뢰(ready=true)
-        out.ready = returns_.full();
+        out.ready = window_.full();
         out.v = out.ready ? stdev_() : 0.0;
         return out;
     }
@@ -79,14 +79,14 @@ namespace trading::indicators {
 
     trading::Value<double> ChangeVolatilityIndicator::value() const noexcept {
         trading::Value<double> out{};
-        out.ready = (window_ > 0) && returns_.full();
+        out.ready = (length_ > 0) && window_.full();
         out.v = out.ready ? stdev_() : 0.0;
         return out;
     }
 
     double ChangeVolatilityIndicator::stdev_() const noexcept {
         // returns_가 full일 때만 호출된다고 가정(호출부에서 ready 체크)
-        const double n = static_cast<double>(window_);
+        const double n = static_cast<double>(length_);
         if (n <= 2.0) return 0.0;
 
         const double mean = sum_ / n;

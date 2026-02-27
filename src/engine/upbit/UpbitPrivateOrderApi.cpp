@@ -1,4 +1,4 @@
-﻿#include <iostream>
+#include <iostream>
 
 #include "engine/upbit/UpbitPrivateOrderApi.h"
 
@@ -23,15 +23,16 @@ namespace engine::upbit
         }
             
 
-        // 성공이면 uuid만 반환
-        const auto& uuid = std::get<std::string>(r);
-        if (uuid.empty())
+        // 성공이면 order_uuid만 반환
+        const auto& order_uuid = std::get<std::string>(r);
+        if (order_uuid.empty())
         {
-            std::cout << "[UpbitPrivateOrderApi] postOrder returned empty uuid\n";
+            std::cout << "[UpbitPrivateOrderApi] postOrder returned empty order_uuid\n";
             return std::nullopt;
         }
             
 
-        return uuid;
+        return order_uuid;
     }
 }
+

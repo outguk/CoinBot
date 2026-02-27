@@ -37,6 +37,7 @@ namespace trading::allocation {
         other.active_ = false;
     }
 
+    // = 도 오버라이딩으로 move 처리
     ReservationToken& ReservationToken::operator=(ReservationToken&& other) noexcept {
         if (this != &other) {
             // 기존 토큰이 active면 먼저 해제 (토큰 객체 없이)
@@ -122,7 +123,7 @@ namespace trading::allocation {
                     budget.initial_capital = 0;  // 다음 단계에서 KRW로 설정됨
                     // available_krw는 0 유지 (3단계에서 배분)
                 } else {
-                    // 거래 가능한 코인 보유
+					// 거래 가능한 코인 보유 시 평단가와 초기 자본 설정
                     budget.coin_balance = pos.free;
                     budget.avg_entry_price = pos.avg_buy_price;
                     budget.initial_capital = coin_value;
@@ -302,6 +303,7 @@ namespace trading::allocation {
         // reserved_krw 차감 (체결 완료된 금액)
         budget.reserved_krw -= executed_krw;
         if (budget.reserved_krw < 0) {
+            // 경고 로그 필요 (로직 오류 가능성)
             budget.reserved_krw = 0;
         }
 
@@ -330,7 +332,7 @@ namespace trading::allocation {
         // 입력 검증
         // sold_coin <= 0: 매도량 없음 (로직 오류)
         // received_krw < 0: 음수 금액 (데이터 오류)
-        // received_krw == 0: 허용 — delta_funds 누락 시에도 코인 차감 필요 (4-3)
+        // received_krw == 0: 허용 — delta_funds 누락 시에도 코인 차감 필요
         if (sold_coin <= 0 || received_krw < 0) {
             return;
         }
@@ -344,69 +346,55 @@ namespace trading::allocation {
 
         MarketBudget& budget = it->second;
 
-        // 매도 전 코인 가치 (평단가 기준)
-        core::Amount sold_cost = sold_coin * budget.avg_entry_price;
-
         // 코인 잔고 감소
         const core::Volume balance_before = budget.coin_balance;
         budget.coin_balance -= sold_coin;
 
-        // 과매도 감지 및 보정 (잔고 부족 매도)
-        core::Amount actual_received_krw = received_krw;
-
-        if (budget.coin_balance < 0) {
-            // 크리티컬: 보유량보다 많이 매도 시도
-            // 원인: 중복 체결 이벤트, 외부 거래 미동기화, 로직 오류 등
-
-            // 실제 매도 가능량 계산
-            core::Volume actual_sold = balance_before;  // 실제로 보유했던 양
-            core::Volume oversold = sold_coin - actual_sold;  // 과매도량
-
-            // 과매도분에 대한 KRW 차감 (비율 계산)
-            if (actual_sold > 0 && sold_coin > 0) {
-                // 실제 매도량에 해당하는 KRW만 반영
-                actual_received_krw = (received_krw / sold_coin) * actual_sold;
-            } else {
-                // 보유량 0인데 매도 시도 → KRW 받지 않음
-                actual_received_krw = 0;
-            }
-
-            budget.coin_balance = 0;
-        }
+        // 과매도 감지 및 보정이 필요??
 
         // KRW 잔고 증가 (실제 매도량에 대한 금액만)
-        budget.available_krw += actual_received_krw;
+        budget.available_krw += received_krw;
 
-        // 전량 매도 시 또는 잔량 dust 처리 (이중 체크)
-        // 1차: 수량 기준 - formatDecimalFloor(8자리)로 인한 미세 잔량
-        // 2차: 가치 기준 - 거래 불가능한 저가 코인 잔량 (전략과 일관성 유지)
+        stats_.total_fills_sell.fetch_add(1, std::memory_order_relaxed);
+    }
+
+    void AccountManager::finalizeSellOrder(std::string_view market,
+                                           std::optional<core::Price> mark_price) {
+        std::unique_lock lock(mtx_);
+
+        auto it = budgets_.find(std::string(market));
+        if (it == budgets_.end()) {
+            return;
+        }
+
+        MarketBudget& budget = it->second;
         const auto& cfg = util::AppConfig::instance().account;
 
         bool should_clear_coin = false;
 
-        // 1차: 수량 기준 (부동소수점 오차)
+        // 1) 수량 기준 dust: 부동소수점 잔량을 정리한다.
         if (budget.coin_balance < cfg.coin_epsilon) {
             should_clear_coin = true;
         }
-        // 2차: 가치 기준 (저가 코인 보호)
-        // - RsiMeanReversionStrategy의 hasMeaningfulPos와 동일한 기준
-        // - init_dust_threshold_krw = min_notional_krw = 5,000원
-        else {
-            core::Amount remaining_value = budget.coin_balance * budget.avg_entry_price;
+        // 2) 가치 기준 dust: mark_price(현재가) 기준으로 판정한다.
+        //    mark_price가 없거나 비정상(<=0)이면 가치 판정 생략 — avg_entry_price fallback 없음.
+        //    (avg_entry_price로 fallback하면 가격 급등 시 오판 문제가 재발한다)
+        else if (mark_price.has_value() && *mark_price > 0.0) {
+            const core::Amount remaining_value = budget.coin_balance * (*mark_price);
             if (remaining_value < cfg.init_dust_threshold_krw) {
                 should_clear_coin = true;
             }
         }
 
-        if (should_clear_coin) {
-            budget.coin_balance = 0;
-            budget.avg_entry_price = 0;
-
-            // 실현 손익 = 현재 자본 - 초기 자본
-            budget.realized_pnl = budget.available_krw - budget.initial_capital;
+        if (!should_clear_coin) {
+            return;
         }
 
-        stats_.total_fills_sell.fetch_add(1, std::memory_order_relaxed);
+        budget.coin_balance = 0;
+        budget.avg_entry_price = 0;
+
+        // 주문 종료 시점에만 실현 손익을 확정한다.
+        budget.realized_pnl = budget.available_krw - budget.initial_capital;
     }
 
     void AccountManager::finalizeOrder(ReservationToken&& token) {
@@ -443,7 +431,7 @@ namespace trading::allocation {
 
     // --- 동기화 메서드 ---
 
-    // [HYBRID v2 §4.2] 시작/수동점검 전용 전체 재구축
+    // 시작/수동점검 전용 전체 재구축
     // 런타임 복구에서는 호출 금지
     void AccountManager::rebuildFromAccount(const core::Account& account) {
         std::unique_lock lock(mtx_);

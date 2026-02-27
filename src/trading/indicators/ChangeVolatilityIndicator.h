@@ -40,8 +40,8 @@ namespace trading::indicators {
         // 윈도우 크기는 유지하고 상태만 초기화
         void clear() noexcept;
 
-        [[nodiscard]] std::size_t window() const noexcept { return window_; }
-        [[nodiscard]] std::size_t count()  const noexcept { return returns_.size(); }
+        [[nodiscard]] std::size_t window() const noexcept { return length_; }
+        [[nodiscard]] std::size_t count()  const noexcept { return window_.size(); }
 
         /*
          * update(close)
@@ -58,10 +58,10 @@ namespace trading::indicators {
 
     private:
         // 표준 편차를 구할 때 몇개의 변화율을 사용할지(표본 집합 크기)
-        std::size_t window_{ 0 };
+        std::size_t length_{ 0 };
 
-        // 최근 window_개 봉의 change(close) 값(변화율 r)을 저장
-        RingBuffer<double> returns_{};
+        // 최근 length_개 봉의 change(close) 값(변화율 r)을 저장
+        RingBuffer<double> window_{};
 
         // 롤링 합/제곱합 (최근 W개 r의 합과 r^2의 합) - 표준 편차 계산용
         double sum_{ 0.0 };

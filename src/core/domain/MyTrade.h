@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <string>
 #include <cstdint>
@@ -21,8 +21,8 @@ namespace core
     struct MyTrade
     {
         // --- 키(중복 제거/정렬의 핵심) ---
-        std::string order_id;     // myOrder.uuid (주문 UUID)
-        std::string trade_id;     // myOrder.trade_uuid (체결 UUID)  ← fill의 고유키
+        std::string order_uuid;     // myOrder.uuid (주문 UUID)
+        std::string trade_uuid;     // myOrder.trade_uuid (체결 UUID)  ← fill의 고유키
 
         // --- 시장/방향 ---
         std::string market;       // myOrder.code (ex: "KRW-BTC")
@@ -55,8 +55,8 @@ namespace core
     };
 
     inline MyTrade makeMyTradeFromFill(
-        std::string order_id,
-        std::string trade_id,
+        std::string order_uuid,
+        std::string trade_uuid,
         std::string market,
         OrderPosition side,
         Price price,
@@ -66,8 +66,8 @@ namespace core
     ) noexcept
     {
         MyTrade t;
-        t.order_id = std::move(order_id);
-        t.trade_id = std::move(trade_id);
+        t.order_uuid = std::move(order_uuid);
+        t.trade_uuid = std::move(trade_uuid);
         t.market = std::move(market);
         t.side = side;
         t.price = price;
@@ -78,3 +78,4 @@ namespace core
         return t;
     }
 }
+

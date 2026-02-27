@@ -252,11 +252,22 @@ namespace api::upbit::dto
 			std::string					funds;					// 체결 총액
 			std::string					trend;					// 체결 시세 흐름("up" - 매수에 의한 체결)
 			std::string					created_at;				// 주문 생성 시각 (KST 기준)
-			Side						side;					// 주문 방향(매수/매도)
+			Side						side{ Side::bid };		// 주문 방향(매수/매도)
 
 		};
-		ArrayOfTrade					trades;					// 주문의 체결 목록
+		std::vector<ArrayOfTrade>		trades;					// 주문의 체결 목록
 	};
+	inline void from_json(const nlohmann::json& j, OrderResponseDto::ArrayOfTrade& o)
+	{
+		if (j.contains("market") && !j.at("market").is_null()) j.at("market").get_to(o.market);
+		if (j.contains("uuid") && !j.at("uuid").is_null()) j.at("uuid").get_to(o.uuid);
+		if (j.contains("price") && !j.at("price").is_null()) j.at("price").get_to(o.price);
+		if (j.contains("volume") && !j.at("volume").is_null()) j.at("volume").get_to(o.volume);
+		if (j.contains("funds") && !j.at("funds").is_null()) j.at("funds").get_to(o.funds);
+		if (j.contains("trend") && !j.at("trend").is_null()) j.at("trend").get_to(o.trend);
+		if (j.contains("created_at") && !j.at("created_at").is_null()) j.at("created_at").get_to(o.created_at);
+		if (j.contains("side") && !j.at("side").is_null()) j.at("side").get_to(o.side);
+	}
 	inline void from_json(const nlohmann::json& j, OrderResponseDto& o)
 	{
 		j.at("market").get_to(o.market);
@@ -287,7 +298,7 @@ namespace api::upbit::dto
 			j.at("executed_funds").get_to(o.executed_funds);
 		else {
 			o.executed_funds.reset();
-			std::cerr << "[DTO] WARN: executed_funds missing in WaitOrderResponse"
+			std::cerr << "[DTO] WARN: executed_funds missing in OrderResponseDto"
 				" uuid=" << o.uuid << "\n";
 		}
 
@@ -340,6 +351,12 @@ namespace api::upbit::dto
 			j.at("identifier").get_to(o.identifier);
 		else
 			o.identifier.reset();
+
+		// trades는 /v1/order에서만 제공되므로 누락 시 빈 배열로 처리한다.
+		if (j.contains("trades") && !j.at("trades").is_null())
+			j.at("trades").get_to(o.trades);
+		else
+			o.trades.clear();
 	}
 	// 개별 주문 목록 조회 (조회 시 uuid 또는 identifier 중 하나는 반드시 파라미터로 포함해야 조회됨
 	struct OrdersResponseDto
@@ -581,7 +598,7 @@ namespace api::upbit::dto
 	struct CancelAndOrderRequestDto
 	{
 		std::optional<std::string>		prev_order_uuid;			// 취소하고자 하는 주문의 유일식별자(UUID)
-		std::optional<std::string>		prev_order_identifier;		// 취소하고자 하는 주문의 유일식별자(UUID)
+		std::optional<std::string>		prev_order_identifier;		// 취소하고자 하는 주문의 식별자(identifier)
 
 		OrdType							new_ord_type;				// 신규 주문의 주문 유형
 		std::optional<std::string>		new_volume;					// 신규 주문 요청 수량

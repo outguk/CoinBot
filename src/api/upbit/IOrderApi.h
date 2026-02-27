@@ -61,26 +61,27 @@ namespace api::upbit
 
         /*
          * DELETE /v1/order?uuid=... OR identifier=...
-         * 주문 취소
+         * 주문 취소 (파라미터명 order_uuid는 내부 통일 명칭)
          */
         virtual std::variant<bool, api::rest::RestError>
-            cancelOrder(const std::optional<std::string>& uuid,
+            cancelOrder(const std::optional<std::string>& order_uuid,
                         const std::optional<std::string>& identifier) = 0;
 
         /*
-         * [HYBRID v2 §4.4] GET /v1/order?uuid=...
-         * 단건 주문 조회 (reconnect 복구 시 pending 주문 상태 확인용)
+         * GET /v1/order?uuid=...
+		 * 단건 주문 조회 (reconnect 복구 시 pending 주문 상태 확인용)
          */
         virtual std::variant<core::Order, api::rest::RestError>
-            getOrder(std::string_view uuid) = 0;
+            getOrder(std::string_view order_uuid) = 0;
 
         /*
          * POST /v1/orders
          * 주문 제출 (매수/매도)
-         * @return Upbit 주문 UUID (Order.id로 사용)
+         * @return Upbit 주문 order_uuid (Order.id로 사용)
          */
         virtual std::variant<std::string, api::rest::RestError>
             postOrder(const core::OrderRequest& req) = 0;
     };
 
 } // namespace api::upbit
+
