@@ -64,12 +64,12 @@ namespace trading::indicators
 		// 직전 가격(변화량 계산용). 첫 값 들어오기 전까지는 없음.
 		std::optional<double> prev_price_{};
 
-		// seed 단계에서 length개의 변화량을 모으기 위한 카운터/누적합
+		// seed(초기) 단계에서 length개의 변화량을 모으기 위한 카운터/누적합
 		std::size_t seed_count_{ 0 }; // 지금까지 누적한 "변화량(delta)" 개수
 		double seed_gain_sum_{ 0.0 }; // 변화량이 +인 크기만 length 개 만큼 모은다
 		double seed_loss_sum_{ 0.0 }; // 변화량이 -인 크기만 length 개 만큼 모은다
 
-		// Wilder smoothing에 사용되는 상태값 seed를 length로 나누어 초기 기준선을 만든다
+		// Wilder smoothing에 사용되는 상태값, seed를 length로 나누어 초기 기준선을 만든다
 		double avg_gain_{ 0.0 };
 		double avg_loss_{ 0.0 };
 

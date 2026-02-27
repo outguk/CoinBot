@@ -1,4 +1,4 @@
-﻿#include "app/StartupRecovery.h"
+#include "app/StartupRecovery.h"
 
 #include <algorithm>
 #include <iostream>
@@ -57,13 +57,13 @@ namespace app {
                 if (!startsWithImpl(*o.identifier, opt.bot_identifier_prefix))
                     continue;
 
-                const std::optional<std::string> uuid =
+                const std::optional<std::string> order_uuid =
                     o.id.empty() ? std::nullopt : std::optional<std::string>(o.id);
 
                 bool ok = false;
                 for (int i = 0; i < opt.cancel_retry; ++i)
                 {
-                    auto cr = api.cancelOrder(uuid, o.identifier);
+                    auto cr = api.cancelOrder(order_uuid, o.identifier);
                     if (std::holds_alternative<bool>(cr) && std::get<bool>(cr)) {
                         ok = true;
                         break;
@@ -72,11 +72,11 @@ namespace app {
 
                 if (ok) {
                     ++cancel_count;
-                    std::cout << "[Startup] cancel ok: uuid=" << o.id
+                    std::cout << "[Startup] cancel ok: order_uuid=" << o.id
                         << " identifier=" << *o.identifier << "\n";
                 }
                 else {
-                    std::cout << "[Startup][Warn] cancel failed: uuid=" << o.id
+                    std::cout << "[Startup][Warn] cancel failed: order_uuid=" << o.id
                         << " identifier=" << *o.identifier << "\n";
                 }
             }
@@ -190,3 +190,4 @@ namespace app {
     }
 
 } // namespace app
+

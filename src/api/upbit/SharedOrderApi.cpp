@@ -56,7 +56,7 @@ namespace api::upbit {
     }
 
     std::variant<bool, api::rest::RestError>
-    SharedOrderApi::cancelOrder(const std::optional<std::string>& uuid,
+    SharedOrderApi::cancelOrder(const std::optional<std::string>& order_uuid,
                                  const std::optional<std::string>& identifier)
     {
         std::lock_guard<std::mutex> lock(mtx_);
@@ -64,16 +64,16 @@ namespace api::upbit {
         // IMPORTANT: increment happens *after* lock acquired (this is the proof point)
         InFlightGuard g(in_flight_, max_in_flight_);
 
-        return client_->cancelOrder(uuid, identifier);
+        return client_->cancelOrder(order_uuid, identifier);
     }
 
-    // [HYBRID v2 §4.4] 단건 주문 조회
+    // 단건 주문 조회
     std::variant<core::Order, api::rest::RestError>
-    SharedOrderApi::getOrder(std::string_view uuid)
+    SharedOrderApi::getOrder(std::string_view order_uuid)
     {
         std::lock_guard<std::mutex> lock(mtx_);
         InFlightGuard g(in_flight_, max_in_flight_);
-        return client_->getOrder(uuid);
+        return client_->getOrder(order_uuid);
     }
 
     std::variant<std::string, api::rest::RestError>
@@ -88,3 +88,4 @@ namespace api::upbit {
     }
 
 } // namespace api::upbit
+

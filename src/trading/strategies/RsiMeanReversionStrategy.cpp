@@ -75,7 +75,7 @@ namespace trading::strategies {
 
     void RsiMeanReversionStrategy::syncOnStart(const trading::PositionSnapshot& pos)
     {
-        // - 미체결 주문은 앱/엔진 시작 루틴에서 “전부 취소”한다.
+        // - 미체결 주문은 앱/엔진 시작 루틴에서 “전부 취소”한다. (StartupRecovery)
         // - 따라서 전략은 미체결을 이어받지 않고, 포지션만 복구한다.
 
         // 시작 시 pending 상태는 항상 제거(미체결 이어받기 X)
@@ -115,7 +115,7 @@ namespace trading::strategies {
 
     Decision RsiMeanReversionStrategy::onCandle(const core::Candle& c, const AccountSnapshot& account)
     {
-        // 관점 A: market 고정 전략이므로 다른 market 봉이 들어오면 아무것도 하지 않음
+        // market 고정 전략이므로 다른 market 봉이 들어오면 아무것도 하지 않음
         if (c.market != market_)
             return Decision::noAction();
 
@@ -143,52 +143,29 @@ namespace trading::strategies {
 
         util::Logger::instance().debug("[Strategy][Indicators]", oss.str());
 
-        // --- self-heal: 전략 상태를 실제 보유 자산과 일관되게 유지 ---
+        // Flat/InPosition에 한해 실제 보유 자산과의 불일치를 보정한다.
+        // - Flat인데 의미 있는 코인 보유: 재시작/외부 거래 복구 → InPosition
+        // - InPosition인데 dust만 남음: 거래 불가 잔량 → Flat
         const double posNotional = account.coin_available * s.close;
-        const bool hasMeaningfulPos = (posNotional >= util::AppConfig::instance().strategy.min_notional_krw);
+        const auto& strategy_cfg = util::AppConfig::instance().strategy;
+        // 진입/이탈 임계값 분리 (히스테리시스)
+        // - enter: min_notional_krw (5,000원) 이상이면 InPosition으로 인식
+        // - exit : dust_exit_threshold_krw (1,000원) 미만일 때만 Flat으로 이탈
+        // 두 임계값 사이(1,000~5,000원) 구간에서는 현재 상태를 유지 → 경계 진동 방지
+        const bool hasMeaningfulPos = (posNotional >= strategy_cfg.min_notional_krw);
+        const bool isTrueDust       = (posNotional <  strategy_cfg.dust_exit_threshold_krw);
 
-        // PendingEntry 복구: 코인이 생겼으면 체결됨 (WS 이벤트 유실 대응)
-        if (state_ == State::PendingEntry && hasMeaningfulPos)
-        {
-            util::Logger::instance().info("[Strategy][SelfHeal] PendingEntry -> InPosition (WS missed)");
-            state_ = State::InPosition;
-
-            // 정확한 체결가를 모르면 현재가로 손절/익절 설정
-            if (!entry_price_.has_value()) {
-                entry_price_ = s.close;
-                setStopsFromEntry(*entry_price_);
-            }
-
-            pending_client_id_.reset();
-            pending_filled_volume_ = 0.0;
-            pending_cost_sum_ = 0.0;
-            pending_last_price_ = 0.0;
-        }
-
-        // PendingExit 복구: 코인이 없거나 dust만 남으면 청산됨
-        if (state_ == State::PendingExit && !hasMeaningfulPos)
-        {
-            util::Logger::instance().info("[Strategy][SelfHeal] PendingExit -> Flat (WS missed)");
-            state_ = State::Flat;
-            entry_price_.reset();
-            stop_price_.reset();
-            target_price_.reset();
-
-            pending_client_id_.reset();
-            pending_filled_volume_ = 0.0;
-            pending_cost_sum_ = 0.0;
-            pending_last_price_ = 0.0;
-        }
-
-        // 기존 복구 로직
         if (state_ == State::Flat && hasMeaningfulPos)
         {
-            // restart/partial-exit/dust 상황에서 "실제 보유"를 기준으로 InPosition 복구
+            // 재시작/partial-exit 상황에서 실제 보유를 기준으로 InPosition 복구
+            // 실제 진입가 불명 → 현재 close를 가상 진입가로 사용
             state_ = State::InPosition;
+            entry_price_ = s.close;
+            setStopsFromEntry(*entry_price_);
         }
-        else if (state_ == State::InPosition && !hasMeaningfulPos)
+        else if (state_ == State::InPosition && isTrueDust)
         {
-            // 팔 수 없는 dust면 Flat 취급해서 고착 방지
+            // 거래 불가 dust → Flat 취급으로 고착 방지
             state_ = State::Flat;
             entry_price_.reset();
             stop_price_.reset();
@@ -271,7 +248,7 @@ namespace trading::strategies {
         if (!(s.rsi.v <= params_.oversold))
             return Decision::noAction();
 
-        // [HYBRID v2 §4.9] 매수 금액 = available / reserve_margin * utilization
+        // 매수 금액 = available / reserve_margin * utilization
         // 엔진 예약 시 reserve = krw_to_use * reserve_margin → reserve ≈ available * utilization
         const auto& engine_cfg = util::AppConfig::instance().engine;
         const double krw_to_use =
@@ -351,7 +328,7 @@ namespace trading::strategies {
         }
 
         const std::string cid = makeIdentifier(reason_tag);
-        const double sellVol = std::max(0.0, account.coin_available - util::AppConfig::instance().strategy.volume_safety_eps);
+        const double sellVol = account.coin_available;
         if (sellVol * s.close < util::AppConfig::instance().strategy.min_notional_krw)
             return Decision::noAction();
 
@@ -431,10 +408,12 @@ namespace trading::strategies {
             else
             {
                 // cancel after trade: "실질적으로 체결 발생" -> 확정 처리
-                // Fill 누적이 있으면 VWAP, 없으면 마지막 체결가(있을 때)를 사용
+                // 우선순위: WS 누적 VWAP → REST VWAP(executed_funds/volume) → 마지막 체결가
                 const double vwap = (pending_filled_volume_ > 0.0)
                     ? (pending_cost_sum_ / pending_filled_volume_)
-                    : pending_last_price_;
+                    : (ev.executed_volume > 0.0 && ev.executed_funds > 0.0
+                        ? ev.executed_funds / ev.executed_volume
+                        : pending_last_price_);
                 if (state_ == State::PendingEntry) {
                     if (vwap > 0.0) {
                         entry_price_ = vwap;
@@ -465,10 +444,13 @@ namespace trading::strategies {
         // 2) 완전 체결: pending 해제 + 상태 확정
         if (ev.status == core::OrderStatus::Filled) 
         {
-            // 평균 체결가(VWAP). 누적 수량이 없으면 마지막 가격을 폴백으로 사용
+            // 평균 체결가(VWAP).
+            // 우선순위: WS 누적 VWAP → REST VWAP(executed_funds/volume) → 마지막 체결가
             const double final_price = (pending_filled_volume_ > 0.0)
                 ? (pending_cost_sum_ / pending_filled_volume_)
-                : pending_last_price_;
+                : (ev.executed_volume > 0.0 && ev.executed_funds > 0.0
+                    ? ev.executed_funds / ev.executed_volume
+                    : pending_last_price_);
 
                 if (state_ == State::PendingEntry) 
                 {

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <string>
 #include <vector>
@@ -71,8 +71,8 @@ namespace api::upbit::mappers
         if (is_trade)
         {
             core::MyTrade t;
-            t.order_id = d.uuid;
-            t.trade_id = *d.trade_uuid;
+            t.order_uuid = d.uuid;
+            t.trade_uuid = *d.trade_uuid;
 
             t.market = d.code;
             t.side = toSide(d.ask_bid);
@@ -97,8 +97,8 @@ namespace api::upbit::mappers
 
                 util::Logger::instance().warn(
                     "[MyOrderMapper] trade_fee missing, using default rate ", default_rate,
-                    ": order_id=", d.uuid,
-                    ", trade_id=", *d.trade_uuid,
+                    ": order_uuid=", d.uuid,
+                    ", trade_uuid=", *d.trade_uuid,
                     ", estimated_fee=", t.fee);
             }
 
@@ -127,11 +127,14 @@ namespace api::upbit::mappers
         else if (d.timestamp.has_value())       o.created_at = std::to_string(*d.timestamp);
         else                                    o.created_at.clear();
 
-        // price/volume: Upbit는 state=="trade"일 때 이 값이 "체결가/체결량" 의미로 바뀔 수 있음
-        // - 그래도 스냅샷 관점에선 누적(executed/remaining)이 더 중요하니,
-        //   여기서는 raw를 넣되, 로직은 executed/remaining 기반으로 판단하는 정책.
-        o.price = core::Price{ d.price };
-        o.volume = core::Volume{ d.volume };
+        // trade 상태: price=체결가, volume=체결량 → MyTrade에서 이미 처리됨
+        // Order 스냅샷에 넣으면 요청 원본(price/volume)이 오염되므로 차단 (1차 방어)
+        // wait/done 상태: 원주문 값 그대로 반영
+        if (d.state != "trade")
+        {
+            o.price  = core::Price{ d.price };
+            o.volume = core::Volume{ d.volume };
+        }
 
         // 누적 스냅샷(중요)
         o.executed_volume = core::Volume{ d.executed_volume };
@@ -149,3 +152,4 @@ namespace api::upbit::mappers
         return out;
     }
 }
+

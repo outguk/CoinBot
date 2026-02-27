@@ -185,7 +185,7 @@ namespace api::rest
 	{
 		beast::error_code ec;	// 네트워크 작업에서 발생한 에러를 담는 ec
 
-		// host/port를 실제 접속 가능한 endpoint 목록으로 변환한다(DNS 조회 포함)
+		// (1) host/port를 실제 접속 가능한 endpoint 목록으로 변환한다(DNS 조회 포함)
 		tcp::resolver resolver(ioc_);	// (1) DNS Resolve
 		auto results = resolver.resolve(req.host, req.port, ec);
 
@@ -242,7 +242,7 @@ namespace api::rest
 		// body를 넣고, body가 있으면 prepare_payload()
 		http_req.body() = req.body;
 		if (!req.body.empty())
-			http_req.prepare_payload();	// http_req의 body 부분을 검토해 있으면 그에 맞는 길이를 계산, 업으면 제거/정리한다.
+			http_req.prepare_payload();	// http_req의 body 부분을 검토해 있으면 그에 맞는 길이를 계산, 없으면 제거/정리한다.
 
 		// (7) write + timeout
 		beast::get_lowest_layer(stream).expires_after(req.timeout);	// 제한 시간

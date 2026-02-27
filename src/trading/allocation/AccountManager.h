@@ -256,39 +256,37 @@ namespace trading::allocation {
          * @param received_krw: 수령한 KRW (수수료 차감 후)
          *
          * [입력 검증]
-         * - sold_coin <= 0 또는 received_krw <= 0 → 무시
+         * - sold_coin <= 0 또는 received_krw < 0 → 무시
+         * - received_krw == 0은 허용 (복구 경로에서 미확정 금액 방어)
          *
          * [동작]
          * 1. coin_balance -= sold_coin
          * 2. 과매도 감지 및 보정:
          *    - coin_balance < 0 → 실제 보유량만큼만 매도된 것으로 간주
-         *    - KRW도 비율에 맞게 조정 (과매도분 KRW는 받지 않음)
+         *    - KRW도 비율에 맞게 조정 (과매도분 KRW는 반영하지 않음)
          * 3. available_krw += actual_received_krw
-         * 4. 잔량 dust 처리 (이중 체크)
          *
-         * [과매도 예시]
-         * - 보유: 0.001 BTC
-         * - 매도 시도: 0.002 BTC → 200,000 KRW
-         * - 실제 처리: 0.001 BTC → 100,000 KRW만 반영
-         *
-         * [Dust 처리 - 이중 체크]
-         * 1차: 수량 기준 (coin_epsilon = 1e-7)
-         *   - formatDecimalFloor(8자리)로 인한 부동소수점 오차 제거
-         *   - 예: 0.00000001 BTC → dust
-         *
-         * 2차: 가치 기준 (init_dust_threshold_krw = 5,000원)
-         *   - 거래 불가능한 저가 코인 잔량 제거
-         *   - RsiMeanReversionStrategy의 hasMeaningfulPos와 동일 기준
-         *   - 예: 1,000 DOGE @ 0.003원 = 3원 → dust
-         *
-         * [전략 일관성]
-         * - 전략: posNotional >= min_notional_krw → "의미 있는 포지션"
-         * - AccountManager: remaining_value < init_dust_threshold_krw → "dust"
-         * - 동일한 기준(5,000원)으로 상태 불일치 방지
+         * 주의: dust 정리/realized_pnl 확정은 finalizeSellOrder()에서만 수행한다.
+         *       (부분 체결 중 조기 0처리로 후속 체결 누락이 생기지 않도록 분리)
          */
         void finalizeFillSell(std::string_view market,
-                             core::Volume sold_coin,
-                             core::Amount received_krw);
+                              core::Volume sold_coin,
+                              core::Amount received_krw);
+
+        /*
+         * 매도 주문 종료 정산 (터미널 상태에서 1회 호출)
+         * @param market: 마켓 코드
+         * @param mark_price: 현재 시장가 (캔들 close 기준). nullopt이면 가치 기준 판정 생략
+         *
+         * [동작]
+         * - 잔량 dust 정리
+         *   1) 수량 기준: coin_balance < coin_epsilon → 무조건 정리
+         *   2) 가치 기준: coin_balance * mark_price < init_dust_threshold_krw → 정리
+         *      mark_price가 nullopt이거나 <= 0이면 가치 기준 판정 생략 (avg_entry_price fallback 없음)
+         * - 포지션이 사실상 종료된 경우 realized_pnl 확정
+         */
+        void finalizeSellOrder(std::string_view market,
+                               std::optional<core::Price> mark_price = std::nullopt);
 
         /*
          * 주문 완료 처리 (체결 완료 또는 취소 후)
@@ -303,7 +301,7 @@ namespace trading::allocation {
         // --- 초기화 전용 동기화 메서드 (unique_lock) ---
 
         /*
-         * [HYBRID v2 §4.2] 시작/수동점검 전용: 계좌 전체 기준으로 마켓별 예산을 재구축한다.
+         * 시작/수동점검 전용: 계좌 전체 기준으로 마켓별 예산을 재구축한다.
          * 런타임 복구에서는 호출 금지 — MarketEngine::reconcileFromSnapshot을 사용할 것.
          *
          * @param account: REST API로 조회한 실제 계좌 정보

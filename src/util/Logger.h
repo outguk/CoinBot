@@ -118,6 +118,7 @@ namespace util
 
 
         // 현재 스레드 로그 태그 설정/해제 (예: "KRW-BTC")
+        // 현재 스레드가 어떤 마켓(혹은 작업 단위)인지 표시
         static void setThreadTag(std::string tag)
         {
             thread_tag_ = std::move(tag);
@@ -177,14 +178,15 @@ namespace util
 
             std::lock_guard<std::mutex> lock(mutex_);
 
-            // 메시지 조합
-            std::ostringstream oss;
+			// 메시지 조합 (받은 인자를 순서대로 이어붙임)
+            std::ostringstream oss; // 메모지 문자열 버퍼에 사용
             oss << "[" << getTimestamp() << "] "
                 << "[" << levelToString(level) << "] "
                 << "[#" << seq << "] ";
             (oss << ... << args);
             oss << "\n";
 
+            // std::ostringstream(oss 버퍼)에 쌓아 둔 내용을 std::string으로 꺼낸다. 재사용 용도
             const std::string message = oss.str();
 
             // 콘솔 출력
@@ -202,12 +204,17 @@ namespace util
             // 마켓별 파일 출력: 워커에서 setThreadTag("KRW-BTC") 설정 시 사용
             if (market_file_output_enabled_ && !thread_tag_.empty())
             {
-                std::ofstream& stream = market_streams_[thread_tag_];
+                // market_streams_ 맵에서 thread_tag_ 키에 해당하는 파일 스트림 참조를 가져옴
+                std::ofstream& stream = market_streams_[thread_tag_]; // 실제 파일에 사용
+
+				// 파일이 아직 열려 있지 않으면 연다 (최초 접근 시)
                 if (!stream.is_open())
                 {
                     const std::filesystem::path p =
                         std::filesystem::path(market_log_dir_) / (thread_tag_ + ".log");
                     stream.open(p.string(), std::ios::app);
+
+					// 파일 열기 실패 시 에러 메시지 출력 (실패해도 계속 진행)
                     if (!stream.is_open())
                     {
                         std::cerr << "[Logger] Failed to open market log file: "
@@ -215,6 +222,7 @@ namespace util
                     }
                 }
 
+				// 파일이 열려 있으면 로그를 쓴다
                 if (stream.is_open())
                     stream << message << std::flush;
             }

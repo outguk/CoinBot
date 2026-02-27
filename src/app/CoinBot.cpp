@@ -14,6 +14,7 @@
 #include <csignal>
 #include <cstdlib>
 #include <iostream>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -44,24 +45,49 @@ namespace {
 // ---- API 키 로딩 ----
 // 환경 변수 UPBIT_ACCESS_KEY / UPBIT_SECRET_KEY 에서 읽는다.
 // 실제 배포 시 secrets 관리 방식에 맞춰 교체할 것.
+static std::optional<std::string> readEnv(const char* name)
+{
+#ifdef _WIN32
+    char* raw = nullptr;
+    size_t raw_len = 0;
+    if (_dupenv_s(&raw, &raw_len, name) != 0 || raw == nullptr)
+        return std::nullopt;
+
+    std::string value(raw);
+    std::free(raw);
+#else
+    const char* raw = std::getenv(name);
+    if (!raw)
+        return std::nullopt;
+
+    std::string value(raw);
+#endif
+    if (value.empty())
+        return std::nullopt;
+    return value;
+}
+
+// 변수가 없다면 예외
 static std::string requireEnv(const char* name)
 {
-    const char* val = std::getenv(name);
-    if (!val || *val == '\0')
+    auto value = readEnv(name);
+    if (!value.has_value())
         throw std::runtime_error(std::string("환경 변수가 없습니다: ") + name);
-    return val;
+    return *value;
 }
 
 // ---- 마켓 목록 로딩 ----
 // 환경 변수 UPBIT_MARKETS (CSV) 우선, 없으면 AppConfig 기본값 사용
 static std::vector<std::string> loadMarkets()
 {
-    const char* env = std::getenv("UPBIT_MARKETS");
-    if (!env || *env == '\0')
+    auto env = readEnv("UPBIT_MARKETS");
+
+    // 환경 변수 등록 x면 AppConfig의 기본 마켓 목록 사용
+	if (!env.has_value()) 
         return util::AppConfig::instance().bot.markets;
 
     std::vector<std::string> result;
-    std::istringstream ss(env);
+    std::istringstream ss(*env);
     std::string token;
     while (std::getline(ss, token, ','))
         if (!token.empty()) result.push_back(token);
@@ -115,7 +141,7 @@ static int run(const std::string& access_key,
     // ---- WebSocket: PUBLIC (캔들) ----
     api::ws::UpbitWebSocketClient ws_public(ioc, ssl_ctx);
     ws_public.setMessageHandler([&router](std::string_view json) {
-        router.routeMarketData(json);
+        (void)router.routeMarketData(json);
     });
     ws_public.connectPublic("api.upbit.com", "443", "/websocket/v1");
     ws_public.subscribeCandles("candle.1m", markets, false, true);
@@ -127,9 +153,9 @@ static int run(const std::string& access_key,
 
     api::ws::UpbitWebSocketClient ws_private(ioc, ssl_ctx);
     ws_private.setMessageHandler([&router](std::string_view json) {
-        router.routeMyOrder(json);
+        (void)router.routeMyOrder(json);
     });
-    // [HYBRID v2 §4.3] Private WS 재연결 시 주문 단위 복구 트리거
+    // Private WS 재연결 시 주문 단위 복구 트리거 (주문 내역을 복구해야 함)
     // atomic flag로 우선 처리 — 전체 계좌 재분배 없이 pending 주문만 복구
     ws_private.setReconnectCallback([&engine_mgr]() {
         engine_mgr.requestReconnectRecovery();

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <string>
 #include <optional>
 #include <variant>
@@ -28,17 +28,17 @@ namespace api::rest {
         // 주문 취소 (DELETE /v1/order?uuid=... OR identifier=...)
         // - 성공/실패만 필요
         std::variant<bool, api::rest::RestError>
-            cancelOrder(const std::optional<std::string>& uuid,
+            cancelOrder(const std::optional<std::string>& order_uuid,
                 const std::optional<std::string>& identifier);
 
         // [HYBRID v2 §4.4] GET /v1/order?uuid=...
         // - 단건 주문 조회 (reconnect 복구용)
         std::variant<core::Order, api::rest::RestError>
-            getOrder(std::string_view uuid);
+            getOrder(std::string_view order_uuid);
 
         // POST /v1/orders
         // - core::OrderRequest -> Upbit order create
-        // - 반환 core::Order.id 는 Upbit uuid
+        // - 반환 core::Order.id 는 Upbit order_uuid
         std::variant<std::string, api::rest::RestError>
             postOrder(const core::OrderRequest& req);
 
@@ -54,3 +54,4 @@ namespace api::rest {
     };
 
 } // namespace api::rest
+

@@ -25,7 +25,7 @@ namespace trading::indicators {
             return out;
         }
 
-        // 덮어쓴 값이 있으면 합에서 빼고
+        // 가득 차지 않으면 빈 값을 반환하고 가득 차면 가장 오래된 값을 반환한다.
         const auto overwritten = window_.push(x);
         if (overwritten.has_value()) {
             sum_ -= *overwritten;

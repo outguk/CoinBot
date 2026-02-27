@@ -10,8 +10,12 @@ namespace util
     // 전략 설정
     struct StrategyConfig
     {
-        double min_notional_krw = 5000.0;       // 최소 주문 금액 (KRW)
-        double volume_safety_eps = 1e-7;        // 수량 오버셀 방지 여유분 (AccountConfig::coin_epsilon과 일치)
+        double min_notional_krw = 5000.0;       // 최소 주문 금액 (KRW) / Block 3 진입 임계값
+
+        // Block 4 (InPosition → Flat) 이탈 임계값
+        // min_notional_krw보다 낮게 유지해야 히스테리시스 보장
+        // 밴드(dust_exit ~ min_notional) 구간에서는 어느 상태든 전이 없음
+        double dust_exit_threshold_krw = 1000.0;
     };
 
     // 엔진 설정
@@ -51,7 +55,7 @@ namespace util
     //
     // 1. 수량 기준 (coin_epsilon): 부동소수점 오차 제거
     //    - formatDecimalFloor(8자리)로 인한 미세 잔량
-    //    - 사용 위치: finalizeFillSell, syncWithAccount (코인 식별)
+    //    - 사용 위치: finalizeSellOrder, rebuildFromAccount (코인 식별)
     //
     // 2. 가치 기준 (init_dust_threshold_krw): 거래 불가 잔량 제거
     //    - 거래소 최소 주문 금액 미만의 코인
@@ -61,9 +65,8 @@ namespace util
     struct AccountConfig
     {
         // [1] 수량 기준 dust (부동소수점 오차)
-        // formatDecimalFloor(8자리)로 인한 미세 잔량 처리
-        // StrategyConfig::volume_safety_eps와 일치
-        double coin_epsilon = 1e-7;             // 0.0000001 BTC
+        // 업비트 최소 수량 단위(8자리 소수) 이하 잔량 처리
+        double coin_epsilon = 1e-8;             // 0.00000001 = 업비트 최소 수량 단위
 
         // [2] KRW dust (원 단위 이하 잔량)
         // 주문 완료 후 reserved_krw 정리

@@ -107,7 +107,7 @@ std::optional<std::string> EventRouter::extractMarketSlow_(std::string_view json
     return std::nullopt;
 }
 
-// ── 시장 데이터 라우팅 (drop-oldest는 BlockingQueue 내부에서 처리) ────
+// ── 시장 데이터 라우팅 (json은 manager에서 거른다, drop-oldest는 BlockingQueue 내부에서 처리) ────
 bool EventRouter::routeMarketData(std::string_view json)
 {
     if (!accepting_.load(std::memory_order_relaxed))

@@ -17,7 +17,7 @@
 namespace trading::strategies {
 
     /*
-        RSI Mean Reversion (관점 A)
+        RSI Mean Reversion
         - market_ 는 생성 시 고정 (단일 종목 전용 인스턴스)
         - 상태 머신 확정:
             Flat(미보유) -> PendingEntry(매수 주문 넣고 대기) -> InPosition(보유 중)
@@ -32,7 +32,7 @@ namespace trading::strategies {
             // RSI
             std::size_t rsiLength{ 5 };
             double oversold{ 50 };
-            double overbought{ 60 };
+            double overbought{ 70 };
             
             // SMA 추가
             int smaLength{ 20 };

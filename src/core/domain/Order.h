@@ -23,9 +23,18 @@ namespace core
 	* 2. 유효성 검사 후 Order 생성 (id/status/timestamp 할당)
 	* 3. WebSocket 이벤트로 상태 업데이트 (체결량/잔여량/수수료)
 	* 4. OrderStore에서 관리 (활성 주문 조회/완료 주문 정리)
+	*
+	* [요청 원본 필드 불변 정책]
+	* price / volume / requested_amount 는 submit 시 1회 설정되며 이후 불변이다.
+	* WS 스냅샷(onOrderSnapshot)이 덮어쓰지 않으므로 요청 원본을 항상 보존한다.
+	*
+	* [주문 유형별 요청 원본 필드 매핑]
+	*   지정가 매수/매도  : price + volume
+	*   시장가 매도(ASK)  : volume 만
+	*   시장가 매수(BID)  : requested_amount 만  (price/volume 모두 nullopt)
 	*/
 
-	struct Order 
+	struct Order
 	{
 
 		// --- 식별 ---
@@ -37,9 +46,10 @@ namespace core
 		OrderPosition		position;				// 매수/매도 구분
 		OrderType			type;					// 주문 타입 (시장가/지정가)
 
-		// --- 요청 값(있을 수도/없을 수도) ---
-		std::optional<Price>	price;					// 주문 가격
-		std::optional<Volume>	volume;					// 주문 수량
+		// --- 요청 원본 (submit 시 1회 설정, 이후 불변) ---
+		std::optional<Price>	price;				// 지정가 목표가. Market 주문은 항상 nullopt
+		std::optional<Volume>	volume;				// 주문 수량.    Market BID는 항상 nullopt
+		std::optional<Amount>	requested_amount;	// 시장가 매수 총액. Market BID에서만 유효
 
 		// --- 부분체결 추적(실거래 핵심) ---
 		Volume				executed_volume{ 0.0 };     // 누적 체결량

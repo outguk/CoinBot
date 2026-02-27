@@ -30,11 +30,11 @@ namespace trading {
     //  “미체결 복구용 데이터(OpenOrderSnapshot 등)”는 여기서 다루지 않는다.
     struct PositionSnapshot final {
         double coin{ 0.0 };              // 해당 마켓 보유 수량
-        double avg_entry_price{ 0.0 };   // 평균 매수가(없거나 신뢰 불가면 0)
+        double avg_entry_price{ 0.0 };   // 평균 매수가(없거나 신뢰 불가면 0) 여기 필요?
         [[nodiscard]] constexpr bool hasPosition() const noexcept { return coin > 0.0; }
     };
 
-    // 체결 이벤트(전략이 entryPrice 확정 / pending 해제에 사용 / 
+    // 체결 이벤트(전략이 entryPrice 확정 / pending 해제에 사용)
     // 이 체결이 내가 낸 주문인지? 진입인지? 청산인지? / 이제 다음 캔들에서 어떤 판단을 해야 하는지 ? )
     // - identifier로 전략이 "내가 낸 주문"인지 매칭
     struct FillEvent final {
@@ -62,7 +62,7 @@ namespace trading {
     // 주문 상태 이벤트(실거래 필수)
     // - FillEvent는 "부분 체결"로 여러 번 올 수 있고, 그 자체로 "완전 체결"을 보장하지 않는다.
     // - 따라서 Pending 해제 / 롤백(취소·거절) / 최종 확정(Filled)은 OrderStatusEvent를 기준으로 처리하는 게 안전하다.
-    // - client_order_id로 전략이 "내가 낸 주문"인지 매칭
+    // - identifier로 전략이 "내가 낸 주문"인지 매칭
     struct OrderStatusEvent final {
         std::string identifier;
         core::OrderStatus status{ core::OrderStatus::Pending };
@@ -72,6 +72,7 @@ namespace trading {
         // - 시장가 매수(Amount)처럼 원주문 수량을 알기 어려운 경우가 있어, 전략이 이 값에 의존하지 않는 설계를 권장
         double executed_volume{ 0.0 };
         double remaining_volume{ 0.0 };
+        double executed_funds{ 0.0 };   // 누적 체결 금액(KRW). WS 유실 복구 시 fill_price 폴백에 사용
 
         OrderStatusEvent() = default;
 
@@ -79,12 +80,14 @@ namespace trading {
             core::OrderStatus st,
             core::OrderPosition pos,
             double execVol = 0.0,
-            double remVol = 0.0) noexcept
+            double remVol = 0.0,
+            double execFunds = 0.0) noexcept
             : identifier(std::move(cid)),
             status(st),
             position(pos),
             executed_volume(execVol),
-            remaining_volume(remVol) {
+            remaining_volume(remVol),
+            executed_funds(execFunds) {
         }
     };
 
@@ -100,6 +103,7 @@ namespace trading {
             return d;
         }
 
+		// Decision::submit()은 주문 요청을 래핑하여 Decision 객체로 반환하는 헬퍼 함수
         [[nodiscard]] static Decision submit(core::OrderRequest req) {
             Decision d;
             d.order = std::move(req);

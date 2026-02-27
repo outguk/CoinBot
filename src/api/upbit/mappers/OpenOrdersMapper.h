@@ -42,6 +42,15 @@ namespace api::upbit::mapper
 		return parseDoubleOr(*s, 0.0);
 	}
 
+	inline double sumTradeFunds(
+		const std::vector<api::upbit::dto::OrderResponseDto::ArrayOfTrade>& trades) noexcept
+	{
+		double total = 0.0;
+		for (const auto& t : trades)
+			total += parseDoubleOr(t.funds, 0.0);
+		return total;
+	}
+
 	// -----------------------------
 	// enum mapping (DTO -> domain)
 	// -----------------------------
@@ -94,9 +103,15 @@ namespace api::upbit::mapper
 
 		o.created_at = dto.created_at;
 
-		// 요청값
-		o.price = parseOptDouble(dto.price);
-		o.volume = parseOptDouble(dto.volume);
+		// 요청 원본: ord_type="price"는 업비트 시장가 매수 → price가 주문총액
+		// Order 불변 정책에 따라 requested_amount에 저장, price/volume은 nullopt 유지
+		if (dto.ord_type == "price")
+			o.requested_amount = parseOptDouble(dto.price);
+		else
+		{
+			o.price  = parseOptDouble(dto.price);
+			o.volume = parseOptDouble(dto.volume);
+		}
 
 		// 부분 체결/잔여
 		o.executed_volume = parseDoubleOr(dto.executed_volume, 0.0);
@@ -132,8 +147,15 @@ namespace api::upbit::mapper
 
 		o.created_at = dto.created_at;
 
-		o.price = parseOptDouble(dto.price);
-		o.volume = parseOptDouble(dto.volume);
+		// 요청 원본: ord_type="price"는 업비트 시장가 매수 → price가 주문총액
+		// Order 불변 정책에 따라 requested_amount에 저장, price/volume은 nullopt 유지
+		if (dto.ord_type == "price")
+			o.requested_amount = parseOptDouble(dto.price);
+		else
+		{
+			o.price  = parseOptDouble(dto.price);
+			o.volume = parseOptDouble(dto.volume);
+		}
 
 		o.executed_volume = parseDoubleOr(dto.executed_volume, 0.0);
 		o.remaining_volume = dto.remaining_volume.has_value()
@@ -141,9 +163,18 @@ namespace api::upbit::mapper
 			: 0.0;
 		o.trades_count = dto.trades_count;
 
-		o.executed_funds = dto.executed_funds.has_value()
-			? parseDoubleOr(*dto.executed_funds, 0.0)
-			: 0.0;
+		if (dto.executed_funds.has_value())
+		{
+			o.executed_funds = parseDoubleOr(*dto.executed_funds, 0.0);
+		}
+		else
+		{
+			// executed_funds 누락 시 /v1/order trades[].funds 합으로 보강한다.
+			o.executed_funds = sumTradeFunds(dto.trades);
+		}
+
+		if (o.trades_count == 0 && !dto.trades.empty())
+			o.trades_count = static_cast<int>(dto.trades.size());
 
 		o.reserved_fee = parseDoubleOr(dto.reserved_fee, 0.0);
 		o.remaining_fee = parseDoubleOr(dto.remaining_fee, 0.0);
