@@ -1,4 +1,4 @@
-﻿# 프로젝트 구조 개선 검토 (2026-02-19 / 2026-02-23 self-heal 추가 / 2026-02-27 OrderStore erase 전환 / 2026-02-28 WS 유실 진입가 폴백 추가)
+﻿# 프로젝트 구조 개선 검토 (2026-02-19 / 2026-02-23 self-heal 추가 / 2026-02-27 OrderStore erase 전환 / 2026-02-28 WS 유실 진입가 폴백 추가 / 2026-02-28 dust 밴드 제거 + 드리프트 로그 추가 / 2026-03-02 #4 Recovery 트리거 해결 + #24 큐/이벤트 구조 개선 추가 + #25 Asio Strand 장기 검토 추가)
 
 ## 목적
 - 현재 코드베이스에서 운영 안정성/유지보수성 측면의 구조 개선 가능 지점을 정리한다.
@@ -19,11 +19,11 @@
 | 모듈 | 관련 항목 |
 |------|---------|
 | `src/app/EventRouter` | #1, #3 |
-| `src/app/MarketEngineManager` | #4, #6, #7, #12, #18, #20 |
+| `src/app/MarketEngineManager` | #4, #6, #7, #12, #18, #20, #24, #25 |
 | `src/app/CoinBot` | #4, #8 |
 | `src/app/StartupRecovery` | #5 |
-| `src/core/BlockingQueue` | #1, #3 |
-| `src/engine/MarketEngine` | #6, #10, #14, #15, #23 |
+| `src/core/BlockingQueue` | #1, #3, #25 |
+| `src/engine/MarketEngine` | #6, #10, #14, #15, #23, #24 |
 | `src/engine/OrderStore` | #10 |
 | `src/api/upbit/SharedOrderApi` | #11 |
 | `src/api/rest/RestClient` | #11 |
@@ -73,6 +73,11 @@
 - 개선:
   - `myOrder` 전용 큐 분리(우선순위 높음)
   - 최소한 `myOrder` 경로는 drop 금지 또는 별도 백프레셔 정책 적용
+- 구체적 구현 방향 (2026-03-02 검토):
+  - `MarketContext`에 큐 2개로 분리: `candle_queue`(bounded, drop-oldest), `order_queue`(unbounded 또는 대용량 bounded, drop 금지)
+  - `workerLoop_`: `order_queue.try_pop()` 우선 처리 후 `candle_queue.pop_for(50ms)` 대기
+  - `EventRouter`: `routeMarketData()`는 `candle_queue`로, `routeMyOrder()`는 `order_queue`로 라우팅
+  - 변경 범위: `MarketContext`, `EventRouter::registerMarket()` 시그니처, `workerLoop_` 순서 제어
 
 ### 2) [P1] 로깅 경합 및 flush 비용 — `Logger` / `MarketEngineManager`
 - **발생 모듈**: `src/util/Logger.h`, `src/app/MarketEngineManager.cpp`
@@ -109,25 +114,20 @@
   - 마켓별 dropped count, high-watermark, queue-lag 지표 추가
   - 임계치 초과 시 WARN 알림 연동
 
-### 4) [P2] Recovery 트리거 과다 및 조건 부족 — `MarketEngineManager` / `CoinBot`
+### ~~4) [P2] Recovery 트리거 과다 및 조건 부족~~ ✅ 해결 (2026-03-02) — `MarketEngineManager`
 - **발생 모듈**: `src/app/MarketEngineManager.cpp`, `src/app/CoinBot.cpp`
-- 현황:
-  - Private WS 재연결 콜백에서 전 마켓 복구 요청
-  - 참조: `src/app/CoinBot.cpp:157`, `src/app/MarketEngineManager.cpp:589`
-  - 워커 루프 매 반복에서 recovery flag 우선 처리
-  - 참조: `src/app/MarketEngineManager.cpp:289`
-  - pending이 없으면 바로 skip 로그
-  - 참조: `src/app/MarketEngineManager.cpp:613`, `src/app/MarketEngineManager.cpp:616`
-- 로그 근거:
-  - `Running recovery`가 반복되지만 대부분 skip
-  - 예시: `market_logs/KRW-BTC.log:8`, `market_logs/KRW-BTC.log:9`
-- 리스크:
+- 기존 문제:
+  - Private WS 재연결 콜백에서 전 마켓 복구 요청 (pending 유무 무관)
   - 정상 구간에서도 복구 루프/로그 오버헤드 누적
-  - pending 동시 발생 시 `getOrder` 재시도 + fallback 호출이 직렬화 REST 병목과 결합
-- 개선:
-  - 마켓별 active pending 존재 시에만 recovery 실행
-  - recovery 최소 간격(cooldown) 도입
-  - trigger reason(`reconnect`, `pending_timeout`, `reconcile_fail`)별 계측 추가
+  - 참조 (구): `src/app/CoinBot.cpp:157`, `src/app/MarketEngineManager.cpp:589`
+- 수정 내용:
+  - `MarketContext::has_active_pending` (atomic bool) 추가 — `checkPendingTimeout_`에서 매 루프마다 `activePendingIds()` 기반으로 갱신
+  - `requestReconnectRecovery()`에서 `has_active_pending`이 false인 마켓은 `recovery_requested` 설정 자체를 skip → pending 없는 마켓은 복구 루프 진입 차단
+  - `runRecovery_()` 진입 시 `activePendingIds()` 재확인 후 조기 반환 (레이스 컨디션 안전망)
+  - atomic flag 방식으로 중복 WS 재연결 요청이 자동 병합 → cooldown과 동등한 효과
+  - 참조: `src/app/MarketEngineManager.cpp:618-636`, `src/app/MarketEngineManager.cpp:648-655`
+- 잔존 한계:
+  - trigger reason별 계측(`reconnect` / `pending_timeout` / `reconcile_fail`) 미추가 — 운영 로그에서 컨텍스트로 구분 가능하므로 현 단계에서는 허용
 
 ### 5) [P2] 로깅 경로 혼용 — `Logger` / `UpbitWebSocketClient` / `StartupRecovery`
 - **발생 모듈**: `src/util/Logger.h`, `src/api/ws/UpbitWebSocketClient.cpp`, `src/app/StartupRecovery.cpp`, `src/api/upbit/UpbitExchangeRestClient.cpp`, `src/engine/upbit/UpbitPrivateOrderApi.cpp`
@@ -264,7 +264,7 @@
    - Block 4 이탈 기준: `dust_exit_threshold_krw` (1,000원) — 분리 적용
    - 1,000~5,000원 히스테리시스 밴드: 이 구간에서는 어느 상태든 전이 없음 → 경계 진동 차단
 
-### 20) [P3] 재시작 시 소액 포지션으로 인한 마켓별 자본 드리프트 고착 — `AccountManager` / `RsiMeanReversionStrategy` / `MarketEngineManager`
+### ~~20) [P3] 재시작 시 소액 포지션으로 인한 마켓별 자본 드리프트 고착~~ 부분 해결 (2026-02-28) — `AccountManager` / `RsiMeanReversionStrategy` / `MarketEngineManager`
 - **발생 모듈**: `src/trading/allocation/AccountManager.cpp`, `src/trading/strategies/RsiMeanReversionStrategy.cpp`, `src/app/MarketEngineManager.cpp`
 - 현황:
   - 초기화/재구축 시 `coin_value >= init_dust_threshold_krw(5,000원)`이면 해당 마켓을 코인 보유 마켓으로 간주
@@ -285,28 +285,28 @@
 - 리뷰 타당성 정리:
   - "임계값 초과 소액 포지션이 재시작 자본 배분을 비틀 수 있다"는 문제 제기는 타당
   - 다만 표현은 "자본 손실"보다 "마켓별 자본 드리프트 고착"이 정확
-- 개선:
-  - 재시작 시 마켓별 목표 운용자본(`target_capital_per_market`)을 기준으로 `available_krw + coin_value` 편차를 계산하고, free KRW 배분 시 편차 보정 우선 적용
-  - 최소한 운영 지표로 `market_equity_drift = (available_krw + coin_value) - target_capital`를 추가해 임계치 초과 시 경고
-  - 재구축 정책을 문서화: "총자산 보존"과 "마켓별 운용자본 보존" 중 우선순위를 명시
+- 수정 내용 (2026-02-28):
+  - `MarketEngineManager.cpp`: `rebuildFromAccount` 직후 마켓별 equity/drift 계산 및 로그 추가
+    - `equity = available_krw + coin_balance * avg_entry_price` (재구축 시점 추정값)
+    - `target = total_equity / num_markets`
+    - `|drift| > target * 20%`이면 WARN 출력
+    - 참조: `src/app/MarketEngineManager.cpp` (rebuildAccountOnStartup_ 내)
+- 잔존 한계:
+  - `coin_value >= 5,000원`인 정상 포지션으로 인한 드리프트는 KRW 배분 로직 변경 없이 유지됨
+  - 단, 해당 포지션은 매도 가능(`>= min_notional_krw`)하므로 청산 후 다음 재시작 시 자동 정정됨
+  - #21 수정으로 1,000~5,000원 구간 dust의 드리프트 원인은 함께 제거됨
 
-### 21) [P3] 히스테리시스 밴드(1,000~5,000원) 장기 고착 가능성 — `RsiMeanReversionStrategy`
+### ~~21) [P3] 히스테리시스 밴드(1,000~5,000원) 장기 고착 가능성~~ ✅ 해결 (2026-02-28) — `RsiMeanReversionStrategy`
 - **발생 모듈**: `src/trading/strategies/RsiMeanReversionStrategy.cpp`, `src/util/Config.h`
-- 현황:
-  - 상태 전이 기준은 `enter >= min_notional_krw(5,000원)`, `exit < dust_exit_threshold_krw(1,000원)`으로 분리
-  - 참조: `src/trading/strategies/RsiMeanReversionStrategy.cpp:155`, `src/trading/strategies/RsiMeanReversionStrategy.cpp:156`, `src/util/Config.h:13`, `src/util/Config.h:18`
-  - 매도 주문은 `sellVol * close >= min_notional_krw(5,000원)`일 때만 생성
-  - 참조: `src/trading/strategies/RsiMeanReversionStrategy.cpp:332`
-  - 결과적으로 1,000~5,000원 구간은 "상태 전이 없음 + 매도 주문 불가" 밴드가 된다.
-- 리스크:
-  - 이 구간의 잔량은 장기적으로 `InPosition` 상태를 유지하며 마켓이 사실상 비활성화될 수 있음
-  - 즉시 장애형은 아니지만, 마켓별 자본 회전율/전략 관측 지표(포지션 점유 시간)에 왜곡을 줄 수 있음
-- 개선:
-  - 정책 선택지를 명시적으로 문서화:
-    - `A안`: 현재 히스테리시스 유지(진동 방지 우선)
-    - `B안`: `dust_exit_threshold_krw`를 `min_notional_krw` 근처로 상향(고착 완화 우선)
-    - `C안`: 밴드 체류 시간 기반 운영 경고(`band_residence_duration`)만 추가
-  - 최소 변경 기준으로는 `C안`을 우선 적용해 실제 운영 영향(체류 시간/빈도)을 계측 후 임계값 재조정 판단
+- 기존 문제:
+  - 상태 전이 기준이 `enter >= min_notional_krw(5,000원)`, `exit < dust_exit_threshold_krw(1,000원)`으로 분리
+  - 결과적으로 1,000~5,000원 구간은 "상태 전이 없음 + 매도 주문 불가" 밴드 → InPosition 고착
+- 수정 내용:
+  - `Config.h`: `dust_exit_threshold_krw` 1,000원 → 5,000원으로 변경 (`min_notional_krw`와 동일)
+  - `hasMeaningfulPos`와 `isTrueDust`가 상호 배타적 → 히스테리시스 밴드 제거
+  - 경계(5,000원) 진동 가능하지만 `canBuy()/canSell()` 가드로 실제 주문 발생 없음
+  - `RsiMeanReversionStrategy.cpp` 주석 업데이트 (151~154줄)
+  - 참조: `src/util/Config.h:18`
 
 ---
 
@@ -366,6 +366,42 @@
 - 개선:
   - 정책 자체는 유지 가능하나, 운영 모드에서 진단 정보(마켓/호출 경로/최근 이벤트) 강화 필요
 
+### 24) [P4] Engine 이벤트 출력 방식 개선 — `MarketEngine` / `MarketEngineManager`
+- **발생 모듈**: `src/engine/MarketEngine.h`, `src/app/MarketEngineManager.cpp`
+- 현황:
+  - `engine->pollEvents()`를 `workerLoop_` 매 반복 끝에서 호출하는 pull 방식
+  - 참조: `src/app/MarketEngineManager.cpp:323`
+  - 이벤트가 없어도 매 루프마다 빈 벡터 조회 발생
+- 리스크:
+  - 실질 성능 영향은 미미 (1분봉, 소수 마켓)
+  - `handleOne_()` → `pollEvents()` 사이에 다른 이벤트가 끼어들 여지가 없으므로 처리 순서 문제는 없음
+- 개선 (선택적):
+  - `MarketEngine`에 `setEventCallback(std::function<void(const EngineEvent&)>)` 추가
+  - `onMyTrade()` / `onOrderSnapshot()` 내부에서 이벤트 발생 시 즉시 콜백 호출
+  - `pollEvents()` 메서드 및 내부 이벤트 버퍼(`pending_events_`) 제거
+  - 효과: 처리 즉시성 향상, 불필요한 벡터 할당 제거
+  - 주의: 콜백은 엔진과 동일 스레드에서만 호출되므로 스레드 안전 문제 없음 (`bindToCurrentThread` 불변 조건 유지)
+
+### 25) [P4] Boost.Asio Strand 기반 아키텍처 — 장기 확장 고려
+- **발생 모듈**: `src/app/MarketEngineManager.cpp`, `src/app/EventRouter.cpp`, `src/core/BlockingQueue.h`
+- 현황:
+  - 마켓당 전용 `jthread` 1개 + `BlockingQueue` 구조
+  - WS IO thread → `EventRouter` → `BlockingQueue.push()` → 워커 `pop_for(50ms)`
+  - 50ms timeout으로 stop token / recovery flag / pending timeout을 주기적으로 확인하는 timer-poll 패턴
+- 대안 구조 (Strand 방식):
+  - 마켓당 `boost::asio::strand<io_context::executor_type>` 1개
+  - WS 수신 콜백에서 `boost::asio::post(market_strand, handler)` 직접 디스패치
+  - io_context 스레드 풀이 스케줄링 담당 → 마켓 수와 스레드 수 독립적 조정 가능
+  - BlockingQueue 불필요 → drop-oldest 리스크 구조적 제거
+- 트레이드오프:
+  - ✅ 마켓 수십 개 이상으로 확장 시 스레드 수 절감 효과
+  - ✅ 이벤트 발생 즉시 처리 (50ms polling 제거)
+  - ⚠️ Recovery REST 호출(blocking)이 io_context thread를 점유 → `co_spawn` 또는 별도 executor 분리 필요
+  - ⚠️ 아키텍처 전면 재작성 수준 — `bindToCurrentThread` 불변 조건 재설계 포함
+- 결론:
+  - 현재(3~5마켓, 1분봉)에서는 오버엔지니어링
+  - 마켓 수가 수십 개 이상으로 늘어나거나 tick 단위 고빈도로 전환 시 재검토
+
 ### 22) [P4] AccountManager 생성자/재구축 로직 중복 — `AccountManager` / `MarketEngineManager`
 - **발생 모듈**: `src/trading/allocation/AccountManager.cpp`, `src/app/MarketEngineManager.cpp`, `src/app/CoinBot.cpp`
 - 현황:
@@ -387,10 +423,10 @@
 ---
 
 ## 권장 실행 순서
-1. [P1] 이벤트 큐 분리 (`myOrder` 전용 큐 분리)
+1. [P1] 이벤트 큐 분리 (`candle_queue` / `order_queue` 이원화, #1)
 2. [P1] 로깅 병목 완화 (flush 정책 분리 / rate-limit)
 3. [P2] 큐 드롭 관측성 지표 도입
-4. [P2] Recovery 트리거 제어 (조건부 실행 + cooldown)
+4. ~~[P2] Recovery 트리거 제어 (조건부 실행 + cooldown, #4)~~ ✅ 완료
 5. [P2] 로깅 경로 통합 (`std::cout` → `Logger`)
 8. ~~[P2] Self-Heal PendingExit 가격 하락 오검출 수정 (#17)~~ ✅ 완료
 9. ~~[P2] Self-Heal PendingEntry dust 오검출 수정 (#16)~~ ✅ 완료
@@ -401,13 +437,15 @@
 13. [P3] 운영 경로 환경변수화
 14. [P3] CMake 모듈화 정리
 15. ~~[P3] OrderStore cleanup 트리거 정합화 (#10)~~ ✅ 완료
-16. [P3] 재시작 자본 드리프트 보정 정책 도입 (#20)
-17. [P3] 밴드 체류 시간 지표 도입 및 임계값 재평가 (#21)
+16. ~~[P3] 재시작 자본 드리프트 관측 로그 추가 (#20)~~ 부분 해결 (2026-02-28)
+17. ~~[P3] 히스테리시스 밴드 제거 — dust_exit_threshold_krw 상향 (#21)~~ ✅ 완료 (2026-02-28)
 18. [P4] SharedOrderApi 병목 완화
 19. [P4] 종료 경로 안정화 (2단계: 하위 취소 전파)
 20. [P4] WebSocket 루프 책임 분리
 21. [P4] 치명 종료 진단 강화
 22. [P4] AccountManager 내부 공통화 및 타 모듈 공통 함수 리팩토링 검토 (#22)
+23. [P4] Engine 이벤트 출력 콜백 전환 (pollEvents → callback, #24)
+24. [P4] Asio Strand 기반 아키텍처 검토 — 마켓 수 대폭 증가 시 (#25)
 
 ## 비고
 - 본 문서는 정적 코드 검토 기준이며, 성능 수치/장애 재현은 별도 실험으로 보강 필요.
@@ -415,8 +453,14 @@
 - #15/#16/#17 해결 (2026-02-23): `onCandle`에서 Pending 상태 전이 Block 1/2 제거. Pending 전이를 주문 이벤트 경로로 단일화.
 - #19 해결 (2026-02-23): Block 3/4 임계값 분리(진입 5,000원 / 이탈 1,000원)로 히스테리시스 적용.
 - #21 추가 (2026-02-27): 히스테리시스 밴드(1,000~5,000원) 장기 체류에 대한 운영 리스크/계측 항목 추가.
+- #21 해결 (2026-02-28): `dust_exit_threshold_krw` 1,000원 → 5,000원으로 상향. 히스테리시스 밴드 제거. `min_notional_krw`와 동일 기준으로 정렬되어 1,000~5,000원 구간 고착 차단.
+- #20 부분 해결 (2026-02-28): `rebuildFromAccount` 직후 마켓별 equity/drift 로그 추가. 1,000~5,000원 구간 드리프트 원인은 #21 수정으로 함께 제거됨. 5,000원 이상 정상 포지션의 드리프트는 청산 후 자동 정정 구조 유지.
 - #22 추가 (2026-02-27): AccountManager 생성자/재구축 중복 검토 및 공통 함수 리팩토링 과제 등록.
 - #10 해결 (2026-02-27): cleanup() 방식 → erase() 즉시 제거 방식으로 전환. `orders_`에 존재 = 활성 주문 불변 조건 성립. DB 연동 시 erase 전 영속화 호출 지점 확보.
 - #23 해결 (2026-02-28): `EngineOrderStatusEvent.executed_funds` 누락 수정 + Canceled/Filled 폴백 체인 3단계 통일. WS 유실 경로에서 `entry_price_` 미설정으로 인한 손절·익절 불가 상태 차단.
+- #4 해결 (2026-03-02): `has_active_pending` atomic flag 도입으로 `requestReconnectRecovery()`에서 active pending이 없는 마켓은 recovery 요청 자체를 skip. `runRecovery_()` 진입 시 이중 확인으로 레이스 컨디션 방어. 불필요한 복구 루프/로그 오버헤드 제거.
+- #24 추가 (2026-03-02): Engine pollEvents() pull 방식을 callback 방식으로 전환하는 개선 방향 등록. P4 — 현 규모에서 체감 효과 미미하나 구조 단순화 목적.
+- #25 추가 (2026-03-02): Boost.Asio Strand 기반 아키텍처 장기 검토 항목 등록. 마켓 수 수십 개 이상 또는 고빈도 전환 시 재검토. 현 단계에서는 오버엔지니어링.
+- #1 업데이트 (2026-03-02): 큐 이원화 구체적 구현 방향 추가 (candle_queue/order_queue 분리, workerLoop_ 우선순위 처리, EventRouter 라우팅 타깃 분리).
 
 ---

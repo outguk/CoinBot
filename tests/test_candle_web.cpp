@@ -1,4 +1,4 @@
-#include <iostream>
+﻿#include <iostream>
 #include <vector>
 #include <variant>
 #include <algorithm>    // sort
@@ -118,7 +118,7 @@ int TestCandleWebUpdate()
         const trading::Decision d = strat.onCandle(c, seedAccount);
 
         // ������ ĵ�� ���� ������ ��ȸ
-        const auto& snap = strat.lastSnapshot();
+        const auto& snap = strat.signalSnapshot();
 
         // seedAccount�� 0�̹Ƿ� �����̶�� �ֹ��� ���� ������ �ʾƾ� ��
         if (d.hasOrder())

@@ -35,8 +35,8 @@ namespace trading::strategies {
             double overbought{ 70 };
             
             // SMA 추가
-            int smaLength{ 20 };
-            double smaBand{ 0.0 };
+            /*int smaLength{ 20 };
+            double smaBand{ 0.0 };*/
 
             // 추세 강도(trendStrength) 계산용: close[N]
             // trendStrength = abs(close - closeN) / closeN
@@ -50,8 +50,8 @@ namespace trading::strategies {
             // [HYBRID v2 §4.9] 배분 자본 사용 비율
             // krw_to_use = account.krw_available / reserve_margin * utilization
             double utilization{ 1.0 };
-            double stopLossPct{ 1.0 };        // 진입가 대비 손절 %
-            double profitTargetPct{ 2 };    // 진입가 대비 익절 %
+            double stopLossPct{ 2.0 };        // 진입가 대비 손절 %
+            double profitTargetPct{ 3 };    // 진입가 대비 익절 %
         };
 
         enum class State : std::uint8_t {
@@ -76,8 +76,8 @@ namespace trading::strategies {
 
         // (2) last snapshot getter (public)
     public:
-        // 테스트용, 현재 사용x
-        [[nodiscard]] const Snapshot& lastSnapshot() const noexcept { return last_snapshot_; }
+        // 마지막 신호 발생 시점 스냅샷 (진입/청산 시점 저장, 테스트·DB 기록용)
+        [[nodiscard]] const Snapshot& signalSnapshot() const noexcept { return signal_snapshot_; }
 
         // 메인 진입점: “봉 1개” 들어오면, 주문 의도가 있으면 Decision::submit 반환
         [[nodiscard]] Decision onCandle(const core::Candle& c, const AccountSnapshot& account);
@@ -93,6 +93,11 @@ namespace trading::strategies {
 
         // - 미체결 주문은 상위(앱/엔진)에서 전부 취소 후 호출(프로그램 시작 시 작동)
         void syncOnStart(const trading::PositionSnapshot& pos);
+
+        // DB 기록용 콜백 등록 (MarketEngineManager에서 주입)
+        // BUY: PendingEntry→InPosition 확정 시 호출
+        // SELL: PendingExit→Flat(완전) 또는 PendingExit→InPosition(부분) 확정 시 호출
+        void setSignalCallback(trading::SignalCallback fn) { signal_callback_ = std::move(fn); }
 
         // 테스트/리셋
         void reset();
@@ -148,8 +153,13 @@ namespace trading::strategies {
         // client_order_id 시퀀스
         std::uint64_t seq_{ 0 };
 
-        // 마지막 스냅샷 저장용 멤버 (private)
-        Snapshot last_snapshot_{};
+        // 마지막 신호 발생 시점 스냅샷
+        // - maybeEnter() 시 진입 신호 캔들, maybeExit() 시 청산 신호 캔들로 갱신
+        // - DB signals 테이블의 rsi/volatility 소스
+        Snapshot signal_snapshot_{};
+
+        // DB 신호 콜백 (MarketEngineManager가 등록, 없으면 no-op)
+        trading::SignalCallback signal_callback_{};
 
         // 같은 1분 캔들이 여러 번(업데이트 형태로) 들어오는 경우 중복 누적 방지용
         std::optional<std::string> last_candle_ts_{};

@@ -13,9 +13,10 @@ namespace util
         double min_notional_krw = 5000.0;       // 최소 주문 금액 (KRW) / Block 3 진입 임계값
 
         // Block 4 (InPosition → Flat) 이탈 임계값
-        // min_notional_krw보다 낮게 유지해야 히스테리시스 보장
-        // 밴드(dust_exit ~ min_notional) 구간에서는 어느 상태든 전이 없음
-        double dust_exit_threshold_krw = 1000.0;
+        // min_notional_krw와 동일하게 설정 → 히스테리시스 밴드 없음
+        // posNotional < 5,000원이면 매도도 불가하므로 Flat 전이가 상태와 정렬됨
+        // 경계 진동 가능하지만 canBuy()/canSell() 가드로 실제 주문 발생 없음
+        double dust_exit_threshold_krw = 5000.0;
     };
 
     // 엔진 설정
@@ -86,6 +87,9 @@ namespace util
         // 거래할 마켓 목록
         // 환경 변수 UPBIT_MARKETS (CSV) 로 재정의 가능
         std::vector<std::string> markets = { "KRW-BTC", "KRW-ETH", "KRW-XRP" };
+
+        // SQLite DB 파일 경로
+        std::string db_path = "C:\\cpp\\CoinBot\\src\\db\\coinbot.db";
     };
 
     // 통합 설정 (나중에 JSON 로딩 추가 가능)

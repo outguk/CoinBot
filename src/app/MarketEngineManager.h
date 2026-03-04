@@ -27,6 +27,7 @@
 #include "trading/allocation/AccountManager.h"
 #include "trading/strategies/RsiMeanReversionStrategy.h"
 #include "trading/strategies/StrategyTypes.h"
+#include "db/Database.h"
 
 namespace app {
 
@@ -56,7 +57,8 @@ public:
                         engine::OrderStore& store,
                         trading::allocation::AccountManager& account_mgr,
                         const std::vector<std::string>& markets,
-                        MarketManagerConfig cfg = {});
+                        MarketManagerConfig cfg = {},
+                        db::Database* db = nullptr);
 
     ~MarketEngineManager();
 
@@ -103,6 +105,10 @@ private:
         // atomic flag로 큐 drop-oldest와 무관하게 우선 처리
         std::atomic<bool> recovery_requested{false};
 
+        // requestReconnectRecovery 필터링용
+        // worker thread(checkPendingTimeout_)에서만 쓰기, WS IO thread에서 읽기
+        std::atomic<bool> has_active_pending{false};
+
         explicit MarketContext(std::string m, std::size_t queue_capacity)
             : market(std::move(m))
             , event_queue(queue_capacity)
@@ -148,6 +154,7 @@ private:
 	api::upbit::IOrderApi& api_;    // 외부 거래소 API
 	engine::OrderStore& store_;     // 마켓들이 공유하는 주문 저장소
 	trading::allocation::AccountManager& account_mgr_; // 공유 계좌 관리자
+    db::Database* db_{ nullptr };   // SQLite DB (없으면 기록 생략)
 
     MarketManagerConfig cfg_;
 
