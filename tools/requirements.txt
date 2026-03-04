@@ -1,0 +1,5 @@
+# Step 7 (fetch_candles.py) + Step 9 (candle_rsi_backtest.py) 의존성
+requests
+pandas
+numpy
+tzdata   # Windows에서 ZoneInfo("Asia/Seoul") 사용에 필요

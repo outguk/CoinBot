@@ -65,15 +65,18 @@ CREATE INDEX IF NOT EXISTS idx_signals_market ON signals(market, ts_ms);
 
 // ─── 소멸자 / 이동 ────────────────────────────────────────────────────────────
 
-Database::~Database() {
-    if (db_) sqlite3_close(db_);
+Database::~Database() 
+{
+    if (db_) sqlite3_close(db_); // SQLite 객체를 닫는다
 }
 
-Database::Database(Database&& other) noexcept : db_(other.db_) {
+Database::Database(Database&& other) noexcept : db_(other.db_) 
+{
     other.db_ = nullptr;
 }
 
-Database& Database::operator=(Database&& other) noexcept {
+Database& Database::operator=(Database&& other) noexcept 
+{
     if (this != &other) {
         if (db_) sqlite3_close(db_);
         db_       = other.db_;
@@ -84,21 +87,28 @@ Database& Database::operator=(Database&& other) noexcept {
 
 // ─── open ─────────────────────────────────────────────────────────────────────
 
-void Database::open(const std::string& path) {
+void Database::open(const std::string& path) 
+{
     // 재호출 시 기존 핸들 닫기 (누수 방지)
-    if (db_) {
+    if (db_) 
+    {
         sqlite3_close(db_);
         db_ = nullptr;
     }
-    if (sqlite3_open(path.c_str(), &db_) != SQLITE_OK) {
+
+    // SQLite 열기 문법(실패 시 throw)
+    if (sqlite3_open(path.c_str(), &db_) != SQLITE_OK) 
+    {
         std::string msg = db_ ? sqlite3_errmsg(db_) : "unknown";
         sqlite3_close(db_);
         db_ = nullptr;
         throw std::runtime_error("[DB] open 실패: " + msg);
     }
+
     // WAL 모드: Streamlit 읽기와 봇 쓰기 비차단
     // 실패 시 db_ 정리 후 재throw → db_ != nullptr = 완전 초기화 보장
     try {
+        // 모드 설정
         exec("PRAGMA journal_mode=WAL;");
         exec("PRAGMA synchronous=NORMAL;");
         exec("PRAGMA wal_autocheckpoint=10;"); // 10페이지(~40KB)마다 체크포인트(db 파일 업데이트)
@@ -111,26 +121,32 @@ void Database::open(const std::string& path) {
     util::log().info("[DB] 열림: ", path);
 }
 
-void Database::exec(const char* sql) {
+void Database::exec(const char* sql) 
+{
     char* err = nullptr;
-    if (sqlite3_exec(db_, sql, nullptr, nullptr, &err) != SQLITE_OK) {
+	// 스키마 초기화·PRAGMA 전용: 결과 처리(바인딩) 필요 없는 단순 실행
+    if (sqlite3_exec(db_, sql, nullptr, nullptr, &err) != SQLITE_OK) 
+    {
         std::string msg = err ? err : "unknown";
         sqlite3_free(err);
         throw std::runtime_error(std::string("[DB] exec 실패: ") + msg);
     }
 }
 
-void Database::initSchema() {
+void Database::initSchema() 
+{
     exec(kSchema);
 }
 
 // ─── normalizeToEpochMs ───────────────────────────────────────────────────────
 
-int64_t Database::normalizeToEpochMs(const std::string& s) {
+int64_t Database::normalizeToEpochMs(const std::string& s) 
+{
     if (s.empty()) return 0;
 
     // 숫자 문자열이면 epoch ms (WS 경로)
-    if (std::all_of(s.begin(), s.end(), ::isdigit)) {
+    if (std::all_of(s.begin(), s.end(), ::isdigit)) 
+    {
         int64_t val = 0;
         auto [ptr, ec] = std::from_chars(s.data(), s.data() + s.size(), val);
         if (ec == std::errc{}) return val;
@@ -141,7 +157,8 @@ int64_t Database::normalizeToEpochMs(const std::string& s) {
     // ISO8601 파싱 (REST 경로): "YYYY-MM-DDTHH:MM:SS+HH:MM"
     int year = 0, mon = 0, day = 0, hour = 0, min = 0, sec = 0;
     if (sscanf_s(s.c_str(), "%d-%d-%dT%d:%d:%d",
-                 &year, &mon, &day, &hour, &min, &sec) != 6) {
+                 &year, &mon, &day, &hour, &min, &sec) != 6) 
+    {
         util::log().warn("[DB] created_at ISO8601 파싱 실패: ", s);
         return 0;
     }
@@ -149,9 +166,11 @@ int64_t Database::normalizeToEpochMs(const std::string& s) {
     // 타임존 오프셋 파싱 (+09:00 / -05:30 / Z)
     // "YYYY-MM-DDTHH:MM:SS" = 19자 → s[19]이 부호 문자
     int tz_offset_min = 0;
-    if (s.size() > 19 && (s[19] == '+' || s[19] == '-')) {
+    if (s.size() > 19 && (s[19] == '+' || s[19] == '-')) 
+    {
         int tz_h = 0, tz_m = 0;
-        if (sscanf_s(s.c_str() + 20, "%d:%d", &tz_h, &tz_m) == 2) {
+        if (sscanf_s(s.c_str() + 20, "%d:%d", &tz_h, &tz_m) == 2) 
+        {
             tz_offset_min = tz_h * 60 + tz_m;
             if (s[19] == '-') tz_offset_min = -tz_offset_min;
         }
@@ -167,7 +186,8 @@ int64_t Database::normalizeToEpochMs(const std::string& s) {
 
     // _mkgmtime: tm을 UTC epoch seconds로 변환 (MSVC 전용, POSIX는 timegm)
     const int64_t epoch_sec = static_cast<int64_t>(_mkgmtime(&tm));
-    if (epoch_sec < 0) {
+    if (epoch_sec < 0) 
+    {
         util::log().warn("[DB] created_at _mkgmtime 변환 실패: ", s);
         return 0;
     }
@@ -177,23 +197,29 @@ int64_t Database::normalizeToEpochMs(const std::string& s) {
 
 // ─── insertCandle ─────────────────────────────────────────────────────────────
 
-bool Database::insertCandle(const std::string& market, const core::Candle& c) {
+bool Database::insertCandle(const std::string& market, const core::Candle& c) 
+{
     if (!db_) {
         util::log().warn("[DB] insertCandle: DB가 열려 있지 않음");
         return false;
     }
 
+	// ?는 bind로 매개변수를 바인딩하는 자리 표시자 (DO NOTHING은 중복 무시)
     static constexpr const char* sql =
         "INSERT INTO candles (market, ts, open, high, low, close, volume) "
         "VALUES (?, ?, ?, ?, ?, ?, ?) "
         "ON CONFLICT(market, ts) DO NOTHING;";
 
+	// 컴파일된 SQL 실행 객체 (prepare가 성공하면 유효 포인터로 채워지고 실패시 nullptr 유지)
     sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+    // SQL 문자열을 파싱/컴파일해서 stmt 객체를 만든다
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK)
+    {
         util::log().warn("[DB] insertCandle prepare 실패: ", sqlite3_errmsg(db_));
         return false;
     }
 
+	// ? 자리에 값을 바인딩한다 (1-based index), SQLite는 1부터 시작
     sqlite3_bind_text  (stmt, 1, market.c_str(),            -1, SQLITE_STATIC);
     sqlite3_bind_text  (stmt, 2, c.start_timestamp.c_str(), -1, SQLITE_STATIC);
     sqlite3_bind_double(stmt, 3, c.open_price);
@@ -202,17 +228,21 @@ bool Database::insertCandle(const std::string& market, const core::Candle& c) {
     sqlite3_bind_double(stmt, 6, c.close_price);
     sqlite3_bind_double(stmt, 7, c.volume);
 
+    // step을 통해 실행한다
     const bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
     if (!ok) util::log().warn("[DB] insertCandle step 실패: ", sqlite3_errmsg(db_));
 
+	// stmt 객체를 해제한다 (메모리 누수 방지)
     sqlite3_finalize(stmt);
     return ok;
 }
 
 // ─── insertOrder ─────────────────────────────────────────────────────────────
 
-bool Database::insertOrder(const core::Order& o) {
-    if (!db_) {
+bool Database::insertOrder(const core::Order& o) 
+{
+    if (!db_) 
+    {
         util::log().warn("[DB] insertOrder: DB가 열려 있지 않음");
         return false;
     }
@@ -229,7 +259,8 @@ bool Database::insertOrder(const core::Order& o) {
     )SQL";
 
     sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) 
+    {
         util::log().warn("[DB] insertOrder prepare 실패: ", sqlite3_errmsg(db_));
         return false;
     }
@@ -271,8 +302,10 @@ bool Database::insertOrder(const core::Order& o) {
 
 // ─── insertSignal ─────────────────────────────────────────────────────────────
 
-bool Database::insertSignal(const trading::SignalRecord& sig) {
-    if (!db_) {
+bool Database::insertSignal(const trading::SignalRecord& sig)       
+{
+    if (!db_) 
+    {
         util::log().warn("[DB] insertSignal: DB가 열려 있지 않음");
         return false;
     }
@@ -284,7 +317,8 @@ bool Database::insertSignal(const trading::SignalRecord& sig) {
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
 
     sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) 
+    {
         util::log().warn("[DB] insertSignal prepare 실패: ", sqlite3_errmsg(db_));
         return false;
     }
