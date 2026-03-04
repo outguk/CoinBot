@@ -226,7 +226,7 @@ CREATE INDEX idx_signals_market ON signals(market, ts_ms);
   - 거래 성과 요약 (signals SQL 집계: 승률, 총손익, 평균 보유 기간)
 
 #### 2.5 백테스트
-- `tools/backtest.py`
+- `tools/candle_rsi_backtest.py`
   - `candles` 테이블에서 데이터 로드
   - RSI 전략 로직 구현 (봇과 동일 파라미터 기준)
   - 시뮬레이션 결과: 진입/청산 목록, 손익 곡선
@@ -261,7 +261,7 @@ Step 5  [미시작] MarketEngineManager DB 주입 + write 연결  (2.3)
 Step 6  [미시작] CoinBot.cpp Database 생성 + 주입          (2.1/2.3)
 Step 7  [미시작] tools/fetch_candles.py                   (2.2)
 Step 8  [미시작] streamlit/app.py                         (2.4)
-Step 9  [미시작] tools/backtest.py                        (2.5)
+Step 9  [미시작] tools/candle_rsi_backtest.py             (2.5)
 ```
 
 ---

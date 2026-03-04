@@ -316,6 +316,9 @@ paket-files/
 __pycache__/
 *.pyc
 
+# Python 가상환경
+.venv/
+
 # Cake - Uncomment if you are using it
 # tools/**
 # !tools/packages.config

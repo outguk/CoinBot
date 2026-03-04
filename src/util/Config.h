@@ -86,7 +86,7 @@ namespace util
     {
         // 거래할 마켓 목록
         // 환경 변수 UPBIT_MARKETS (CSV) 로 재정의 가능
-        std::vector<std::string> markets = { "KRW-BTC", "KRW-ETH", "KRW-XRP" };
+        std::vector<std::string> markets = { "KRW-ADA", "KRW-TRX", "KRW-XRP" };
 
         // SQLite DB 파일 경로
         std::string db_path = "C:\\cpp\\CoinBot\\src\\db\\coinbot.db";
