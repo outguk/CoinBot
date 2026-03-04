@@ -1,6 +1,7 @@
 ﻿#include "RsiMeanReversionStrategy.h"
 
 #include <algorithm> // std::max, std::min
+#include <chrono>
 #include <cmath>     // std::abs
 #include <utility>   // std::move
 #include <iostream>
@@ -12,6 +13,14 @@
 
 #include "util/Config.h"
 #include "util/Logger.h"
+
+namespace {
+    // 현재 시각을 epoch milliseconds로 반환
+    int64_t nowMs() {
+        using namespace std::chrono;
+        return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+    }
+}
 
 namespace trading::strategies {
 
@@ -68,7 +77,7 @@ namespace trading::strategies {
         closeN_.clear();
         vol_.clear();
 
-        last_snapshot_ = Snapshot{};
+        signal_snapshot_ = Snapshot{};
 
         last_candle_ts_.reset();
     }
@@ -148,10 +157,10 @@ namespace trading::strategies {
         // - InPosition인데 dust만 남음: 거래 불가 잔량 → Flat
         const double posNotional = account.coin_available * s.close;
         const auto& strategy_cfg = util::AppConfig::instance().strategy;
-        // 진입/이탈 임계값 분리 (히스테리시스)
+        // 진입/이탈 임계값 (동일 기준, 히스테리시스 밴드 없음)
         // - enter: min_notional_krw (5,000원) 이상이면 InPosition으로 인식
-        // - exit : dust_exit_threshold_krw (1,000원) 미만일 때만 Flat으로 이탈
-        // 두 임계값 사이(1,000~5,000원) 구간에서는 현재 상태를 유지 → 경계 진동 방지
+        // - exit : dust_exit_threshold_krw (5,000원) 미만이면 Flat으로 이탈
+        // 두 기준이 동일하므로 hasMeaningfulPos와 isTrueDust는 상호 배타적
         const bool hasMeaningfulPos = (posNotional >= strategy_cfg.min_notional_krw);
         const bool isTrueDust       = (posNotional <  strategy_cfg.dust_exit_threshold_krw);
 
@@ -229,8 +238,6 @@ namespace trading::strategies {
 
         s.marketOk = (trendOk && volOk && rsiOk);
 
-        // 마지막 스냅샷 저장 (테스트에서 RSI를 여기서 읽게 됨)
-        last_snapshot_ = s;
         return s;
     }
 
@@ -271,6 +278,9 @@ namespace trading::strategies {
         pending_filled_volume_ = 0.0;
         pending_cost_sum_ = 0.0;
         pending_last_price_ = 0.0;
+
+        // 진입 신호 시점 스냅샷 저장 (BUY 신호 기록 시 rsi/volatility 소스)
+        signal_snapshot_ = s;
 
         // 상태 전이: Flat -> PendingEntry
         state_ = State::PendingEntry;
@@ -339,6 +349,9 @@ namespace trading::strategies {
         pending_filled_volume_ = 0.0;
         pending_cost_sum_ = 0.0;
         pending_last_price_ = 0.0;
+
+        // 청산 신호 시점 스냅샷 저장 (SELL 신호 기록 시 rsi/volatility 소스)
+        signal_snapshot_ = s;
 
         // 상태 전이: InPosition -> PendingExit
         state_ = State::PendingExit;
@@ -426,9 +439,41 @@ namespace trading::strategies {
                             " entry_price_unavailable");
                     }
                     state_ = State::InPosition;
+
+                    // BUY 신호: PendingEntry → InPosition 확정
+                    if (signal_callback_ && entry_price_.has_value()) {
+                        const double vol = pending_filled_volume_ > 0.0 ? pending_filled_volume_ : ev.executed_volume;
+                        trading::SignalRecord sig;
+                        sig.market      = market_;
+                        sig.side        = trading::SignalSide::BUY;
+                        sig.price       = *entry_price_;
+                        sig.volume      = vol;
+                        sig.krw_amount  = pending_cost_sum_ > 0.0 ? pending_cost_sum_ : ev.executed_funds;
+                        sig.stop_price  = stop_price_;
+                        sig.target_price = target_price_;
+                        sig.rsi        = signal_snapshot_.rsi.ready       ? std::optional<double>(signal_snapshot_.rsi.v)        : std::nullopt;
+                        sig.volatility = signal_snapshot_.volatility.ready ? std::optional<double>(signal_snapshot_.volatility.v) : std::nullopt;
+                        sig.is_partial  = 0;
+                        sig.ts_ms       = nowMs();
+                        signal_callback_(sig);
+                    }
                 }
                 else if (state_ == State::PendingExit) {
-                    // 부분 청산: 수량 추적은 계좌 스냅샷에 맡기고 InPosition 유지
+                    // 부분 청산(is_partial=1): pending_filled_volume_ > 0인 경우에만 기록
+                    if (signal_callback_ && pending_filled_volume_ > 0.0) {
+                        trading::SignalRecord sig;
+                        sig.market     = market_;
+                        sig.side       = trading::SignalSide::SELL;
+                        sig.price      = vwap;
+                        sig.volume     = pending_filled_volume_;
+                        sig.krw_amount = pending_cost_sum_ > 0.0 ? pending_cost_sum_ : ev.executed_funds;
+                        sig.rsi        = signal_snapshot_.rsi.ready       ? std::optional<double>(signal_snapshot_.rsi.v)        : std::nullopt;
+                        sig.volatility = signal_snapshot_.volatility.ready ? std::optional<double>(signal_snapshot_.volatility.v) : std::nullopt;
+                        sig.is_partial = 1;
+                        sig.ts_ms      = nowMs();
+                        signal_callback_(sig);
+                    }
+                    // 수량 추적은 계좌 스냅샷에 맡기고 InPosition 유지
                     state_ = State::InPosition;
                 }
 
@@ -452,19 +497,53 @@ namespace trading::strategies {
                     ? ev.executed_funds / ev.executed_volume
                     : pending_last_price_);
 
-                if (state_ == State::PendingEntry) 
+                if (state_ == State::PendingEntry)
                 {
                     // 진입 확정
-                    if (final_price > 0.0) 
+                    if (final_price > 0.0)
                     {
                         entry_price_ = final_price;
                         setStopsFromEntry(*entry_price_);
                         logEntryConfirmed_("filled", *entry_price_);
                     }
                     state_ = State::InPosition;
+
+                    // BUY 신호: PendingEntry → InPosition 확정
+                    if (signal_callback_ && entry_price_.has_value()) {
+                        const double vol = pending_filled_volume_ > 0.0 ? pending_filled_volume_ : ev.executed_volume;
+                        trading::SignalRecord sig;
+                        sig.market       = market_;
+                        sig.side         = trading::SignalSide::BUY;
+                        sig.price        = *entry_price_;
+                        sig.volume       = vol;
+                        sig.krw_amount   = pending_cost_sum_ > 0.0 ? pending_cost_sum_ : ev.executed_funds;
+                        sig.stop_price   = stop_price_;
+                        sig.target_price = target_price_;
+                        sig.rsi        = signal_snapshot_.rsi.ready       ? std::optional<double>(signal_snapshot_.rsi.v)        : std::nullopt;
+                        sig.volatility = signal_snapshot_.volatility.ready ? std::optional<double>(signal_snapshot_.volatility.v) : std::nullopt;
+                        sig.is_partial   = 0;
+                        sig.ts_ms        = nowMs();
+                        signal_callback_(sig);
+                    }
                 }
-            else if (state_ == State::PendingExit) 
+            else if (state_ == State::PendingExit)
             {
+                // SELL 신호(완전 청산, is_partial=0): 유효가 확인된 경우만 기록
+                if (signal_callback_ && final_price > 0.0) {
+                    const double vol = pending_filled_volume_ > 0.0 ? pending_filled_volume_ : ev.executed_volume;
+                    trading::SignalRecord sig;
+                    sig.market     = market_;
+                    sig.side       = trading::SignalSide::SELL;
+                    sig.price      = final_price;
+                    sig.volume     = vol;
+                    sig.krw_amount = pending_cost_sum_ > 0.0 ? pending_cost_sum_ : ev.executed_funds;
+                    sig.rsi        = signal_snapshot_.rsi.ready       ? std::optional<double>(signal_snapshot_.rsi.v)        : std::nullopt;
+                    sig.volatility = signal_snapshot_.volatility.ready ? std::optional<double>(signal_snapshot_.volatility.v) : std::nullopt;
+                    sig.is_partial = 0;
+                    sig.ts_ms      = nowMs();
+                    signal_callback_(sig);
+                }
+
                 // 청산 확정
                 state_ = State::Flat;
                 entry_price_.reset();

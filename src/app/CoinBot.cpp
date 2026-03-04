@@ -29,6 +29,7 @@
 #include "api/ws/UpbitWebSocketClient.h"
 #include "app/EventRouter.h"
 #include "app/MarketEngineManager.h"
+#include "db/Database.h"
 #include "engine/OrderStore.h"
 #include "trading/allocation/AccountManager.h"
 #include "util/Config.h"
@@ -124,6 +125,12 @@ static int run(const std::string& access_key,
     engine::OrderStore                  order_store;
     trading::allocation::AccountManager account_mgr(core::Account{}, markets);
 
+    // ---- Database ----
+    // engine_mgr보다 먼저 생성 → 소멸은 역순(engine_mgr 먼저) → db 수명이 항상 더 김
+    db::Database db;
+    db.open(util::AppConfig::instance().bot.db_path);
+    logger.info("[CoinBot] Database opened: ", util::AppConfig::instance().bot.db_path);
+
     // ---- MarketEngineManager ----
     // 생성자 내부에서 계좌 동기화 + 마켓별 미체결 복구 수행
     // 계좌 동기화 실패 시 std::runtime_error → run() 밖으로 전파
@@ -132,7 +139,9 @@ static int run(const std::string& access_key,
         shared_api,
         order_store,
         account_mgr,
-        markets);
+        markets,
+        {},   // MarketManagerConfig 기본값
+        &db); // DB 주입: 신호·주문·캔들 기록
 
     // ---- EventRouter ----
     app::EventRouter router;

@@ -59,11 +59,13 @@ MarketEngineManager::MarketEngineManager(
     engine::OrderStore& store,
     trading::allocation::AccountManager& account_mgr,
     const std::vector<std::string>& markets,
-    MarketManagerConfig cfg)
+    MarketManagerConfig cfg,
+    db::Database* db)
     : api_(api)
     , store_(store)
     , account_mgr_(account_mgr)
     , cfg_(std::move(cfg))
+    , db_(db)
 {
     auto& logger = util::Logger::instance();
     const auto logBudgets = [this, &logger](std::string_view stage)
@@ -111,6 +113,13 @@ MarketEngineManager::MarketEngineManager(
         // 전략 생성
         ctx->strategy = std::make_unique<trading::strategies::RsiMeanReversionStrategy>(
             market, cfg_.strategy_params);
+
+        // DB 신호 콜백 등록: PendingEntry→InPosition, PendingExit→Flat 전이 시 signals 테이블 기록
+        if (db_) {
+            ctx->strategy->setSignalCallback([this](const trading::SignalRecord& sig) {
+                db_->insertSignal(sig);
+            });
+        }
 
         // StartupRecovery: 미체결 취소 + 포지션 복구
         recoverMarketState_(*ctx);
@@ -209,6 +218,30 @@ bool MarketEngineManager::rebuildAccountOnStartup_(bool throw_on_fail)
         if (std::holds_alternative<core::Account>(result))
         {
             account_mgr_.rebuildFromAccount(std::get<core::Account>(result));
+
+            // 마켓별 자본 현황 및 드리프트 관측 (avg_entry_price 기준 추정값)
+            {
+                auto budgets = account_mgr_.snapshot();
+                double total = 0.0;
+                for (const auto& [_, b] : budgets)
+                    total += b.available_krw + b.coin_balance * b.avg_entry_price;
+
+                const double target = budgets.empty() ? 0.0
+                                    : total / static_cast<double>(budgets.size());
+
+                for (const auto& [mkt, b] : budgets) {
+                    const double coin_val = b.coin_balance * b.avg_entry_price;
+                    const double equity   = b.available_krw + coin_val;
+                    const double drift    = equity - target;
+                    logger.info("[MarketEngineManager] budget: market=", mkt,
+                        " krw=", b.available_krw, " coin_val=", coin_val,
+                        " equity=", equity, " drift=", drift);
+                    if (target > 0 && std::abs(drift) > target * 0.2)
+                        logger.warn("[MarketEngineManager] Capital drift detected: market=", mkt,
+                            " drift=", drift, " (", drift / target * 100.0, "%)");
+                }
+            }
+
             logger.info("[MarketEngineManager] Account synced (attempt ", attempt, ")");
             return true;
         }
@@ -406,13 +439,16 @@ void MarketEngineManager::handleMyOrder_(MarketContext& ctx,
                 o.status == core::OrderStatus::Canceled ||
                 o.status == core::OrderStatus::Rejected;
 
+            bool reconcile_ok = true;
+
             if (!has_trade && isTerminal)
             {
                 logger.info("[Manager][", ctx.market,
                     "][OrderEvent] done-only detected, using reconcile path: "
                     "status=", static_cast<int>(o.status), " order_uuid=", o.id);
 
-                if (!ctx.engine->reconcileFromSnapshot(o))
+                reconcile_ok = ctx.engine->reconcileFromSnapshot(o);
+                if (!reconcile_ok)
                 {
                     logger.warn("[Manager][", ctx.market,
                         "][OrderEvent] reconcile failed, keep pending for recovery retry, order_uuid=", o.id);
@@ -425,6 +461,11 @@ void MarketEngineManager::handleMyOrder_(MarketContext& ctx,
             {
                 ctx.engine->onOrderSnapshot(o);
             }
+
+            // DB 주문 이력 기록 (터미널 + 정산 성공 시에만)
+            // - 터미널 시점은 state != "trade"이므로 origin 필드가 항상 올바르게 채워짐
+            // - reconcile 실패 시 executed_funds 등이 불완전하므로 기록 보류
+            if (db_ && isTerminal && reconcile_ok) db_->insertOrder(o);
 
             logger.info("[Manager][", ctx.market, "][OrderEvent] status=",
                 static_cast<int>(o.status), " order_uuid=", o.id);
@@ -483,6 +524,9 @@ void MarketEngineManager::handleMarketData_(MarketContext& ctx,
     const core::Candle candle = *ctx.pending_candle;
     ctx.pending_candle = incoming;
 
+    // DB 확정 캔들 기록 (다음 분봉 도착 시점 = 이전 분봉 확정)
+    if (db_) db_->insertCandle(ctx.market, candle);
+
     logger.info("[Manager][", ctx.market, "][Candle] ts=",
         candle.start_timestamp, " close=", candle.close_price);
 
@@ -496,7 +540,7 @@ void MarketEngineManager::handleMarketData_(MarketContext& ctx,
 
     // 4) 전략 실행
     const trading::Decision d = ctx.strategy->onCandle(candle, account);
-    const trading::Snapshot snap = ctx.strategy->lastSnapshot();
+    const trading::Snapshot snap = ctx.strategy->signalSnapshot();
 
     // 전략 반영 여부 검증용 로그
     logger.info("[Manager][", ctx.market, "][Strategy] state=",
@@ -590,13 +634,25 @@ trading::AccountSnapshot MarketEngineManager::buildAccountSnapshot_(
 // 복구 요청: atomic flag로 우선 처리
 // 일반 큐 push 대신 flag → workerLoop_ 매 반복 시작에서 체크
 // 중복 요청은 자동 병합 (flag이므로 여러 번 set해도 1회만 실행)
+// pending 없는 마켓은 사전 필터링 — 불필요한 runRecovery_ 진입 차단
 void MarketEngineManager::requestReconnectRecovery()
 {
-    util::Logger::instance().info(
-        "[MarketEngineManager] Reconnect recovery requested (all markets)");
+    int triggered = 0;
 
     for (auto& [market, ctx] : contexts_)
+    {
+        if (!ctx->has_active_pending.load(std::memory_order_acquire))
+            continue;
+
         ctx->recovery_requested.store(true, std::memory_order_release);
+        ++triggered;
+    }
+
+    if (triggered > 0)
+        util::Logger::instance().info(
+            "[MarketEngineManager] Reconnect recovery: ",
+            triggered, " market(s) with pending orders");
+    // triggered == 0: 정상 구간 — 로그 생략
 }
 
 // 주문 단건 조회 기반 복구
@@ -609,19 +665,17 @@ void MarketEngineManager::requestReconnectRecovery()
 //      정산 실패면 pending 유지(다음 recovery에서 재시도)
 void MarketEngineManager::runRecovery_(MarketContext& ctx)
 {
-    auto& logger = util::Logger::instance();
-    logger.info("[MarketEngineManager][", ctx.market, "] Running recovery...");
-
-    // 1) pending 주문 ID 확보
+    // 1) pending 주문 ID 확보 (pre-filter 이후 안전망 — 레이스 컨디션 방어)
     const auto [buy_order_uuid, sell_order_uuid] = ctx.engine->activePendingIds();
     if (buy_order_uuid.empty() && sell_order_uuid.empty())
     {
-        logger.info("[MarketEngineManager][", ctx.market,
-            "] No pending orders, recovery skipped");
         ctx.tracking_pending = false;
         ctx.pending_timeout_fired = false;
         return;
     }
+
+    auto& logger = util::Logger::instance();
+    logger.info("[MarketEngineManager][", ctx.market, "] Running recovery...");
 
     // 2) 각 pending 주문에 대해 복구 시도
     for (const auto& order_uuid : { buy_order_uuid, sell_order_uuid })
@@ -679,6 +733,10 @@ void MarketEngineManager::runRecovery_(MarketContext& ctx)
             // 터미널 + 정산 성공:
             // - clearPendingState: reconcileFromSnapshot → onOrderSnapshot 내부에서 이미 처리됨 (no-op)
             // - syncOnStart: EngineOrderStatusEvent.executed_funds → onOrderUpdate 폴백으로 대체됨
+
+            // WS 유실로 handleMyOrder_를 거치지 않은 주문의 최종 상태를 DB에 반영
+            if (db_) db_->insertOrder(*order);
+
             logger.info("[MarketEngineManager][", ctx.market,
                 "] Recovery done: state=", toStringState(ctx.strategy->state()));
         }
@@ -768,6 +826,9 @@ void MarketEngineManager::checkPendingTimeout_(MarketContext& ctx)
 {
     const auto [buy_id, sell_id] = ctx.engine->activePendingIds();
     const bool is_pending = (!buy_id.empty() || !sell_id.empty());
+
+    // WS IO thread가 읽을 수 있도록 atomic 동기화
+    ctx.has_active_pending.store(is_pending, std::memory_order_release);
 
     // Pending 진입 시점 기록
     if (is_pending && !ctx.tracking_pending)

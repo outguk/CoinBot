@@ -129,11 +129,27 @@ namespace api::upbit::mappers
 
         // trade 상태: price=체결가, volume=체결량 → MyTrade에서 이미 처리됨
         // Order 스냅샷에 넣으면 요청 원본(price/volume)이 오염되므로 차단 (1차 방어)
-        // wait/done 상태: 원주문 값 그대로 반영
+        // wait/done 상태: Upbit WS ord_type별로 price/volume 필드 의미가 다름
+        //   "limit"  → price=지정가,   volume=주문수량
+        //   "price"  → price=주문총액, volume=null (시장가 매수, BID)
+        //   "market" → price=null,     volume=주문수량 (시장가 매도, ASK)
         if (d.state != "trade")
         {
-            o.price  = core::Price{ d.price };
-            o.volume = core::Volume{ d.volume };
+            if (o.type == core::OrderType::Limit)
+            {
+                o.price  = core::Price{ d.price };
+                o.volume = core::Volume{ d.volume };
+            }
+            else if (o.position == core::OrderPosition::ASK)
+            {
+                // 시장가 매도(ord_type="market"): volume만 유효
+                o.volume = core::Volume{ d.volume };
+            }
+            else
+            {
+                // 시장가 매수(ord_type="price"): 총액이 d.price에 담겨 옴
+                o.requested_amount = core::Amount{ d.price };
+            }
         }
 
         // 누적 스냅샷(중요)

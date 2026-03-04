@@ -2,6 +2,7 @@
 
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -136,5 +137,29 @@ namespace trading {
 
     // (선택) 전략 식별자: 문자열 복사 없이 string_view로 사용 가능
     using StrategyId = std::string_view;
+
+
+    // DB signals.side 컬럼 값 (CHECK 제약과 동일: BUY / SELL)
+    enum class SignalSide : uint8_t { BUY, SELL };
+
+    // DB signals 테이블에 기록할 전략 신호 데이터
+    // - DB 컬럼과 1:1 대응 (schema.sql의 signals 테이블 참조)
+    // - optional 필드: BUY에만 의미 있거나 지표가 미준비된 경우 nullopt
+    struct SignalRecord final {
+        std::string market;
+        SignalSide side{};                     // BUY or SELL (DB insert 시 문자열 변환은 Database.cpp에서)
+        double price{ 0.0 };                  // 체결 VWAP
+        double volume{ 0.0 };
+        double krw_amount{ 0.0 };
+        std::optional<double> stop_price{};   // BUY 시 손절가
+        std::optional<double> target_price{}; // BUY 시 익절가
+        std::optional<double> rsi{};          // 신호 발생 시 RSI
+        std::optional<double> volatility{};   // 신호 발생 시 변동성
+        int is_partial{ 0 };                  // 0: 완전청산, 1: 부분청산(SELL만)
+        int64_t ts_ms{ 0 };
+    };
+
+    // MarketEngineManager가 등록, 전략이 상태 전이 시 호출
+    using SignalCallback = std::function<void(const SignalRecord&)>;
 
 } // namespace trading
