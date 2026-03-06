@@ -59,6 +59,7 @@ namespace trading::strategies {
         // 상태 초기화
         state_ = State::Flat;
         pending_client_id_.reset();
+        pending_exit_reason_.clear();
 
         // 부분/복수 체결 누적값 초기화
         // - 실거래에서는 한 주문이 여러 번 나눠 체결될 수 있으므로,
@@ -89,6 +90,7 @@ namespace trading::strategies {
 
         // 시작 시 pending 상태는 항상 제거(미체결 이어받기 X)
         pending_client_id_.reset();
+        pending_exit_reason_.clear();
         pending_filled_volume_ = 0.0;
         pending_cost_sum_ = 0.0;
         pending_last_price_ = 0.0;
@@ -355,7 +357,8 @@ namespace trading::strategies {
 
         // 상태 전이: InPosition -> PendingExit
         state_ = State::PendingExit;
-        pending_client_id_ = cid;
+        pending_client_id_   = cid;
+        pending_exit_reason_ = reason_tag;
 
         return Decision::submit(std::move(req));
     }
@@ -445,14 +448,16 @@ namespace trading::strategies {
                         const double vol = pending_filled_volume_ > 0.0 ? pending_filled_volume_ : ev.executed_volume;
                         trading::SignalRecord sig;
                         sig.market      = market_;
+                        sig.identifier  = pending_client_id_.has_value() ? *pending_client_id_ : "";
                         sig.side        = trading::SignalSide::BUY;
                         sig.price       = *entry_price_;
                         sig.volume      = vol;
                         sig.krw_amount  = pending_cost_sum_ > 0.0 ? pending_cost_sum_ : ev.executed_funds;
                         sig.stop_price  = stop_price_;
                         sig.target_price = target_price_;
-                        sig.rsi        = signal_snapshot_.rsi.ready       ? std::optional<double>(signal_snapshot_.rsi.v)        : std::nullopt;
-                        sig.volatility = signal_snapshot_.volatility.ready ? std::optional<double>(signal_snapshot_.volatility.v) : std::nullopt;
+                        sig.rsi            = signal_snapshot_.rsi.ready       ? std::optional<double>(signal_snapshot_.rsi.v)        : std::nullopt;
+                        sig.volatility     = signal_snapshot_.volatility.ready ? std::optional<double>(signal_snapshot_.volatility.v) : std::nullopt;
+                        sig.trend_strength = signal_snapshot_.trendReady       ? std::optional<double>(signal_snapshot_.trendStrength) : std::nullopt;
                         sig.is_partial  = 0;
                         sig.ts_ms       = nowMs();
                         signal_callback_(sig);
@@ -462,15 +467,18 @@ namespace trading::strategies {
                     // 부분 청산(is_partial=1): pending_filled_volume_ > 0인 경우에만 기록
                     if (signal_callback_ && pending_filled_volume_ > 0.0) {
                         trading::SignalRecord sig;
-                        sig.market     = market_;
-                        sig.side       = trading::SignalSide::SELL;
-                        sig.price      = vwap;
-                        sig.volume     = pending_filled_volume_;
-                        sig.krw_amount = pending_cost_sum_ > 0.0 ? pending_cost_sum_ : ev.executed_funds;
-                        sig.rsi        = signal_snapshot_.rsi.ready       ? std::optional<double>(signal_snapshot_.rsi.v)        : std::nullopt;
-                        sig.volatility = signal_snapshot_.volatility.ready ? std::optional<double>(signal_snapshot_.volatility.v) : std::nullopt;
-                        sig.is_partial = 1;
-                        sig.ts_ms      = nowMs();
+                        sig.market       = market_;
+                        sig.identifier   = pending_client_id_.has_value() ? *pending_client_id_ : "";
+                        sig.side         = trading::SignalSide::SELL;
+                        sig.price        = vwap;
+                        sig.volume       = pending_filled_volume_;
+                        sig.krw_amount   = pending_cost_sum_ > 0.0 ? pending_cost_sum_ : ev.executed_funds;
+                        sig.rsi            = signal_snapshot_.rsi.ready       ? std::optional<double>(signal_snapshot_.rsi.v)        : std::nullopt;
+                        sig.volatility     = signal_snapshot_.volatility.ready ? std::optional<double>(signal_snapshot_.volatility.v) : std::nullopt;
+                        sig.trend_strength = signal_snapshot_.trendReady       ? std::optional<double>(signal_snapshot_.trendStrength) : std::nullopt;
+                        sig.is_partial   = 1;
+                        sig.exit_reason  = pending_exit_reason_;
+                        sig.ts_ms        = nowMs();
                         signal_callback_(sig);
                     }
                     // 수량 추적은 계좌 스냅샷에 맡기고 InPosition 유지
@@ -479,6 +487,7 @@ namespace trading::strategies {
 
                 // pending을 끝냈으니 반드시 정리하고 종료
                 pending_client_id_.reset();
+                pending_exit_reason_.clear();
                 pending_filled_volume_ = 0.0;
                 pending_cost_sum_ = 0.0;
                 pending_last_price_ = 0.0;
@@ -513,14 +522,16 @@ namespace trading::strategies {
                         const double vol = pending_filled_volume_ > 0.0 ? pending_filled_volume_ : ev.executed_volume;
                         trading::SignalRecord sig;
                         sig.market       = market_;
+                        sig.identifier   = pending_client_id_.has_value() ? *pending_client_id_ : "";
                         sig.side         = trading::SignalSide::BUY;
                         sig.price        = *entry_price_;
                         sig.volume       = vol;
                         sig.krw_amount   = pending_cost_sum_ > 0.0 ? pending_cost_sum_ : ev.executed_funds;
                         sig.stop_price   = stop_price_;
                         sig.target_price = target_price_;
-                        sig.rsi        = signal_snapshot_.rsi.ready       ? std::optional<double>(signal_snapshot_.rsi.v)        : std::nullopt;
-                        sig.volatility = signal_snapshot_.volatility.ready ? std::optional<double>(signal_snapshot_.volatility.v) : std::nullopt;
+                        sig.rsi            = signal_snapshot_.rsi.ready       ? std::optional<double>(signal_snapshot_.rsi.v)        : std::nullopt;
+                        sig.volatility     = signal_snapshot_.volatility.ready ? std::optional<double>(signal_snapshot_.volatility.v) : std::nullopt;
+                        sig.trend_strength = signal_snapshot_.trendReady       ? std::optional<double>(signal_snapshot_.trendStrength) : std::nullopt;
                         sig.is_partial   = 0;
                         sig.ts_ms        = nowMs();
                         signal_callback_(sig);
@@ -532,15 +543,18 @@ namespace trading::strategies {
                 if (signal_callback_ && final_price > 0.0) {
                     const double vol = pending_filled_volume_ > 0.0 ? pending_filled_volume_ : ev.executed_volume;
                     trading::SignalRecord sig;
-                    sig.market     = market_;
-                    sig.side       = trading::SignalSide::SELL;
-                    sig.price      = final_price;
-                    sig.volume     = vol;
-                    sig.krw_amount = pending_cost_sum_ > 0.0 ? pending_cost_sum_ : ev.executed_funds;
-                    sig.rsi        = signal_snapshot_.rsi.ready       ? std::optional<double>(signal_snapshot_.rsi.v)        : std::nullopt;
-                    sig.volatility = signal_snapshot_.volatility.ready ? std::optional<double>(signal_snapshot_.volatility.v) : std::nullopt;
-                    sig.is_partial = 0;
-                    sig.ts_ms      = nowMs();
+                    sig.market      = market_;
+                    sig.identifier  = pending_client_id_.has_value() ? *pending_client_id_ : "";
+                    sig.side        = trading::SignalSide::SELL;
+                    sig.price       = final_price;
+                    sig.volume      = vol;
+                    sig.krw_amount  = pending_cost_sum_ > 0.0 ? pending_cost_sum_ : ev.executed_funds;
+                    sig.rsi            = signal_snapshot_.rsi.ready       ? std::optional<double>(signal_snapshot_.rsi.v)        : std::nullopt;
+                    sig.volatility     = signal_snapshot_.volatility.ready ? std::optional<double>(signal_snapshot_.volatility.v) : std::nullopt;
+                    sig.trend_strength = signal_snapshot_.trendReady       ? std::optional<double>(signal_snapshot_.trendStrength) : std::nullopt;
+                    sig.is_partial  = 0;
+                    sig.exit_reason = pending_exit_reason_;
+                    sig.ts_ms       = nowMs();
                     signal_callback_(sig);
                 }
 
@@ -552,6 +566,7 @@ namespace trading::strategies {
             }
 
             pending_client_id_.reset();
+            pending_exit_reason_.clear();
             pending_filled_volume_ = 0.0;
             pending_cost_sum_ = 0.0;
             pending_last_price_ = 0.0;
@@ -586,6 +601,7 @@ namespace trading::strategies {
 
         // pending 누적값 정리(안전)
         pending_client_id_.reset();
+        pending_exit_reason_.clear();
         pending_filled_volume_ = 0.0;
         pending_cost_sum_ = 0.0;
         pending_last_price_ = 0.0;

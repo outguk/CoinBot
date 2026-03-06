@@ -147,15 +147,18 @@ namespace trading {
     // - optional 필드: BUY에만 의미 있거나 지표가 미준비된 경우 nullopt
     struct SignalRecord final {
         std::string market;
+        std::string identifier;                // orders.identifier와 동일한 cid (JOIN 연결 고리)
         SignalSide side{};                     // BUY or SELL (DB insert 시 문자열 변환은 Database.cpp에서)
         double price{ 0.0 };                  // 체결 VWAP
         double volume{ 0.0 };
         double krw_amount{ 0.0 };
         std::optional<double> stop_price{};   // BUY 시 손절가
         std::optional<double> target_price{}; // BUY 시 익절가
-        std::optional<double> rsi{};          // 신호 발생 시 RSI
-        std::optional<double> volatility{};   // 신호 발생 시 변동성
+        std::optional<double> rsi{};             // 신호 발생 시 RSI
+        std::optional<double> volatility{};    // 신호 발생 시 변동성
+        std::optional<double> trend_strength{};// 신호 발생 시 추세 강도
         int is_partial{ 0 };                  // 0: 완전청산, 1: 부분청산(SELL만)
+        std::string exit_reason{};            // SELL 청산 사유 ("exit_stop" / "exit_target" / "exit_rsi_overbought" / "exit_unknown"), BUY는 빈 문자열
         int64_t ts_ms{ 0 };
     };
 

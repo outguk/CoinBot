@@ -1,6 +1,6 @@
 ﻿# 구현 현황
 
-마지막 업데이트: 2026-03-03
+마지막 업데이트: 2026-03-05 (Phase 2 Step 8·9 완료)
 
 ---
 
@@ -9,7 +9,7 @@
 - [x] Phase 0: 기존 코드 리팩토링 (완료)
 - [x] Phase 1: 멀티마켓 핵심 기능 구현 (완료)
 - [x] Phase 1.7: 장시간 부하/안정화 검증 (완료)
-- [ ] Phase 2: Streamlit 대시보드 + SQLite 기록 (미시작)
+- [x] Phase 2: Streamlit 대시보드 + SQLite 기록 (완료 — Steps 1~9 모두 완료)
 - [ ] Phase 3: AWS 운영 자동화 (미시작)
 
 참고: 상세 계획은 [ROADMAP.md](ROADMAP.md)
@@ -96,6 +96,65 @@
   - `unknown_funds` 재시도 시나리오 정상 동작 확인
   - pending 장기 고착 대응 정책 확정 및 구현 완료
 - Phase 1.7 기간 주요 수정 내용은 아래 섹션 참조
+
+---
+
+## 2-B) Phase 2 상세 상태
+
+### 2-B-1. DB 인프라 (Steps 1~3)
+
+- 상태: ✅ 완료
+- 핵심:
+  - `schema.sql`: candles / orders / signals 테이블 + WAL 모드
+  - `Database` 클래스: sqlite3 번들 포함, `insertCandle` / `insertOrder` / `insertSignal`
+  - `SignalRecord` 구조체 + `SignalCallback` 타입 정의
+  - `signals.exit_reason` 컬럼 추가 (2026-03-05, identifier 파싱 의존 제거)
+- 관련 파일:
+  - `src/db/schema.sql`, `src/db/Database.h/.cpp`
+  - `src/trading/strategies/StrategyTypes.h`
+
+### 2-B-2. 봇 통합 (Steps 4~6)
+
+- 상태: ✅ 완료
+- 핵심:
+  - `RsiMeanReversionStrategy::setSignalCallback` — BUY/SELL 확정 시 signals 기록
+  - `pending_exit_reason_` — 청산 사유를 `exit_reason` 컬럼에 직접 저장
+  - `MarketEngineManager` — DB 주입 + 콜백 등록
+  - `CoinBot.cpp` — `Database::open()` 호출, 수명 보장
+  - orders: 터미널 상태(Filled/Canceled/Rejected) 확정 시 1회 INSERT (`ON CONFLICT DO NOTHING`)
+- 관련 파일:
+  - `src/trading/strategies/RsiMeanReversionStrategy.h/.cpp`
+  - `src/app/MarketEngineManager.cpp`, `src/app/CoinBot.cpp`
+
+### 2-B-3. 캔들 수집기 (Step 7)
+
+- 상태: ✅ 완료
+- 핵심:
+  - `tools/fetch_candles.py` — Upbit `/v1/candles/minutes/15` (15분봉, 백테스트용)
+  - Bootstrap(초기 적재) + Incremental(이후 보강) 모드
+  - WAL pragma 설정, `ON CONFLICT DO NOTHING`으로 봇과 충돌 없음
+- 관련 파일:
+  - `tools/fetch_candles.py`
+
+### 2-B-4. Streamlit 대시보드 (Step 8)
+
+- 상태: ✅ 완료 (2026-03-05)
+- 핵심:
+  - `streamlit/app.py` — 분석 탭(P&L·전략 분석) + 백테스트 탭
+  - P&L: identifier 기반 BID↔ASK 페어링 + FIFO fallback
+  - 전략 분석: 캔들차트 + BUY/SELL 마커 + RSI 서브플롯, 진입 RSI 분포, 청산 사유 파이차트
+  - 백테스트: candle_rsi_backtest 모듈 import, 파라미터 슬라이더, 실거래 signals 오버레이
+  - [설계 수정] signals에 paid_fee 없어 P&L은 orders 단독 계산, signals는 전략 컨텍스트 전용
+  - [설계 수정] "BID created_at_ms 기준 BUY 창" → identifier 기반 1차 + FIFO 2차 페어링으로 구체화
+  - [설계 수정] RSI 서브플롯 기준선 = 파라미터 슬라이더(oversold/overbought) 동적 반영
+- 관련 파일:
+  - `streamlit/app.py`
+
+### 2-B-5. 백테스트 (Step 9)
+
+- 상태: ✅ 완료 (2026-03-05)
+- 관련 파일:
+  - `tools/candle_rsi_backtest.py`
 
 ---
 
@@ -190,8 +249,8 @@
 
 ### 4-3. Phase 2 -> Phase 3
 
-- [ ] DB (candles/orders/signals) 기록 정상 동작 확인
-- [ ] Streamlit 대시보드 실시간 탭 + 분석 탭 동작 확인
+- [x] DB (candles/orders/signals) 기록 정상 동작 확인 (Steps 1~6 완료)
+- [ ] Streamlit 대시보드 분석 탭(P&L·전략 분석) + 백테스트 탭 동작 확인
 - [ ] 백테스트 스크립트로 전략 손익 시뮬레이션 가능
 
 ---
@@ -216,6 +275,11 @@
 
 | 날짜 | 구분 | 내용 |
 |------|------|------|
+| 2026-03-05 | Phase 2 | streamlit/app.py 구현 완료 — 분석 탭(P&L·전략 분석) + 백테스트 탭, Step 8·9 완료 |
+| 2026-03-05 | Phase 2 | signals.exit_reason 컬럼 추가 — identifier 파싱 의존 제거, pending_exit_reason_ 전략 멤버 추가 |
+| 2026-03-05 | Phase 2 | fetch_candles.py 캔들 주기 15분봉 확정, 일별 P&L 집계 설계 추가 |
+| 2026-03-05 | Phase 2 | Steps 4~7 완료 반영, IMPLEMENTATION_STATUS 동기화 |
+| 2026-03-05 | 문서 | ROADMAP 완료 기준 orders upsert → terminal INSERT 수정, 실시간 탭 참조 제거 |
 | 2026-03-03 | 문서 | Phase 2 재설계: Streamlit+API(실시간) / SQLite(분석·백테스트) 분리 구조로 변경 |
 | 2026-03-03 | 문서 | Phase 1.7 완료 반영. 전체 진행 상태 및 게이트 체크 업데이트 |
 | 2026-03-02 | Phase 1.7 | Recovery 트리거 조건화 — `has_active_pending` flag 도입 (#4) |

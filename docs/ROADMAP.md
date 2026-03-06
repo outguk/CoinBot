@@ -2,7 +2,7 @@
 
 > **현재 구조**: [ARCHITECTURE.md](ARCHITECTURE.md)
 > **구현 현황**: [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md)
-> 최종 갱신: 2026-03-03 (Phase 2 재설계: Streamlit + SQLite 분리 구조)
+> 최종 갱신: 2026-03-05 (Phase 2 대시보드 재설계: 실시간 탭 제거, P&L orders 단독 쿼리)
 
 ---
 
@@ -12,7 +12,7 @@
 Phase 0  [완료] 기존 코드 리팩토링
 Phase 1  [완료] 멀티마켓 핵심 구현
 Phase 1.7 [완료] 장시간 부하/안정화 검증
-Phase 2  [미시작] Streamlit 대시보드 + SQLite 기록
+Phase 2  [완료] Streamlit 대시보드 + SQLite 기록
 Phase 3  [미시작] AWS 24시간 운영
 ```
 
@@ -57,22 +57,20 @@ Phase 3  [미시작] AWS 24시간 운영
 ### 설계 원칙
 
 ```
-실시간 현황 (Streamlit) → Upbit API
-    현재 잔고, 미체결 주문, 최근 거래 내역
-
-분석/검증 (Streamlit + 백테스트) → SQLite DB
+분석/백테스트 (Streamlit) → SQLite DB
     캔들 이력, 주문 이력, 전략 신호
 ```
 
-**두 관심사를 분리하는 이유**:
-- 실시간 탭은 API만으로 항상 최신 데이터를 보여줄 수 있어 DB 불필요
-- 백테스트·감사 추적·운영 분석에는 Upbit API가 제공하지 않는 로컬 데이터 필요
+**Upbit API 의존을 제거한 이유**:
+- 실시간 잔고·주문은 Upbit 앱/웹에서 동일하게 확인 가능 → 중복 구현 대비 실용성 낮음
+- API 키 관리·JWT 서명 로직이 대시보드에 추가되어 복잡도 증가
+- 백테스트·감사 추적·운영 분석은 Upbit API가 제공하지 않는 로컬 데이터 필요
   - 캔들: 매 백테스트 실행 시 API 재호출 비용(1년치 ≈ 7,000회 호출) 회피
   - signals: 전략 진입 시점의 RSI·손절가 등은 API가 제공하지 않음
 
 **의존성**:
 - **sqlite3**: amalgamation 단일 파일 번들 (`src/db/sqlite3.h`, `src/db/sqlite3.c`)
-- **Streamlit**: Python 패키지 (`pip install streamlit plotly pandas requests`)
+- **Streamlit**: Python 패키지 (`pip install streamlit plotly pandas numpy`)
 
 ---
 
@@ -99,14 +97,14 @@ CREATE TABLE candles (
 );
 
 -- 주문 이력 (감사 추적)
--- INSERT/UPDATE 시점: onOrderSnapshot() 도착 시 upsert (submit() 아님)
---   이유: submit() 시점엔 created_at이 비어있음 (거래소 응답 전)
---         첫 WS/REST 스냅샷 도착 시 created_at이 채워짐
+-- INSERT 시점: 터미널 상태(Filled/Canceled/Rejected) 확정 시 1회
+--   이유: 비터미널 상태(wait/trade)는 로그로 충분, 최종 확정값만 기록
+-- ON CONFLICT(order_uuid) DO NOTHING: WS 재연결 중복 수신 대응
 -- created_at_ms 정규화 (normalizeToEpochMs 함수):
 --   WS 경로  → Order.created_at = epoch ms 숫자 문자열 → stoll()
 --   REST 경로 → Order.created_at = ISO8601 문자열 (UTC offset 포함) → 파싱 후 epoch ms
 --   파싱 실패  → 0 저장 + WARN 로그 (NOT NULL DEFAULT 0 이므로 NULL 없음)
--- 크래시 허용: submit 후 첫 snapshot 전 크래시 시 row 자체 미생성 → Upbit API 복구 가능
+-- 크래시 허용: submit 후 터미널 전 크래시 시 row 미생성 → Upbit API 복구 가능
 -- 소스: src/core/domain/Order.h
 CREATE TABLE orders (
     id               INTEGER PRIMARY KEY,
@@ -136,6 +134,7 @@ CREATE TABLE orders (
 CREATE TABLE signals (
     id           INTEGER PRIMARY KEY,
     market       TEXT    NOT NULL,
+    identifier   TEXT,               -- orders.identifier와 동일한 cid (orders JOIN 연결 고리)
     side         TEXT    NOT NULL CHECK (side IN ('BUY', 'SELL')),
     price        REAL    NOT NULL,   -- 체결 VWAP
     volume       REAL    NOT NULL,
@@ -145,6 +144,7 @@ CREATE TABLE signals (
     rsi          REAL,               -- 신호 발생 시 RSI
     volatility   REAL,               -- 신호 발생 시 변동성
     is_partial   INTEGER NOT NULL DEFAULT 0,  -- 0: 완전 청산, 1: 부분 청산
+    exit_reason  TEXT,               -- SELL 청산 사유. 단일: exit_stop/exit_target/exit_rsi_overbought/exit_unknown. 복합(동시 트리거): exit_stop_target 등 조합 가능. BUY는 NULL
     ts_ms        INTEGER NOT NULL
 );
 
@@ -177,35 +177,22 @@ CREATE INDEX idx_signals_market ON signals(market, ts_ms);
 
 #### 2.2 캔들 수집기 (봇 코드 변경 없음)
 - `tools/fetch_candles.py`: 독립 스크립트
-  - Upbit `/v1/candles/minutes/1` API 호출
+  - Upbit `/v1/candles/minutes/15` API 호출
   - DB의 마지막 ts 이후 데이터만 append (`ON CONFLICT(market, ts) DO NOTHING`)
   - rate limit 준수 (0.1s 간격)
 - 봇 실행 중: `MarketEngineManager`의 `workerLoop_`에서 캔들 처리 완료 후 `candles` append
   - **쓰기 위치**: 이벤트 처리(전략 onCandle) 완료 후, 다음 pop 전
 
 #### 2.3 봇 코드 통합 (orders + signals 기록)
-- **orders** (upsert 패턴):
-  - `onOrderSnapshot()` 도착 시마다 upsert (submit() 시점 아님):
+- **orders** (terminal INSERT 패턴):
+  - 터미널 상태(Filled/Canceled/Rejected) 확정 시 1회 INSERT:
     ```sql
     INSERT INTO orders (...) VALUES (...)
-    ON CONFLICT(order_uuid) DO UPDATE SET
-        -- 동적 필드: snapshot마다 갱신 (체결 진행 + 상태 변화)
-        status           = excluded.status,
-        executed_volume  = excluded.executed_volume,
-        executed_funds   = excluded.executed_funds,
-        paid_fee         = excluded.paid_fee,
-        -- created_at_ms: 기존 유효값(>0)을 0으로 역행 방지
-        created_at_ms    = CASE WHEN excluded.created_at_ms > 0
-                                THEN excluded.created_at_ms
-                                ELSE orders.created_at_ms END;
-        -- 정적 필드(market/side/order_type/price/volume/identifier)는
-        -- INSERT 시 확정 후 변경 없음 → DO UPDATE 제외
+    ON CONFLICT(order_uuid) DO NOTHING
+    -- WS 재연결 중복 수신 대응, CHECK/NOT NULL 위반은 정상 오류로 노출
     ```
-    - `INSERT OR REPLACE` 금지: UNIQUE 충돌 시 row 삭제 후 재삽입 → id 변경 부작용
   - `created_at_ms = normalizeToEpochMs(o.created_at)`
-  - **쓰기 위치**: 모든 `onOrderSnapshot()` 호출 시 upsert
-    - 비터미널(Open/Pending): 도착 즉시 중간 상태 갱신
-    - 터미널(done/cancel): `store_.erase()` 직전에 최종 상태 확정
+  - **쓰기 위치**: `onOrderSnapshot()` 내 터미널 상태 전이 시, `store_.erase()` 직전
 - **signals**:
   - `RsiMeanReversionStrategy`에 `setSignalCallback(fn)` 추가
   - BUY: `PendingEntry → InPosition` 전이 시 (entry_price, stop_price, target_price, rsi, volatility)
@@ -216,14 +203,19 @@ CREATE INDEX idx_signals_market ON signals(market, ts_ms);
 
 #### 2.4 Streamlit 대시보드
 - `streamlit/app.py`
-- **실시간 탭** (Upbit API):
-  - 마켓별 현재 잔고 (`/v1/accounts`)
-  - 미체결 주문 (`/v1/orders/open`)
-  - 최근 체결 목록 (`/v1/orders/closed`)
 - **분석 탭** (SQLite DB):
-  - 캔들차트 + BUY/SELL 마커 (candles + signals JOIN)
-  - 주문 이력 테이블 (orders)
-  - 거래 성과 요약 (signals SQL 집계: 승률, 총손익, 평균 보유 기간)
+  - **P&L 섹션** (orders 단독):
+    - 일별/주별/월별 수익률 표 (청산일 `last_sell_ts` 기준)
+    - 누적 손익 곡선
+    - 마켓별 성과 요약 (승률, 평균 손익률)
+    - BUY↔SELL 페어링 거래 내역 테이블
+    - 페어링: BID `created_at_ms` 기준 BUY 창 → 창 내 모든 ASK 합산 (cancel_after_trade·부분청산 포함)
+    - P&L 산식: `cost = executed_funds + paid_fee` / `revenue = executed_funds - paid_fee`
+  - **전략 분석 섹션** (signals 기반):
+    - 캔들차트 + BUY/SELL 마커 (candles + signals JOIN)
+    - 진입 RSI 분포 / 손절·익절·RSI청산 비율
+    - 부분청산 건수 (is_partial=1)
+- **백테스트 탭**: 기존 유지 (시뮬레이션 결과 + 실거래 signals 오버레이)
 
 #### 2.5 백테스트
 - `tools/candle_rsi_backtest.py`
@@ -242,7 +234,7 @@ CREATE INDEX idx_signals_market ON signals(market, ts_ms);
   ├─ 2.2 캔들 수집기 (봇 무관, 독립 진행 가능)
   │    └─ 2.5 백테스트 (캔들 데이터 필요)
   └─ 2.3 봇 통합 (orders + signals 기록)
-       └─ 2.4 Streamlit (실시간 탭은 즉시 가능, 분석 탭은 2.3 이후)
+       └─ 2.4 Streamlit (분석 탭은 2.3 이후)
             └─ 2.5 백테스트 탭 (2.4 + 2.2 이후)
 ```
 
@@ -256,12 +248,12 @@ CREATE INDEX idx_signals_market ON signals(market, ts_ms);
 Step 1  [완료] src/db/schema.sql 작성                    (2.1)
 Step 2  [완료] sqlite3 번들 + Database 클래스 + CMake    (2.1)
 Step 3  [완료] SignalRecord + SignalCallback 타입 추가    (2.3 선행)
-Step 4  [미시작] RsiMeanReversionStrategy setSignalCallback (2.3)
-Step 5  [미시작] MarketEngineManager DB 주입 + write 연결  (2.3)
-Step 6  [미시작] CoinBot.cpp Database 생성 + 주입          (2.1/2.3)
-Step 7  [미시작] tools/fetch_candles.py                   (2.2)
-Step 8  [미시작] streamlit/app.py                         (2.4)
-Step 9  [미시작] tools/candle_rsi_backtest.py             (2.5)
+Step 4  [완료] RsiMeanReversionStrategy setSignalCallback   (2.3)
+Step 5  [완료] MarketEngineManager DB 주입 + write 연결     (2.3)
+Step 6  [완료] CoinBot.cpp Database 생성 + 주입             (2.1/2.3)
+Step 7  [완료] tools/fetch_candles.py                      (2.2)
+Step 8  [완료] streamlit/app.py                            (2.4)
+Step 9  [완료] tools/candle_rsi_backtest.py                (2.5)
 ```
 
 ---
@@ -269,11 +261,11 @@ Step 9  [미시작] tools/candle_rsi_backtest.py             (2.5)
 ### Phase 2 완료 기준
 
 - [ ] 봇 실행 중 캔들이 DB에 실시간 적재됨
-- [ ] `onOrderSnapshot()` 도착 시마다 orders 테이블에 upsert됨
+- [ ] 터미널 상태(Filled/Canceled/Rejected) 확정 시 orders 테이블에 1회 INSERT됨
 - [ ] BUY/SELL 확정 시 signals 테이블에 기록됨
 - [ ] WAL 모드에서 Streamlit과 봇의 동시 읽기/쓰기 정상 동작
-- [ ] Streamlit 실시간 탭에서 현재 잔고·주문 확인 가능
-- [ ] Streamlit 분석 탭에서 캔들차트 + 신호 마커 표시
+- [ ] Streamlit 분석 탭 P&L 섹션에서 주별/월별 수익률 확인 가능
+- [ ] Streamlit 분석 탭 전략 분석 섹션에서 캔들차트 + 신호 마커 표시
 - [ ] 백테스트 스크립트로 전략 손익 시뮬레이션 가능
 
 ---

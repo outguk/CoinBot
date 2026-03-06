@@ -7,7 +7,7 @@ candle_rsi_backtest.py — 캔들 기반 RSI 평균회귀 전략 백테스트
 한계:
   - 체결가를 close로 단순화 (실전은 시장가 VWAP)
   - 상태머신을 2상태로 축소 (실전: Flat/PendingEntry/InPosition/PendingExit)
-  - 슬리피지 미반영
+  - 슬리피지: 고정 비율(slippage_rate) 반영 (매수=close×1.0005, 매도=close×0.9995)
   - 파라미터·신호 판단 규칙은 C++와 정렬 → 전략 방향성 검증 용도에 적합
 """
 
@@ -39,6 +39,7 @@ DEFAULT_PARAMS = {
     "profit_target_pct":   3.0,
 
     "fee_rate":            0.0005, # 0.05% (Config.h EngineConfig::default_trade_fee_rate)
+    "slippage_rate":       0.0005, # 0.05% 슬리피지: 매수는 close보다 비싸게, 매도는 싸게 체결
 
     "utilization":         1.0,    # 가용 KRW 중 사용 비율
     "reserve_margin":      1.001,  # 수수료 여유 (Config.h EngineConfig::reserve_margin)
@@ -73,13 +74,14 @@ def load_candles(
     market: str,
     start_ts: str | None,
     end_ts: str | None,
+    unit: int = 15,
 ) -> pd.DataFrame:
-    """candles 테이블에서 해당 마켓의 캔들을 ts 오름차순으로 로드한다."""
+    """candles 테이블에서 해당 마켓·unit의 캔들을 ts 오름차순으로 로드한다."""
     conn = sqlite3.connect(db_path)
     conn.execute("PRAGMA journal_mode=WAL;")
     try:
-        query = "SELECT ts, open, high, low, close, volume FROM candles WHERE market = ?"
-        params: list = [market]
+        query = "SELECT ts, open, high, low, close, volume FROM candles WHERE market = ? AND unit = ?"
+        params: list = [market, unit]
         if start_ts:
             query += " AND ts >= ?"
             params.append(start_ts)
@@ -107,54 +109,52 @@ def _compute_wilder_rsi(close_series: pd.Series, length: int) -> tuple[pd.Series
     경계값: both=0 → 50, loss=0 → 100, gain=0 → 0.
 
     반환: (rsi Series, ready bool Series)
+
+    [최적화] delta/gain/loss를 numpy 벡터 연산으로 한 번에 계산.
+    seed 합산도 np.sum으로 처리. Wilder smoothing 루프만 유지 (재귀적 특성상 벡터화 불가).
     """
     closes = close_series.to_numpy(dtype=float)
-    n = len(closes)
+    n      = len(closes)
     rsi_arr   = np.full(n, np.nan)
     ready_arr = np.zeros(n, dtype=bool)
 
-    prev_price  = None
-    seed_count  = 0
-    seed_gain   = 0.0
-    seed_loss   = 0.0
-    avg_gain    = 0.0
-    avg_loss    = 0.0
-    is_ready    = False
+    # 데이터가 seed를 채우기에 부족하면 전부 NaN/False 반환
+    if n <= length:
+        return (
+            pd.Series(rsi_arr,   index=close_series.index),
+            pd.Series(ready_arr, index=close_series.index),
+        )
 
-    for i, close in enumerate(closes):
-        if prev_price is None:
-            prev_price = close
-            continue
+    # delta/gain/loss 배열을 벡터 연산으로 한 번에 계산 (Python 루프 제거)
+    deltas = np.diff(closes)                           # shape: n-1
+    gains  = np.where(deltas > 0,  deltas,  0.0)
+    losses = np.where(deltas < 0, -deltas,  0.0)
 
-        delta = close - prev_price
-        gain  = delta  if delta > 0 else 0.0
-        loss  = -delta if delta < 0 else 0.0
-        prev_price = close
+    # seed 단계: 첫 length개 delta로 초기 avg 계산 (np.sum → 벡터화)
+    avg_gain = float(np.sum(gains[:length])  / length)
+    avg_loss = float(np.sum(losses[:length]) / length)
 
-        if seed_count < length:
-            seed_gain += gain
-            seed_loss += loss
-            seed_count += 1
-            if seed_count == length:   # seed 완료: 첫 평균값 산출
-                avg_gain = seed_gain / length
-                avg_loss = seed_loss / length
-                is_ready = True
-        else:
-            # Wilder smoothing
-            avg_gain = (avg_gain * (length - 1) + gain) / length
-            avg_loss = (avg_loss * (length - 1) + loss) / length
+    def _rsi(ag: float, al: float) -> float:
+        if ag == 0.0 and al == 0.0:
+            return 50.0
+        if al == 0.0:
+            return 100.0
+        if ag == 0.0:
+            return 0.0
+        return 100.0 - 100.0 / (1.0 + ag / al)
 
-        if is_ready:
-            ready_arr[i] = True
-            if avg_gain == 0.0 and avg_loss == 0.0:
-                rsi_arr[i] = 50.0
-            elif avg_loss == 0.0:
-                rsi_arr[i] = 100.0
-            elif avg_gain == 0.0:
-                rsi_arr[i] = 0.0
-            else:
-                rs = avg_gain / avg_loss
-                rsi_arr[i] = 100.0 - 100.0 / (1.0 + rs)
+    # seed 완료 시점: deltas[length-1] 처리 후 → closes 인덱스 = length
+    rsi_arr[length]   = _rsi(avg_gain, avg_loss)
+    ready_arr[length] = True
+
+    # Wilder smoothing: seed 이후 구간만 루프 (재귀 특성으로 순차 처리 필수)
+    alpha = (length - 1) / length
+    for i in range(length, n - 1):   # i = deltas 인덱스
+        avg_gain = alpha * avg_gain + gains[i]  / length
+        avg_loss = alpha * avg_loss + losses[i] / length
+        ci = i + 1                    # closes 인덱스
+        rsi_arr[ci]   = _rsi(avg_gain, avg_loss)
+        ready_arr[ci] = True
 
     return (
         pd.Series(rsi_arr,   index=close_series.index),
@@ -192,6 +192,7 @@ def run_backtest(
     end_ts: str | None = None,
     params: dict | None = None,
     initial_krw: float = 1_000_000,
+    unit: int = 15,
 ) -> dict:
     """
     RSI 평균회귀 전략 백테스트.
@@ -207,7 +208,7 @@ def run_backtest(
     """
     p = {**DEFAULT_PARAMS, **(params or {})}
 
-    df = load_candles(db_path, market, start_ts, end_ts)
+    df = load_candles(db_path, market, start_ts, end_ts, unit)
     if df.empty:
         empty_summary = {
             "total_trades": 0, "win_rate": 0.0,
@@ -249,22 +250,25 @@ def run_backtest(
     total_cost  = 0.0   # 진입 시 실제 지출 (entry_krw + buy_fee)
     entry_ts    = None
 
-    for ts, row in df.iterrows():
-        close = float(row["close"])
+    # itertuples(): iterrows() 대비 5~10배 빠름 (매 행마다 Series 생성 오버헤드 제거)
+    for row in df.itertuples():
+        ts    = row.Index
+        close = float(row.close)
 
         if state == "Flat":
             # 진입 조건: marketOk AND RSI 과매도 AND 최소 주문 금액 이상
-            if row["market_ok"] and row["rsi"] <= p["oversold"]:
+            if row.market_ok and row.rsi <= p["oversold"]:
                 entry_krw = krw / p["reserve_margin"] * p["utilization"]
                 if entry_krw >= p["min_notional_krw"]:
+                    buy_price    = close * (1.0 + p["slippage_rate"])  # 매수: close보다 비싸게 체결
                     buy_fee      = entry_krw * p["fee_rate"]
-                    coin_qty     = entry_krw / close
+                    coin_qty     = entry_krw / buy_price
                     total_cost   = entry_krw + buy_fee
                     krw         -= total_cost
 
-                    entry_price  = close
-                    stop_price   = close * (1.0 - p["stop_loss_pct"]  / 100.0)
-                    target_price = close * (1.0 + p["profit_target_pct"] / 100.0)
+                    entry_price  = buy_price
+                    stop_price   = buy_price * (1.0 - p["stop_loss_pct"]  / 100.0)
+                    target_price = buy_price * (1.0 + p["profit_target_pct"] / 100.0)
                     entry_ts     = ts
                     state        = "InPosition"
                     # elif 구조 덕분에 같은 캔들에서 청산 체크 없이 다음 캔들로 넘어감
@@ -278,11 +282,12 @@ def run_backtest(
                     reason = "stop_loss"
                 elif close >= target_price:
                     reason = "take_profit"
-                elif row["rsi_ready"] and row["rsi"] >= p["overbought"]:
+                elif row.rsi_ready and row.rsi >= p["overbought"]:
                     reason = "rsi_exit"
 
                 if reason:
-                    sell_gross = coin_qty * close
+                    sell_price = close * (1.0 - p["slippage_rate"])  # 매도: close보다 싸게 체결
+                    sell_gross = coin_qty * sell_price
                     sell_fee   = sell_gross * p["fee_rate"]
                     sell_net   = sell_gross - sell_fee
                     pnl        = sell_net - total_cost
@@ -293,7 +298,7 @@ def run_backtest(
                         "entry_ts":    entry_ts,
                         "exit_ts":     ts,
                         "entry_price": entry_price,
-                        "exit_price":  close,
+                        "exit_price":  sell_price,
                         "pnl":         pnl,
                         "pnl_pct":     pnl_pct,
                         "reason":      reason,
@@ -346,16 +351,53 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="RSI 평균회귀 전략 백테스트")
     parser.add_argument("--db",     default=None,        help="SQLite DB 경로 (기본: src/db/coinbot.db)")
     parser.add_argument("--market", default="KRW-BTC",   help="마켓 (기본: KRW-BTC)")
-    parser.add_argument("--days",   type=int, default=30, help="분석 기간 일 수 (기본: 30)")
+    parser.add_argument("--days",   type=int, default=30, help="분석 기간 일 수 (기본: 30, --start 미지정 시 사용)")
+    parser.add_argument("--start",  default=None,        help="시작 날짜 (YYYY-MM-DD, 지정 시 --days 무시)")
+    parser.add_argument("--end",    default=None,        help="종료 날짜 (YYYY-MM-DD, 미지정 시 현재까지)")
+    parser.add_argument("--unit",   type=int, default=15,
+                        choices=[1, 3, 5, 10, 15, 30, 60, 240],
+                        help="분봉 단위 (기본: 15)")
     args = parser.parse_args()
 
-    db_path  = resolve_db_path(args.db)
-    start_ts = (datetime.now(KST) - timedelta(days=args.days)).strftime("%Y-%m-%dT%H:%M:%S")
+    db_path = resolve_db_path(args.db)
 
+    # start_ts: --start 지정 시 해당 날짜 00:00:00, 미지정 시 현재 기준 --days 전
+    if args.start:
+        start_ts = f"{args.start}T00:00:00"
+    else:
+        start_ts = (datetime.now(KST) - timedelta(days=args.days)).strftime("%Y-%m-%dT%H:%M:%S")
+
+    # end_ts: --end 지정 시 해당 날짜 23:59:59, 미지정 시 None (현재까지)
+    end_ts = f"{args.end}T23:59:59" if args.end else None
+
+    # 로그: 요청 기간 표시
+    period_desc = f"{args.start} ~ {args.end or '현재'}" if args.start else f"최근 {args.days}일 ({start_ts} ~ )"
     print(f"[backtest] DB: {db_path}")
-    print(f"[backtest] 마켓: {args.market}, 기간: {args.days}일 ({start_ts} ~ )")
+    print(f"[backtest] 마켓: {args.market}, 요청 기간: {period_desc}")
 
-    result = run_backtest(db_path, args.market, start_ts=start_ts)
+    result = run_backtest(db_path, args.market, start_ts=start_ts, end_ts=end_ts, unit=args.unit)
+
+    candles = result["candles"]
+    if candles.empty:
+        print("[backtest] 데이터 없음. fetch_candles.py로 캔들을 먼저 수집하세요.")
+        return
+
+    actual_start = candles.index.min()
+    actual_end   = candles.index.max()
+    actual_days  = (actual_end - actual_start).total_seconds() / 86400
+    print(f"[backtest] 실제 데이터: {actual_start} ~ {actual_end} ({len(candles)}캔들, {actual_days:.1f}일)")
+
+    # 요청 기간 대비 실제 데이터 비율 체크 (모든 케이스 공통)
+    if args.start:
+        # --start/--end 지정 시: 요청 기간(일) 계산 후 비교
+        end_dt    = datetime.strptime(args.end, "%Y-%m-%d") if args.end else datetime.now(KST).replace(tzinfo=None)
+        start_dt  = datetime.strptime(args.start, "%Y-%m-%d")
+        requested_days = (end_dt - start_dt).total_seconds() / 86400
+    else:
+        requested_days = args.days
+
+    if actual_days < requested_days * 0.9:
+        print(f"[backtest] ⚠ 요청({requested_days:.0f}일)보다 짧은 데이터({actual_days:.1f}일)입니다. fetch_candles.py --days {int(requested_days) + 1} 로 보강하세요.")
 
     s = result["summary"]
     print("\n=== 백테스트 결과 ===")
@@ -365,7 +407,9 @@ def main() -> None:
     print(f"  평균 보유 시간:   {s['avg_hold_minutes']:.1f} 분")
 
     if not result["trades"].empty:
-        csv_path = f"trades_{args.market.replace('-', '_')}.csv"
+        results_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "backtest_results")
+        os.makedirs(results_dir, exist_ok=True)
+        csv_path = os.path.join(results_dir, f"trades_{args.market.replace('-', '_')}.csv")
         result["trades"].to_csv(csv_path, index=False, encoding="utf-8-sig")
         print(f"\n  → 거래 목록 저장: {csv_path}")
 
