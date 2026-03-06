@@ -1,6 +1,6 @@
 ﻿# Phase 2 Step 7~9: Python 도구 설계 명세
 
-> **관련 단계**: Phase 2 Steps 1~6 (C++ DB 인프라 + 봇 통합) 완료 후
+> **관련 단계**: Phase 2 Steps 1~7 완료 (C++ DB 인프라 + 봇 통합 + 캔들 수집기) — Step 8·9 미시작
 > **목적**: 과거 데이터 수집 / Streamlit 대시보드 / 백테스트 모듈 (모두 Python 독립 컴포넌트)
 
 ---
@@ -15,7 +15,6 @@ C:\cpp\CoinBot\
 │   └── requirements.txt       (Step 7/9 전용 의존성)
 └── streamlit\
     ├── app.py                 (Step 8: 대시보드 메인)
-    ├── upbit_api.py           (Step 8: JWT + REST 헬퍼)
     └── requirements.txt       (Step 8: 의존성)
 ```
 
@@ -70,7 +69,7 @@ end_ts = 현재 분의 직전 분   # 미확정(진행 중) 캔들 제외 — In
 to     = None                 # 최신 캔들부터 역방향 시작
 
 while True:
-    GET /v1/candles/minutes/1?market=<market>&count=200[&to=<to>]
+    GET /v1/candles/minutes/15?market=<market>&count=200[&to=<to>]
 
     for each candle in result:
         if candle_ts <= end_ts:          # 미확정 캔들 제외
@@ -94,7 +93,7 @@ end_ts      = 현재 분의 직전 분 (KST now 기준)      # 미확정(진행 
 to          = None  # 최신부터 역방향 시작
 
 while True:
-    GET /v1/candles/minutes/1?market=<market>&count=200[&to=<to>]
+    GET /v1/candles/minutes/15?market=<market>&count=200[&to=<to>]
 
     for each candle in result:
         if candle_ts <= end_ts:          # 미확정 캔들 제외 (현재 진행 중인 분봉 skip)
@@ -131,7 +130,7 @@ while True:
 ### 목적
 
 DB 캔들 기반으로 RSI 평균회귀 전략을 시뮬레이션한다.
-Streamlit `app.py` Tab3에서 `import candle_rsi_backtest as backtest`로 사용하며, 독립 CLI로도 실행 가능.
+Streamlit `app.py` Tab2에서 `import candle_rsi_backtest as backtest`로 사용하며, 독립 CLI로도 실행 가능.
 
 ### 의존성 (`tools/requirements.txt`에 포함)
 
@@ -319,11 +318,11 @@ python tools/candle_rsi_backtest.py --market KRW-BTC --days 30
 
 ---
 
-## Step 8: `streamlit/app.py` + `streamlit/upbit_api.py` — 대시보드
+## Step 8: `streamlit/app.py` — 대시보드
 
 ### 목적
 
-실시간 계좌 현황(Upbit REST API) + DB 기반 캔들/신호 분석 + 백테스트 UI
+DB 기반 P&L 분석 + 전략 분석 + 백테스트 UI (Upbit API 의존 없음)
 
 ### 의존성 (`streamlit/requirements.txt`)
 
@@ -331,30 +330,7 @@ python tools/candle_rsi_backtest.py --market KRW-BTC --days 30
 streamlit
 plotly
 pandas
-numpy          # candle_rsi_backtest.py 의존성 (Tab3 import)
-requests
-PyJWT
-```
-
-### API 키 처리 (우선순위)
-
-1. 환경변수: `UPBIT_ACCESS_KEY`, `UPBIT_SECRET_KEY`
-2. Streamlit secrets (`~/.streamlit/secrets.toml`) fallback
-3. Sidebar 직접 입력 (password type)
-
----
-
-### `upbit_api.py` — JWT + REST 헬퍼
-
-```python
-def make_jwt(access_key, secret_key, query_params=None) -> str:
-    # query_params 있으면: SHA512(query_string) → query_hash 포함
-    # PyJWT로 {access_key, nonce, [query_hash, query_hash_alg]} 서명
-    # returns "Bearer <token>"
-
-def get_accounts(access_key, secret_key) -> list
-def get_open_orders(access_key, secret_key, market=None) -> list
-def get_closed_orders(access_key, secret_key, market, limit=20) -> list
+numpy          # candle_rsi_backtest.py 의존성 (Tab2 import)
 ```
 
 ---
@@ -367,25 +343,26 @@ def get_closed_orders(access_key, secret_key, market, limit=20) -> list
 |------|------|
 | DB 경로 입력 | `__file__` 기준 자동 계산 (Step 7과 동일 규칙) |
 | 마켓 선택 | multiselect |
-| API 키 입력 | password type (환경변수 없을 때만 표시) |
 
-#### Tab 1 — 실시간
+#### Tab 1 — 분석
 
-- 잔고 테이블 (`/v1/accounts`)
-- 미체결 주문 (`/v1/orders/open`)
-- 최근 체결 (`/v1/orders/closed`)
-- [새로고침] 버튼
+**섹션 A: P&L** (`orders` 기반 — 실측 수수료 포함)
 
-#### Tab 2 — 분석
+- 마켓 + 기간 선택 (일별/주별/월별 토글)
+- **손익 바차트** (Plotly): 기간별 총손익(KRW) 기본, 수익률(%) 토글 전환 가능
+  - KRW: `SUM(pnl)` / 수익률(%): `SUM(pnl) / SUM(cost) * 100` (가중 수익률. SQL은 0~1 비율 반환, UI에서 *100 변환)
+- **누적 손익 곡선** (Plotly): 거래 완료 시점 기준
+- **마켓별 성과 요약 카드**: 승률 / 총손익(KRW) / 평균 손익률(%)
+- **BUY↔SELL 페어링 거래 내역 테이블** (아래 쿼리 참고)
 
-- 마켓 + 기간 선택
+**섹션 B: 전략 분석** (`signals` 기반 — 봇 내부 컨텍스트)
+
 - **Plotly 캔들차트** (`go.Candlestick`)
   - BUY 마커: `signals WHERE side='BUY'` → 삼각형 ▲ (green)
   - SELL 마커: `signals WHERE side='SELL' AND is_partial=0` → 삼각형 ▼ (red)
-- 주문 이력 테이블 (`orders` DataFrame)
-- **봇 신호 통계 카드** (아래 쿼리 참고) — 봇 신호 패턴 진단용. 정확한 실거래 손익은 Tab 1(Upbit API) 기준
+- **신호 통계 카드**: 손절/익절/RSI청산 비율, 평균 보유 기간, 부분청산 건수
 
-#### Tab 3 — 백테스트
+#### Tab 2 — 백테스트
 
 `candle_rsi_backtest` import 실패 시 앱 전체 크래시 없이 탭 내 안내 메시지로 처리. (`tools/` 경로를 `sys.path`에 추가한 후 import)
 
@@ -403,31 +380,117 @@ def get_closed_orders(access_key, secret_key, market, limit=20) -> list
 [실행] 버튼 → `backtest.run_backtest()` 호출
 
 결과:
-- 캔들차트 + 진입(↑) / 청산(↓) 마커 (Plotly)
+- 캔들차트 + 백테스트 진입(↑) / 청산(↓) 마커 (Plotly)
+- **실거래 signals 오버레이**: `signals WHERE market=? AND ts_ms BETWEEN start AND end`
+  - BUY 마커 ▲ (green, 실선) / SELL 마커 ▼ (red, 실선) — 백테스트 마커와 색상/형태 구분
 - 자산 곡선 (equity curve)
 - 거래 요약 테이블
 
 ---
 
-## 봇 신호 통계 쿼리 설계
+## 쿼리 설계
 
-> **목적**: 봇이 기록한 신호(signals 테이블) 기반 패턴 진단 및 오류 검증.
-> 정확한 실거래 손익(슬리피지, 실측 수수료 포함)은 Tab 1의 Upbit API 잔고/주문 기준으로 확인한다.
+### 섹션 A: P&L 쿼리 (`orders` 단독)
 
-### BUY/SELL 페어링 규칙
+#### 설계 원칙
 
-- `is_partial=0` SELL만 완전 청산으로 간주하여 BUY와 매칭
-- `is_partial=1` SELL(부분체결 후 취소)은 성과 집계에서 제외하고 건수만 별도 표시
+- **대상**: `created_at_ms > 0` 필터로 파싱 실패 행 제외
+- **포함 범위**: `status = 'Filled'` + `status = 'Canceled' AND executed_volume > 0`
+  - cancel_after_trade(부분체결 후 취소) 자동 포함
+- **BUY 창 방식**: BID `created_at_ms` 기준으로 LEAD()로 다음 BUY 시각 계산
+  - 창 내 모든 ASK 합산 → 부분청산(복수 SELL) 자동 포함
+  - ROW_NUMBER 1:1 매칭보다 데이터 누락에 강건
+  - `created_at_ms` = 주문 생성 시각 기준 (체결 완료 시각 아님). 시장가 위주 운영 시 차이는 수백ms 이내로 분석 결과에 실질 영향 없음
+- P&L 산식:
+  - `cost    = executed_funds + paid_fee`  (BID: 실제 지출)
+  - `revenue = executed_funds - paid_fee`  (ASK: 실제 수령)
+  - `pnl     = Σrevenue - cost`
 
 ```sql
--- 각 BUY에 대해 이후 첫 번째 완전청산(is_partial=0) SELL 매칭
+-- BUY↔SELL 페어링 + P&L (orders 단독)
+WITH buys AS (
+    SELECT
+        market,
+        executed_funds + paid_fee  AS cost,
+        created_at_ms              AS buy_ts,
+        COALESCE(
+            LEAD(created_at_ms) OVER (PARTITION BY market ORDER BY created_at_ms),
+            9999999999999
+        )                          AS next_buy_ts
+    FROM orders
+    WHERE side = 'BID'
+      AND created_at_ms > 0
+      AND (status = 'Filled' OR (status = 'Canceled' AND executed_volume > 0))
+),
+sells AS (
+    SELECT
+        market,
+        executed_funds - paid_fee  AS revenue,
+        created_at_ms              AS sell_ts
+    FROM orders
+    WHERE side = 'ASK'
+      AND created_at_ms > 0
+      AND (status = 'Filled' OR (status = 'Canceled' AND executed_volume > 0))
+)
+-- 각 BUY 창에 속한 모든 SELL 합산 (부분청산 포함)
 SELECT
-    b.ts_ms       AS buy_ts,
-    b.price       AS buy_price,
-    b.krw_amount  AS buy_krw,
-    s.ts_ms       AS sell_ts,
-    s.price       AS sell_price,
-    s.krw_amount  AS sell_krw
+    b.market,
+    b.buy_ts,
+    b.cost,
+    SUM(s.revenue)                        AS total_revenue,
+    SUM(s.revenue) - b.cost              AS pnl,
+    (SUM(s.revenue) - b.cost) / b.cost   AS pnl_pct,
+    MAX(s.sell_ts)                        AS last_sell_ts
+FROM buys b
+JOIN sells s
+  ON  s.market   = b.market
+  AND s.sell_ts  > b.buy_ts
+  AND s.sell_ts <= b.next_buy_ts
+GROUP BY b.market, b.buy_ts, b.cost
+ORDER BY b.buy_ts
+```
+
+#### 일별/주별/월별 집계
+
+```sql
+-- 위 페어링 결과를 CTE `pairs`로 감싸서 집계
+-- 귀속 기준: last_sell_ts (청산일) — 실현손익은 포지션을 닫는 시점에 귀속
+-- SQLite: datetime(ts/1000, 'unixepoch', '+9 hours') → KST 변환
+
+-- 일별
+SELECT
+    strftime('%Y-%m-%d', datetime(last_sell_ts/1000, 'unixepoch', '+9 hours')) AS day,
+    SUM(pnl)                                                           AS total_pnl,
+    SUM(pnl) / SUM(cost)                                               AS period_return_pct,  -- 가중 수익률 (0~1 비율, UI 표시 시 *100 하여 % 변환. AVG(pnl_pct) 사용 금지: 소액 거래 왜곡)
+    COUNT(*)                                                           AS trades,
+    SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END) * 1.0 / COUNT(*)        AS win_rate
+FROM pairs
+GROUP BY day ORDER BY day
+
+-- 주별: '%Y-%m-%d' → '%Y-%W'
+-- 월별: '%Y-%m-%d' → '%Y-%m'
+```
+
+---
+
+### 섹션 B: 전략 분석 쿼리 (`signals` 기반)
+
+> **목적**: 봇 진입 컨텍스트(RSI·손절가 등) 기반 패턴 진단. Upbit API가 제공하지 않는 내부 데이터.
+
+#### BUY/SELL 신호 페어링 (보유 기간 계산용)
+
+- `is_partial=0` SELL만 완전 청산으로 간주하여 BUY와 매칭
+- `is_partial=1` SELL(부분체결 후 취소)은 집계에서 제외하고 건수만 별도 표시
+
+```sql
+SELECT
+    b.ts_ms        AS buy_ts,
+    b.price        AS buy_price,
+    b.rsi          AS entry_rsi,
+    b.stop_price,
+    b.target_price,
+    s.ts_ms        AS sell_ts,
+    s.price        AS sell_price
 FROM signals b
 JOIN signals s
   ON  s.market     = b.market
@@ -444,18 +507,14 @@ WHERE b.side = 'BUY'
 ORDER BY b.ts_ms
 ```
 
-### 지표 산식
+#### 전략 통계 산식
 
 | 지표 | 계산 |
 |------|------|
-| 총 거래 수 | 매칭된 BUY/SELL 쌍 수 |
-| 승률 | `(sell_krw - buy_krw) > 0` 건 / 전체 |
-| 총손익 gross (KRW) | `Σ(sell_krw - buy_krw)` |
-| 총손익 estimated net (KRW) | `gross - fee_rate × Σ(buy_krw + sell_krw)` (추정치, 아래 참고) |
 | 평균 보유 기간 | `Σ(sell_ts - buy_ts) / count` [ms → minutes] |
-| 부분청산 건수 | `SELECT COUNT(*) FROM signals WHERE is_partial=1` (별도 노트) |
-
-> **향후 개선**: `orders` 테이블의 `paid_fee` 컬럼에 실측 수수료가 기록되어 있으므로, signals↔orders 조인으로 추정치 대신 실측 net을 계산할 수 있다. 1차 구현에서는 signals 단독 쿼리의 단순성을 우선한다.
+| 진입 RSI 분포 | `signals WHERE side='BUY'`의 `rsi` 히스토그램 |
+| 청산 reason 비율 | `signals WHERE side='SELL'`의 `exit_reason` 컬럼 집계. 단일값 4종(`exit_stop` / `exit_target` / `exit_rsi_overbought` / `exit_unknown`) + 복합값(`exit_stop_target` / `exit_stop_rsi_overbought` / `exit_target_rsi_overbought` / `exit_stop_target_rsi_overbought`). 복합값은 다중 조건 동시 트리거 시 생성되며, Python 집계 시 단순 일치가 아닌 `LIKE` 또는 `startswith` 분류 필요 |
+| 부분청산 건수 | `SELECT COUNT(*) FROM signals WHERE is_partial=1` |
 
 ---
 
@@ -466,7 +525,7 @@ Step 7 (fetch_candles.py)
     └─ DB에 데이터 적재 (Streamlit/백테스트 실행 전 필수)
 
 Step 9 (candle_rsi_backtest.py)
-    └─ Streamlit Tab3에서 import하므로 app.py보다 먼저 구현
+    └─ Streamlit Tab2에서 import하므로 app.py보다 먼저 구현
 
 Step 8 (app.py)
     └─ Step 7 데이터 + Step 9 모듈 모두 의존
@@ -483,7 +542,7 @@ Step 8 (app.py)
 python tools/fetch_candles.py --days 7 --markets KRW-BTC
 sqlite3 src/db/coinbot.db \
   "SELECT COUNT(*), MIN(ts), MAX(ts) FROM candles WHERE market='KRW-BTC'"
-# 약 10,000건 기대 (7일 × 1440분)
+# 약 672건 기대 (7일 × 96봉/일, 15분봉 기준)
 # ts 값이 KST 형식("2024-01-01T09:00:00")인지 확인
 ```
 
@@ -498,9 +557,9 @@ python tools/candle_rsi_backtest.py --market KRW-BTC --days 30
 
 ```bash
 cd streamlit && streamlit run app.py
-# Tab1: 잔고 테이블 표시 확인
-# Tab2: 캔들차트 + 신호 마커 표시 확인 / 부분청산 건수 노트 확인
-# Tab3: [실행] 클릭 후 백테스트 결과 차트 표시 확인
+# Tab1 섹션A: 주별/월별 수익률 바차트 + 거래 내역 테이블 표시 확인
+# Tab1 섹션B: 캔들차트 + 신호 마커 / 부분청산 건수 표시 확인
+# Tab2: [실행] 클릭 후 백테스트 결과 차트 표시 확인
 ```
 
 ### 통합 검증

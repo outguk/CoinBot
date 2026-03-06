@@ -25,7 +25,14 @@
       "Bash(dir:*)",
       "Bash(cmd /c \"dir C:\\\\cpp\\\\CoinBot\")",
       "Bash(cmd /c \"dir C:\\\\cpp\\\\CoinBot /b\")",
-      "Bash(cmd /c:*)"
+      "Bash(cmd /c:*)",
+      "Bash(python:*)",
+      "Bash(where streamlit:*)",
+      "Bash(pip show:*)",
+      "Bash(py -0)",
+      "Read(//c/Users/김인국/AppData/Local/Programs/**)",
+      "Bash(ls /c/Python*)",
+      "Bash(py:*)"
     ]
   }
 }

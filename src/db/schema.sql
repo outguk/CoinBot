@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS candles (
     low    REAL    NOT NULL,
     close  REAL    NOT NULL,
     volume REAL    NOT NULL,
-    UNIQUE (market, ts)        -- 유니크 제약, ()내 요소가 테이블 내에서 하나만 존재하도록 강제
+    unit   INTEGER NOT NULL DEFAULT 15,  -- 분봉 단위 (1/3/5/10/15/30/60/240)
+    UNIQUE (market, ts, unit)            -- 같은 마켓·시각이라도 단위가 다르면 별도 행
 );
 
 
@@ -60,15 +61,18 @@ CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE TABLE IF NOT EXISTS signals (
     id           INTEGER PRIMARY KEY,
     market       TEXT    NOT NULL,
+    identifier   TEXT,               -- orders.identifier와 동일한 cid (JOIN 연결 고리)
     side         TEXT    NOT NULL CHECK (side IN ('BUY', 'SELL')),
     price        REAL    NOT NULL,   -- 체결 VWAP
     volume       REAL    NOT NULL,
-    krw_amount   REAL    NOT NULL,
+    krw_amount   REAL    NOT NULL,   -- fee 미포함 순수 체결 금액
     stop_price   REAL,               -- BUY 시 손절가
     target_price REAL,               -- BUY 시 익절가
-    rsi          REAL,               -- 신호 발생 시 RSI
-    volatility   REAL,               -- 신호 발생 시 변동성
+    rsi            REAL,               -- 신호 발생 시 RSI
+    volatility     REAL,               -- 신호 발생 시 변동성
+    trend_strength REAL,               -- 신호 발생 시 추세 강도
     is_partial   INTEGER NOT NULL DEFAULT 0 CHECK (is_partial IN (0, 1)),  -- 0: 완전 청산, 1: 부분 청산
+    exit_reason  TEXT,               -- SELL 청산 사유. 단일: exit_stop/exit_target/exit_rsi_overbought/exit_unknown. 복합(동시 트리거): exit_stop_target 등 조합 가능. BUY는 NULL
     ts_ms        INTEGER NOT NULL
 );
 

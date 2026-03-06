@@ -47,7 +47,7 @@ namespace trading::strategies {
             std::size_t volatilityWindow{ 5 };
             double minVolatility{ 0 };    // 1% 이상이면 거래하기 적당
 
-            // [HYBRID v2 §4.9] 배분 자본 사용 비율
+            // 배분 자본 사용 비율
             // krw_to_use = account.krw_available / reserve_margin * utilization
             double utilization{ 1.0 };
             double stopLossPct{ 2.0 };        // 진입가 대비 손절 %
@@ -132,6 +132,7 @@ namespace trading::strategies {
         // 상태 + 주문 추적
         State state_{ State::Flat };
         std::optional<std::string> pending_client_id_{};
+        std::string pending_exit_reason_{}; // maybeExit() 에서 set, SELL 신호 기록 시 사용
 
         // 부분 체결 누적용
         double pending_filled_volume_{ 0.0 }; // Σ filled_volume 지금까지 체결된 수량

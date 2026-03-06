@@ -22,7 +22,8 @@ CREATE TABLE IF NOT EXISTS candles (
     low    REAL    NOT NULL,
     close  REAL    NOT NULL,
     volume REAL    NOT NULL,
-    UNIQUE (market, ts)
+    unit   INTEGER NOT NULL DEFAULT 15,
+    UNIQUE (market, ts, unit)
 );
 
 CREATE TABLE IF NOT EXISTS orders (
@@ -48,15 +49,18 @@ CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE TABLE IF NOT EXISTS signals (
     id           INTEGER PRIMARY KEY,
     market       TEXT    NOT NULL,
+    identifier   TEXT,               -- orders.identifier와 동일한 cid (JOIN 연결 고리)
     side         TEXT    NOT NULL CHECK (side IN ('BUY', 'SELL')),
     price        REAL    NOT NULL,
     volume       REAL    NOT NULL,
-    krw_amount   REAL    NOT NULL,
+    krw_amount   REAL    NOT NULL,   -- fee 미포함 순수 체결 금액
     stop_price   REAL,
     target_price REAL,
-    rsi          REAL,
-    volatility   REAL,
-    is_partial   INTEGER NOT NULL DEFAULT 0 CHECK (is_partial IN (0, 1)),
+    rsi            REAL,
+    volatility     REAL,
+    trend_strength REAL,
+    is_partial     INTEGER NOT NULL DEFAULT 0 CHECK (is_partial IN (0, 1)),
+    exit_reason  TEXT,               -- SELL 청산 사유. 단일/복합 조합 가능 (ex. exit_stop_target). BUY는 NULL
     ts_ms        INTEGER NOT NULL
 );
 
@@ -133,9 +137,56 @@ void Database::exec(const char* sql)
     }
 }
 
-void Database::initSchema() 
+void Database::initSchema()
 {
     exec(kSchema);
+
+    // 기존 DB 마이그레이션: identifier 컬럼이 없는 구버전 DB 대응
+    // ALTER TABLE ADD COLUMN은 컬럼이 이미 있으면 오류 → 반환값만 무시
+    sqlite3_exec(db_, "ALTER TABLE signals ADD COLUMN identifier TEXT;",
+                 nullptr, nullptr, nullptr);
+    sqlite3_exec(db_, "ALTER TABLE signals ADD COLUMN exit_reason TEXT;",
+                 nullptr, nullptr, nullptr);
+    sqlite3_exec(db_, "ALTER TABLE signals ADD COLUMN trend_strength REAL;",
+                 nullptr, nullptr, nullptr);
+
+    // candles unit 마이그레이션:
+    // unit 컬럼이 없으면 테이블 재작성 — UNIQUE 제약 변경은 ALTER TABLE로 불가
+    sqlite3_stmt* stmt = nullptr;
+    int has_unit = 0;
+    if (sqlite3_prepare_v2(db_,
+            "SELECT COUNT(*) FROM pragma_table_info('candles') WHERE name='unit';",
+            -1, &stmt, nullptr) == SQLITE_OK)
+    {
+        if (sqlite3_step(stmt) == SQLITE_ROW)
+            has_unit = sqlite3_column_int(stmt, 0);
+        sqlite3_finalize(stmt);
+    }
+
+    if (!has_unit)
+    {
+        util::log().info("[DB] candles 마이그레이션: unit 컬럼 추가 및 UNIQUE(market,ts,unit) 재설정");
+        exec("BEGIN;");
+        exec(R"SQL(
+            CREATE TABLE candles_new (
+                id     INTEGER PRIMARY KEY,
+                market TEXT    NOT NULL,
+                ts     TEXT    NOT NULL,
+                open   REAL    NOT NULL,
+                high   REAL    NOT NULL,
+                low    REAL    NOT NULL,
+                close  REAL    NOT NULL,
+                volume REAL    NOT NULL,
+                unit   INTEGER NOT NULL DEFAULT 15,
+                UNIQUE (market, ts, unit)
+            );
+        )SQL");
+        exec("INSERT INTO candles_new (id,market,ts,open,high,low,close,volume,unit) "
+             "SELECT id,market,ts,open,high,low,close,volume,15 FROM candles;");
+        exec("DROP TABLE candles;");
+        exec("ALTER TABLE candles_new RENAME TO candles;");
+        exec("COMMIT;");
+    }
 }
 
 // ─── normalizeToEpochMs ───────────────────────────────────────────────────────
@@ -205,10 +256,11 @@ bool Database::insertCandle(const std::string& market, const core::Candle& c)
     }
 
 	// ?는 bind로 매개변수를 바인딩하는 자리 표시자 (DO NOTHING은 중복 무시)
+    // ON CONFLICT 대상 (market,ts,unit)
     static constexpr const char* sql =
-        "INSERT INTO candles (market, ts, open, high, low, close, volume) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?) "
-        "ON CONFLICT(market, ts) DO NOTHING;";
+        "INSERT INTO candles (market, ts, open, high, low, close, volume, unit) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, 15) "
+        "ON CONFLICT(market, ts, unit) DO NOTHING;";
 
 	// 컴파일된 SQL 실행 객체 (prepare가 성공하면 유효 포인터로 채워지고 실패시 nullptr 유지)
     sqlite3_stmt* stmt = nullptr;
@@ -312,12 +364,12 @@ bool Database::insertSignal(const trading::SignalRecord& sig)
 
     static constexpr const char* sql =
         "INSERT INTO signals "
-        "(market, side, price, volume, krw_amount, "
-        " stop_price, target_price, rsi, volatility, is_partial, ts_ms) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
+        "(market, identifier, side, price, volume, krw_amount, "
+        " stop_price, target_price, rsi, volatility, trend_strength, is_partial, exit_reason, ts_ms) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
 
     sqlite3_stmt* stmt = nullptr;
-    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) 
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK)
     {
         util::log().warn("[DB] insertSignal prepare 실패: ", sqlite3_errmsg(db_));
         return false;
@@ -325,19 +377,28 @@ bool Database::insertSignal(const trading::SignalRecord& sig)
 
     const char* side = (sig.side == trading::SignalSide::BUY) ? "BUY" : "SELL";
 
-    sqlite3_bind_text  (stmt, 1, sig.market.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_text  (stmt, 2, side,               -1, SQLITE_STATIC);
-    sqlite3_bind_double(stmt, 3, sig.price);
-    sqlite3_bind_double(stmt, 4, sig.volume);
-    sqlite3_bind_double(stmt, 5, sig.krw_amount);
+    sqlite3_bind_text  (stmt, 1, sig.market.c_str(),     -1, SQLITE_STATIC);
+    sig.identifier.empty()
+        ? sqlite3_bind_null(stmt, 2)
+        : sqlite3_bind_text(stmt, 2, sig.identifier.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_text  (stmt, 3, side,                   -1, SQLITE_STATIC);
+    sqlite3_bind_double(stmt, 4, sig.price);
+    sqlite3_bind_double(stmt, 5, sig.volume);
+    sqlite3_bind_double(stmt, 6, sig.krw_amount);
 
-    sig.stop_price   ? sqlite3_bind_double(stmt, 6, *sig.stop_price)   : sqlite3_bind_null(stmt, 6);
-    sig.target_price ? sqlite3_bind_double(stmt, 7, *sig.target_price) : sqlite3_bind_null(stmt, 7);
-    sig.rsi          ? sqlite3_bind_double(stmt, 8, *sig.rsi)          : sqlite3_bind_null(stmt, 8);
-    sig.volatility   ? sqlite3_bind_double(stmt, 9, *sig.volatility)   : sqlite3_bind_null(stmt, 9);
+    sig.stop_price   ? sqlite3_bind_double(stmt, 7, *sig.stop_price)   : sqlite3_bind_null(stmt, 7);
+    sig.target_price ? sqlite3_bind_double(stmt, 8, *sig.target_price) : sqlite3_bind_null(stmt, 8);
+    sig.rsi            ? sqlite3_bind_double(stmt,  9, *sig.rsi)            : sqlite3_bind_null(stmt,  9);
+    sig.volatility     ? sqlite3_bind_double(stmt, 10, *sig.volatility)     : sqlite3_bind_null(stmt, 10);
+    sig.trend_strength ? sqlite3_bind_double(stmt, 11, *sig.trend_strength) : sqlite3_bind_null(stmt, 11);
 
-    sqlite3_bind_int  (stmt, 10, sig.is_partial);
-    sqlite3_bind_int64(stmt, 11, sig.ts_ms);
+    sqlite3_bind_int  (stmt, 12, sig.is_partial);
+
+    sig.exit_reason.empty()
+        ? sqlite3_bind_null(stmt, 13)
+        : sqlite3_bind_text(stmt, 13, sig.exit_reason.c_str(), -1, SQLITE_STATIC);
+
+    sqlite3_bind_int64(stmt, 14, sig.ts_ms);
 
     const bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
     if (!ok) util::log().warn("[DB] insertSignal step 실패: ", sqlite3_errmsg(db_));

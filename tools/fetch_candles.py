@@ -2,7 +2,7 @@
 fetch_candles.py — 과거/최신 캔들 수집기 (Phase 2 Step 7)
 
 용도: DB에 과거 캔들을 적재한다. 봇 실행과 독립적으로 실행 가능.
-실행: python tools/fetch_candles.py [--db <path>] [--markets KRW-ADA,...] [--days 90]
+실행: python tools/fetch_candles.py [--db <path>] [--markets KRW-ADA,...] [--days 90] [--start YYYY-MM-DD] [--end YYYY-MM-DD] [--unit 15]
 
 DB 경로 우선순위:
   1. CLI --db 인자
@@ -21,13 +21,14 @@ import requests
 
 # ─── 상수 ─────────────────────────────────────────────────────────────────────
 
-UPBIT_CANDLES_URL = "https://api.upbit.com/v1/candles/minutes/15"
-DEFAULT_MARKETS   = ["KRW-ADA", "KRW-TRX", "KRW-XRP"]
-DEFAULT_DAYS      = 90
-OVERLAP_MINUTES   = 2    # Incremental: 경계 누락 방지용 overlap (ON CONFLICT DO NOTHING으로 중복 흡수)
-REQUEST_INTERVAL  = 0.1  # rate limit: 분당 ~600회 상한 (0.1s 간격)
-BATCH_SIZE        = 200  # Upbit API 1회 최대 수신 개수
-REQUEST_TIMEOUT   = 10   # 단일 요청 타임아웃 (초)
+SUPPORTED_UNITS  = [1, 3, 5, 10, 15, 30, 60, 240]  # Upbit 지원 분봉 단위 (모두 1440의 약수)
+DEFAULT_UNIT     = 15
+DEFAULT_MARKETS  = ["KRW-ADA", "KRW-TRX", "KRW-XRP"]
+DEFAULT_DAYS     = 90
+OVERLAP_CANDLES  = 2    # Incremental: 경계 누락 방지용 overlap 캔들 수 (unit에 비례해 분으로 환산)
+REQUEST_INTERVAL = 0.1  # rate limit: 분당 ~600회 상한 (0.1s 간격)
+BATCH_SIZE       = 200  # Upbit API 1회 최대 수신 개수
+REQUEST_TIMEOUT  = 10   # 단일 요청 타임아웃 (초)
 
 KST = ZoneInfo("Asia/Seoul")
 
@@ -56,57 +57,72 @@ def resolve_db_path(cli_path: str | None) -> str:
 
 # ─── end_ts 계산 ──────────────────────────────────────────────────────────────
 
-def calc_end_ts(now: datetime) -> str:
+def calc_end_ts(now: datetime, unit: int) -> str:
     """
-    현재 분의 직전 분을 반환한다 (미확정 캔들 제외).
+    마지막으로 완료된 분봉의 시작 시각을 반환한다 (미확정 캔들 제외).
+
+    자정 이후 누적 분을 unit으로 나눈 나머지 = 현재 봉 시작으로부터 경과 분.
+    unit이 1440의 약수(Upbit 지원 단위: 1/3/5/10/15/30/60/240)이면 항상 자정 기준 경계와 정렬됨.
+
+    예) unit=15, 10:37 → elapsed=7 → current=10:30 → last=10:15
+        unit=60, 10:37 → elapsed=37 → current=10:00 → last=09:00
+        unit=240, 10:37 → elapsed=157 → current=08:00 → last=04:00
+
     미확정 캔들을 insert하면 ON CONFLICT DO NOTHING으로 인해
     이후 봇이 완성된 값을 write하지 못해 틀린 데이터가 고착된다.
     """
-    # 현재 시간을 분 단위로 내리고 1분을 뺀다 (미확정 캔들을 제외하기 위함)
-    prev = now.replace(second=0, microsecond=0) - timedelta(minutes=1) 
-    return prev.strftime("%Y-%m-%dT%H:%M:%S")
+    total_minutes    = now.hour * 60 + now.minute   # 자정 이후 누적 분
+    elapsed          = total_minutes % unit          # 현재 봉 시작으로부터 경과 분
+    current_boundary = now.replace(second=0, microsecond=0) - timedelta(minutes=elapsed)
+    last_complete    = current_boundary - timedelta(minutes=unit)
+    return last_complete.strftime("%Y-%m-%dT%H:%M:%S")
 
 
 # ─── Upbit API ─────────────────────────────────────────────────────────────────
 
-def fetch_batch(market: str, to: str | None) -> list[dict]:
+def fetch_batch(market: str, to: str | None, unit: int) -> list[dict]:
     """
-    Upbit /v1/candles/minutes/15 1회 호출.
+    Upbit /v1/candles/minutes/{unit} 1회 호출.
     to: candle_date_time_kst 형식 문자열 (None이면 최신부터 역방향 수집)
     반환: 캔들 dict 리스트 (최신 → 과거 순)
-
-    [명세서 수정] 원본 명세서에는 API 오류 처리가 없음.
-    네트워크 실패 시 예외를 그대로 전파해 호출자가 인지할 수 있도록 raise_for_status 추가.
     """
+    url    = f"https://api.upbit.com/v1/candles/minutes/{unit}"
     params: dict = {"market": market, "count": BATCH_SIZE}
     if to:
         params["to"] = to  # candle_date_time_kst 형식("YYYY-MM-DDTHH:MM:SS") 그대로 사용
 
-    # 타임아웃을 걸어 무한 대기 방지
-    resp = requests.get(UPBIT_CANDLES_URL, params=params, timeout=REQUEST_TIMEOUT)
-    resp.raise_for_status() # HTTP 에러면 예외 발생
+    resp = requests.get(url, params=params, timeout=REQUEST_TIMEOUT)
+    resp.raise_for_status()
     return resp.json()
 
 
 # ─── DB 헬퍼 ──────────────────────────────────────────────────────────────────
 
-def get_last_ts(conn: sqlite3.Connection, market: str) -> str | None:
-    """candles 테이블에서 해당 마켓의 최신 분봉 시간(ts)를 반환. 없으면 None."""
+def get_first_ts(conn: sqlite3.Connection, market: str, unit: int) -> str | None:
+    """candles 테이블에서 해당 마켓·unit의 가장 오래된 분봉 시간(ts)를 반환. 없으면 None."""
     row = conn.execute(
-        "SELECT MAX(ts) FROM candles WHERE market = ?", (market,)
+        "SELECT MIN(ts) FROM candles WHERE market = ? AND unit = ?", (market, unit)
     ).fetchone()
     return row[0] if row and row[0] else None
 
 
-def insert_candle_row(conn: sqlite3.Connection, market: str, c: dict) -> int:
+def get_last_ts(conn: sqlite3.Connection, market: str, unit: int) -> str | None:
+    """candles 테이블에서 해당 마켓·unit의 최신 분봉 시간(ts)를 반환. 없으면 None."""
+    row = conn.execute(
+        "SELECT MAX(ts) FROM candles WHERE market = ? AND unit = ?", (market, unit)
+    ).fetchone()
+    return row[0] if row and row[0] else None
+
+
+def insert_candle_row(conn: sqlite3.Connection, market: str, c: dict, unit: int) -> int:
     """
     캔들 1건 INSERT (ON CONFLICT DO NOTHING — 봇 실시간 write와 충돌 없음).
     반환: 1=실제 삽입, 0=중복으로 무시됨
     """
     cursor = conn.execute(
-        "INSERT INTO candles (market, ts, open, high, low, close, volume) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?) "
-        "ON CONFLICT(market, ts) DO NOTHING",
+        "INSERT INTO candles (market, ts, open, high, low, close, volume, unit) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
+        "ON CONFLICT(market, ts, unit) DO NOTHING",
         (
             market,
             c["candle_date_time_kst"],   # C++ CandleMapper와 동일한 ts 기준 (KST)
@@ -115,97 +131,43 @@ def insert_candle_row(conn: sqlite3.Connection, market: str, c: dict) -> int:
             c["low_price"],
             c["trade_price"],            # close price
             c["candle_acc_trade_volume"],
+            unit,
         ),
     )
     return cursor.rowcount  # ON CONFLICT DO NOTHING: 삽입 시 1, 중복 무시 시 0
 
 
-# ─── Bootstrap 모드 ───────────────────────────────────────────────────────────
+# ─── 구간 수집 ────────────────────────────────────────────────────────────────
 
-def bootstrap(conn: sqlite3.Connection, market: str, days: int) -> int:
+def fetch_range(conn: sqlite3.Connection, market: str, start_ts: str, end_ts: str, unit: int) -> int:
     """
-    DB에 해당 마켓 데이터 없음(get_last_ts가 None) → 과거 days일치 캔들을 역방향 수집.
+    start_ts ~ end_ts 구간 캔들을 end_ts 기준 역방향 수집.
+
+    bootstrap / incremental / backfill 모두 동일한 역방향 수집 로직이므로 하나로 통합.
+    범위 밖 캔들은 skip, 중복은 ON CONFLICT DO NOTHING으로 흡수.
     반환: 실제 삽입된 캔들 수 (ON CONFLICT DO NOTHING으로 무시된 건 제외)
     """
-    now       = datetime.now(KST)
-    cutoff    = now - timedelta(days=days)
-    end_ts    = calc_end_ts(now)
-    cutoff_str = cutoff.strftime("%Y-%m-%dT%H:%M:%S")
-
-    print(f"  [Bootstrap] {market}: {cutoff_str} ~ {end_ts} ({days}일)")
-
-    to      = None  # 최신부터 역방향 시작
-    count   = 0     # 누적 삽입 건수 계산
-
-    while True:
-        candles = fetch_batch(market, to)
-
-        # candles=[]이면 min() 호출이 ValueError 발생하므로 guard 추가.
-        if not candles:
-            break
-
-        for c in candles:
-            ts = c["candle_date_time_kst"]
-            # bootstrap은 지정 기간(cutoff~end_ts) 안에 드는 캔들만 적재한다.
-            if cutoff_str <= ts <= end_ts:  # 현재 진행 중인 분봉(미확정) 제외
-                count += insert_candle_row(conn, market, c)  # 실제 삽입 건수만 합산
-
-        # 배치마다 커밋: 수집 중 중단 시 진행분 보존.
-        conn.commit()
-
-        oldest_ts = min(c["candle_date_time_kst"] for c in candles)
-        print(f"    ~ {oldest_ts} ({count}건 삽입)")
-
-        # oldest_ts와 cutoff_str 모두 "YYYY-MM-DDTHH:MM:SS" 형식이므로 문자열 비교 가능
-        if len(candles) < BATCH_SIZE or oldest_ts <= cutoff_str:
-            break
-
-        to = oldest_ts
-        time.sleep(REQUEST_INTERVAL)
-
-    return count
-
-
-# ─── Incremental 모드 ─────────────────────────────────────────────────────────
-
-def incremental(conn: sqlite3.Connection, market: str, last_ts: str) -> int:
-    """
-    DB에 기존 데이터 있음 → last_ts 이후 누락 캔들을 수집해 append.
-    overlap 2분: 경계 누락 방지 (ON CONFLICT DO NOTHING으로 중복 흡수).
-    반환: 실제 삽입된 캔들 수 (ON CONFLICT DO NOTHING으로 무시된 건 제외)
-    """
-    now    = datetime.now(KST)
-    end_ts = calc_end_ts(now)
-
-    # 마지막 시간 문자열을 실제 시간으로 변환해 계산 가능하도록 함
-    last_dt  = datetime.strptime(last_ts, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=KST)
-    # start_ts: last_ts에서 OVERLAP_MINUTES을 빼서 overlap 이전부터 시작 (경계 누락 방지)
-    start_ts = (last_dt - timedelta(minutes=OVERLAP_MINUTES)).strftime("%Y-%m-%dT%H:%M:%S")
-
-    print(f"  [Incremental] {market}: {start_ts} ~ {end_ts} (last={last_ts})")
-
-    to    = None  # 최신부터 역방향 시작
+    to    = end_ts  # end_ts부터 역방향으로 시작
     count = 0
 
     while True:
-        # to는 맨밑에서 갱신되며 최신 -> 과거 순으로 진행
-        candles = fetch_batch(market, to)
-
-        # [명세서 수정] 빈 결과 guard
+        candles = fetch_batch(market, to, unit)
         if not candles:
             break
 
-        # 각 배치의 캔들을 순회하며 start_ts ~ end_ts 범위 안에 드는 캔들만 적재
+        batch_count = 0
         for c in candles:
             ts = c["candle_date_time_kst"]
-            # incremental은 start_ts 이후 구간만 보강한다.
-            if start_ts <= ts <= end_ts:  # 미확정 캔들 제외
-                count += insert_candle_row(conn, market, c)  # 실제 삽입 건수만 합산
+            if start_ts <= ts <= end_ts:
+                batch_count += insert_candle_row(conn, market, c, unit)
+        count += batch_count
 
-        # 배치마다 커밋
+        # 배치마다 커밋: 수집 중 중단 시 진행분 보존
         conn.commit()
 
+        latest_ts = max(c["candle_date_time_kst"] for c in candles)
         oldest_ts = min(c["candle_date_time_kst"] for c in candles)
+        print(f"    {oldest_ts} ~ {latest_ts} (+{batch_count}건, 누적 {count}건)")
 
         if len(candles) < BATCH_SIZE or oldest_ts <= start_ts:
             break
@@ -218,17 +180,46 @@ def incremental(conn: sqlite3.Connection, market: str, last_ts: str) -> int:
 
 # ─── 마켓별 진입점 ────────────────────────────────────────────────────────────
 
-def fetch_market(conn: sqlite3.Connection, market: str, days: int) -> None:
-    last_ts = get_last_ts(conn, market)
+def fetch_market(conn: sqlite3.Connection, market: str, start_ts: str, end_ts: str, unit: int) -> None:
+    """
+    요청 구간(start_ts ~ end_ts)을 기준으로 3가지 케이스를 처리한다.
+
+      1. 데이터 없음            → 전체 구간 수집 (Bootstrap)
+      2. 요청 start < DB 최솟값 → 과거 구간 백필 (Backfill)
+      3. 요청 end   > DB 최댓값 → 최신 구간 보강 (Incremental, OVERLAP_CANDLES 포함)
+
+    케이스 2·3는 독립적으로 판단하므로 동시에 발생할 수 있다.
+    이미 수집된 구간은 ON CONFLICT DO NOTHING으로 무시된다.
+    """
+    first_ts = get_first_ts(conn, market, unit)
+    last_ts  = get_last_ts(conn, market, unit)
+    count    = 0
 
     if last_ts is None:
-        # 참고: --days는 bootstrap(초기 적재) 범위에만 적용된다.
-        count = bootstrap(conn, market, days)
-    else:
-        # 참고: incremental에서는 --days를 사용하지 않고, last_ts 이후만 보강한다.
-        count = incremental(conn, market, last_ts)
+        # 데이터 없음 → 요청 구간 전체 수집
+        print(f"  [Bootstrap]   {market} (unit={unit}): {start_ts} ~ {end_ts}")
+        count = fetch_range(conn, market, start_ts, end_ts, unit)
 
-    print(f"  → {market}: {count}건 삽입 완료")
+    else:
+        # 과거 구간 백필: 요청 start가 DB 최솟값보다 이전인 경우
+        if start_ts < first_ts:
+            print(f"  [Backfill]    {market} (unit={unit}): {start_ts} ~ {first_ts}")
+            count += fetch_range(conn, market, start_ts, first_ts, unit)
+
+        # 최신 구간 보강: 요청 end가 DB 최댓값보다 이후인 경우
+        if end_ts > last_ts:
+            overlap_min   = unit * OVERLAP_CANDLES  # 캔들 수 기준 overlap → 분으로 환산
+            overlap_start = (
+                datetime.strptime(last_ts, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=KST)
+                - timedelta(minutes=overlap_min)
+            ).strftime("%Y-%m-%dT%H:%M:%S")
+            print(f"  [Incremental] {market} (unit={unit}): {overlap_start} ~ {end_ts} (last={last_ts})")
+            count += fetch_range(conn, market, overlap_start, end_ts, unit)
+
+        if count == 0:
+            print(f"  [Skip]        {market} (unit={unit}): 요청 구간이 이미 수집됨 ({start_ts} ~ {end_ts})")
+
+    print(f"  → {market} (unit={unit}): {count}건 삽입 완료")
 
 
 # ─── CLI 진입점 ───────────────────────────────────────────────────────────────
@@ -240,16 +231,44 @@ def main() -> None:
     parser.add_argument("--markets", default=",".join(DEFAULT_MARKETS),
                         help="마켓 목록 (쉼표 구분, 기본: KRW-ADA,KRW-TRX,KRW-XRP)")
     parser.add_argument("--days",    type=int, default=DEFAULT_DAYS,
-                        help="Bootstrap 시 수집 기간 일 수 (기본: 90)")
+                        help="수집 기간 일 수 (기본: 90, --start 미지정 시 사용)")
+    parser.add_argument("--start",   default=None,
+                        help="수집 시작 날짜 (YYYY-MM-DD, 지정 시 --days 무시)")
+    parser.add_argument("--end",     default=None,
+                        help="수집 종료 날짜 (YYYY-MM-DD, 미지정 시 현재까지)")
+    parser.add_argument("--unit",    type=int, default=DEFAULT_UNIT,
+                        choices=SUPPORTED_UNITS,
+                        help=f"분봉 단위 (기본: {DEFAULT_UNIT}, 선택: {SUPPORTED_UNITS})")
     args = parser.parse_args()
 
     db_path = resolve_db_path(args.db)
     markets = [m.strip() for m in args.markets.split(",") if m.strip()]
+    unit    = args.unit
+
+    now = datetime.now(KST)
+
+    start_ts = (
+        f"{args.start}T00:00:00"
+        if args.start
+        else (now - timedelta(days=args.days)).strftime("%Y-%m-%dT%H:%M:%S")
+    )
+    if args.end:
+        cli_end = f"{args.end}T23:59:59"
+        # 오늘 날짜를 명시한 경우 미확정 봉이 포함되지 않도록 unit 기준 상한을 cap
+        end_ts  = min(cli_end, calc_end_ts(now, unit))
+    else:
+        end_ts = calc_end_ts(now, unit)
+
+    period_desc = (
+        f"{args.start} ~ {args.end or '현재'}"
+        if args.start
+        else f"최근 {args.days}일 ({start_ts} ~)"
+    )
 
     print(f"[fetch_candles] DB: {db_path}")
-    print(f"[fetch_candles] 마켓: {markets}, 기간: {args.days}일")
+    print(f"[fetch_candles] 마켓: {markets}, 분봉: {unit}분, 요청 기간: {period_desc}")
 
-    # [명세서 수정] Python 연결에도 WAL pragma 설정.
+    # Python 연결에도 WAL pragma 설정.
     # 봇(C++)이 WAL 모드로 쓰는 도중 Python이 기본 모드로 열면 read/write 충돌 가능.
     conn = sqlite3.connect(db_path)
     conn.execute("PRAGMA journal_mode=WAL;")
@@ -257,7 +276,7 @@ def main() -> None:
     try:
         for market in markets:
             print(f"\n[{market}]")
-            fetch_market(conn, market, args.days)
+            fetch_market(conn, market, start_ts, end_ts, unit)
     finally:
         conn.close()
 

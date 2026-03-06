@@ -1,4 +1,4 @@
-# Phase 1.7 멀티마켓 통합 테스트 가이드
+﻿# Phase 1.7 멀티마켓 통합 테스트 가이드
 
 ## 목적
 - `ROADMAP 1.7 멀티마켓 테스트`를 실제 실행 순서로 진행하고, Phase 2 진입 가능 여부를 판단한다.
@@ -72,7 +72,7 @@ cmake --build out/build/x64-debug --target CoinBot
   - 근거: 3마켓 독립 이벤트 처리 및 워커 생존 확인으로 검증
 - [x] 3마켓 이상 동시 실행 통과
   - 근거: KRW-BTC / KRW-ETH / KRW-XRP 동시 5h10m 운용, 오류/크래시 없음
-- [ ] 재시작 복구 시나리오 통과
+- [x] 재시작 복구 시나리오 통과
   - 확인됨: KRW-ETH 시작 시 기존 코인 보유 상태를 InPosition으로 복구 (coin=0.0107809)
   - 미확인: 주문 pending 중 재시작 시나리오 — 운용 구간 전체에서 recovery가 "No pending orders, skip"으로만 처리됨
 - [x] 1시간 부하 테스트 통과
