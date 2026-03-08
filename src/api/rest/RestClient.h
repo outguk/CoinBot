@@ -31,7 +31,7 @@ namespace api::rest
 
 		// perform - 재시도를 포함한 "고수준" 호출
 		// RetryPolicy를 파라미터로 받아 호출마다 다르게 적용 가능
-		Result perform(const HttpRequest& req, const RetryPolicy& retry = {}) const;
+		Result perform(const HttpRequest& req, const RetryPolicy& retry = RetryPolicy{}) const;
 
 	private:
 		// performOnce - 재시도 없는 1회 시도
