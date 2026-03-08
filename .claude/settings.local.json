@@ -32,7 +32,8 @@
       "Bash(py -0)",
       "Read(//c/Users/김인국/AppData/Local/Programs/**)",
       "Bash(ls /c/Python*)",
-      "Bash(py:*)"
+      "Bash(py:*)",
+      "Bash(echo exit: $?:*)"
     ]
   }
 }

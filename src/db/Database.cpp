@@ -207,8 +207,8 @@ int64_t Database::normalizeToEpochMs(const std::string& s)
 
     // ISO8601 파싱 (REST 경로): "YYYY-MM-DDTHH:MM:SS+HH:MM"
     int year = 0, mon = 0, day = 0, hour = 0, min = 0, sec = 0;
-    if (sscanf_s(s.c_str(), "%d-%d-%dT%d:%d:%d",
-                 &year, &mon, &day, &hour, &min, &sec) != 6) 
+    if (sscanf(s.c_str(), "%d-%d-%dT%d:%d:%d",
+               &year, &mon, &day, &hour, &min, &sec) != 6)
     {
         util::log().warn("[DB] created_at ISO8601 파싱 실패: ", s);
         return 0;
@@ -217,10 +217,10 @@ int64_t Database::normalizeToEpochMs(const std::string& s)
     // 타임존 오프셋 파싱 (+09:00 / -05:30 / Z)
     // "YYYY-MM-DDTHH:MM:SS" = 19자 → s[19]이 부호 문자
     int tz_offset_min = 0;
-    if (s.size() > 19 && (s[19] == '+' || s[19] == '-')) 
+    if (s.size() > 19 && (s[19] == '+' || s[19] == '-'))
     {
         int tz_h = 0, tz_m = 0;
-        if (sscanf_s(s.c_str() + 20, "%d:%d", &tz_h, &tz_m) == 2) 
+        if (sscanf(s.c_str() + 20, "%d:%d", &tz_h, &tz_m) == 2)
         {
             tz_offset_min = tz_h * 60 + tz_m;
             if (s[19] == '-') tz_offset_min = -tz_offset_min;
@@ -235,11 +235,15 @@ int64_t Database::normalizeToEpochMs(const std::string& s)
     tm.tm_min  = min;
     tm.tm_sec  = sec;
 
-    // _mkgmtime: tm을 UTC epoch seconds로 변환 (MSVC 전용, POSIX는 timegm)
+    // tm을 UTC epoch seconds로 변환 (MSVC: _mkgmtime, POSIX: timegm)
+#ifdef _WIN32
     const int64_t epoch_sec = static_cast<int64_t>(_mkgmtime(&tm));
-    if (epoch_sec < 0) 
+#else
+    const int64_t epoch_sec = static_cast<int64_t>(timegm(&tm));
+#endif
+    if (epoch_sec < 0)
     {
-        util::log().warn("[DB] created_at _mkgmtime 변환 실패: ", s);
+        util::log().warn("[DB] created_at UTC 변환 실패: ", s);
         return 0;
     }
 

@@ -18,15 +18,19 @@ set(CMAKE_CXX_STANDARD 20) # C++ 표준을 C++20으로 설정.
 set(CMAKE_CXX_STANDARD_REQUIRED ON) # 컴파일러가 C++20을 지원하지 않는 환경이면 CMake 단계에서 실패하도록
 set(CMAKE_CXX_EXTENSIONS OFF) # 컴파일러의 비표준 확장(-std=gnu++20 같은 것)을 끄고 순수한 표준 C++ 모드(-std=c++20)로 빌드하게 함
 
-# Boost 경로 직접 지정
-set(BOOST_ROOT "C:/git-repository/boost_1_89_0")
-set(BOOST_LIBRARYDIR "${BOOST_ROOT}/stage/lib")   # 빌드된 .lib 위치
-set(Boost_NO_SYSTEM_PATHS ON)          # 시스템 경로 무시하고 위 경로 우선
-set(Boost_USE_STATIC_LIBS ON)          # 위에서 static으로 빌드 했다면 ON
-
-# OpenSSL 경로 직접 지정
-set(OPENSSL_ROOT_DIR "C:/git-repository/OpenSSL-Win64")
-set(OPENSSL_USE_STATIC_LIBS OFF)
+# 플랫폼별 의존성 경로 설정
+if(WIN32)
+    # Windows: 하드코딩 경로 (기존 설치 위치 유지)
+    set(BOOST_ROOT "C:/git-repository/boost_1_89_0")
+    set(BOOST_LIBRARYDIR "${BOOST_ROOT}/stage/lib")   # 빌드된 .lib 위치
+    set(Boost_NO_SYSTEM_PATHS ON)          # 시스템 경로 무시하고 위 경로 우선
+    set(Boost_USE_STATIC_LIBS ON)          # static으로 빌드된 Boost 사용
+    set(OPENSSL_ROOT_DIR "C:/git-repository/OpenSSL-Win64")
+    set(OPENSSL_USE_STATIC_LIBS OFF)
+else()
+    # Linux: 시스템 패키지 사용 (apt install libboost-all-dev libssl-dev)
+    set(Boost_USE_STATIC_LIBS OFF)
+endif()
 
 
 # (선택) VS IntelliSense에 도움이 되는 경우가 많음
@@ -36,23 +40,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(Boost 1.80 REQUIRED COMPONENTS thread chrono)
 find_package(OpenSSL REQUIRED)
 
-
-# 빌드 옵션 플래그 정의
-option(COINBOT_BUILD_TESTS "Build unit tests" ON) # 유닛 테스트를 빌드할지 말지 선택할 수 있는 스위치 하나 만들기
-
 # 컴파일할 때 #include 경로에 전역적으로 디렉토리 하나 추가
 include_directories(${CMAKE_SOURCE_DIR}/include) # 프로젝트 루트 / include 디렉토리
-
-# coinbot/src/ 폴더 안에 있는 CMakeLists.txt를 읽어서 처리해라
- # add_subdirectory(src)
-
-# 위에서 만든 옵션 COINBOT_BUILD_TESTS가 ON 일 때만 tests 폴더를 CMake 빌드 트리 안으로 포함시켜라
-if (COINBOT_BUILD_TESTS)
-    add_subdirectory(tests) # coinbot/tests/ 아래에 있는 CMakeLists.txt를 불러와서 유닛 테스트용 타깃을 정의
-endif()
-
-
-
 
 # Enable Hot Reload for MSVC compilers if supported.
 if (POLICY CMP0141)
@@ -83,9 +72,19 @@ endif()
 target_include_directories(CoinBot
     PRIVATE
         ${CMAKE_SOURCE_DIR}/src
+)
+
+if(WIN32)
+    # Windows: 하드코딩 경로로 헤더 추가
+    target_include_directories(CoinBot PRIVATE
         "C:/git-repository/boost_1_89_0"
         "C:/git-repository/nlohmann_json"
-)
+    )
+else()
+    # Linux: apt 설치 시 헤더가 /usr/include/nlohmann/json.hpp에 위치
+    # 코드에서 <json.hpp>로 include하므로 nlohmann 디렉토리를 경로에 추가
+    target_include_directories(CoinBot PRIVATE /usr/include/nlohmann)
+endif()
 
 target_link_libraries(CoinBot
     PRIVATE

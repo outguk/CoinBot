@@ -88,8 +88,9 @@ namespace util
         // 환경 변수 UPBIT_MARKETS (CSV) 로 재정의 가능
         std::vector<std::string> markets = { "KRW-ADA", "KRW-TRX", "KRW-XRP" };
 
-        // SQLite DB 파일 경로
-        std::string db_path = "C:\\cpp\\CoinBot\\src\\db\\coinbot.db";
+        // SQLite DB 파일 경로 (실행 파일과 동일 디렉토리 기준 상대 경로)
+        // EC2: systemd WorkingDirectory=/home/ubuntu/coinbot 설정 시 해당 위치에 생성
+        std::string db_path = "coinbot.db";
     };
 
     // 통합 설정 (나중에 JSON 로딩 추가 가능)

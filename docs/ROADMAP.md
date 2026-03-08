@@ -264,7 +264,6 @@ Step 9  [완료] tools/candle_rsi_backtest.py                (2.5)
 - [ ] 터미널 상태(Filled/Canceled/Rejected) 확정 시 orders 테이블에 1회 INSERT됨
 - [ ] BUY/SELL 확정 시 signals 테이블에 기록됨
 - [ ] WAL 모드에서 Streamlit과 봇의 동시 읽기/쓰기 정상 동작
-- [ ] Streamlit 분석 탭 P&L 섹션에서 주별/월별 수익률 확인 가능
 - [ ] Streamlit 분석 탭 전략 분석 섹션에서 캔들차트 + 신호 마커 표시
 - [ ] 백테스트 스크립트로 전략 손익 시뮬레이션 가능
 
