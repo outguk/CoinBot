@@ -319,6 +319,17 @@ __pycache__/
 # Python 가상환경
 .venv/
 
+# SQLite DB (런타임 생성, 거래 데이터 포함)
+*.db
+*.db-shm
+*.db-wal
+
+# 마켓별 로그 디렉토리
+market_logs/
+
+# VS Code (launch.json에 API 키 포함 가능성)
+.vscode/
+
 # Cake - Uncomment if you are using it
 # tools/**
 # !tools/packages.config
