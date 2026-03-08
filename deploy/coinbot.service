@@ -1,0 +1,26 @@
+[Unit]
+Description=CoinBot - Upbit Trading Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/coinbot
+
+# 실행 파일 경로
+ExecStart=/home/ubuntu/coinbot/CoinBot
+
+# Upbit API 키 (EC2 환경 변수로 주입)
+EnvironmentFile=/home/ubuntu/coinbot/.env
+
+# 비정상 종료 시 10초 후 재시작
+Restart=on-failure
+RestartSec=10
+
+# 로그는 journald로 (systemctl status coinbot, journalctl -u coinbot)
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

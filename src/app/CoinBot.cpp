@@ -103,8 +103,9 @@ static int run(const std::string& access_key,
                const std::vector<std::string>& markets)
 {
     auto& logger = util::Logger::instance();
-    // 작업 디렉터리와 무관하게 항상 프로젝트 루트 로그 폴더로 저장
-    logger.enableMarketFileOutput("C:\\cpp\\CoinBot\\market_logs");
+    // 로그 경로: 실행 디렉토리 기준 상대 경로
+    // EC2: systemd WorkingDirectory=/home/ubuntu/coinbot → 해당 디렉토리에 market_logs/ 생성
+    logger.enableMarketFileOutput("market_logs");
 
     // ---- 네트워크 컨텍스트 ----
     boost::asio::io_context   ioc;
