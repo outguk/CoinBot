@@ -11,12 +11,14 @@
 //   6) WebSocket 클라이언트 구성 (public: 캔들, private: myOrder)
 //   7) start() → SIGINT 대기 → stop()
 
+#include <chrono>
 #include <csignal>
 #include <cstdlib>
 #include <iostream>
 #include <optional>
 #include <sstream>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <boost/asio/io_context.hpp>
@@ -141,7 +143,7 @@ static int run(const std::string& access_key,
         order_store,
         account_mgr,
         markets,
-        {},   // MarketManagerConfig 기본값
+        app::MarketEngineManager::MarketManagerConfig{},   // 기본값
         &db); // DB 주입: 신호·주문·캔들 기록
 
     // ---- EventRouter ----

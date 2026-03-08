@@ -57,7 +57,7 @@ public:
                         engine::OrderStore& store,
                         trading::allocation::AccountManager& account_mgr,
                         const std::vector<std::string>& markets,
-                        MarketManagerConfig cfg = {},
+                        MarketManagerConfig cfg = MarketManagerConfig{},
                         db::Database* db = nullptr);
 
     ~MarketEngineManager();
