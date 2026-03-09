@@ -5,6 +5,7 @@
 #include "app/StartupRecovery.h"
 
 #include <chrono>
+#include <charconv>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
@@ -15,6 +16,7 @@
 
 #include "api/upbit/mappers/MyOrderMapper.h"
 #include "api/upbit/mappers/CandleMapper.h"
+#include "util/Config.h"
 #include "util/Logger.h"
 
 namespace app {
@@ -49,6 +51,24 @@ namespace {
                 oss << "<UNKNOWN_SIZE>";
             return oss.str();
         }, size);
+    }
+
+    std::optional<int> parseMinuteCandleUnit(std::string_view type) noexcept
+    {
+        constexpr std::string_view prefix = "candle.";
+        if (!type.starts_with(prefix) || type.size() <= prefix.size() + 1)
+            return std::nullopt;
+
+        if (type.back() != 'm')
+            return std::nullopt;
+
+        const std::string_view number = type.substr(prefix.size(), type.size() - prefix.size() - 1);
+        int unit = 0;
+        const auto [ptr, ec] = std::from_chars(number.data(), number.data() + number.size(), unit);
+        if (ec != std::errc{} || ptr != number.data() + number.size() || unit <= 0)
+            return std::nullopt;
+
+        return unit;
     }
 
 } // anonymous namespace
@@ -219,30 +239,7 @@ bool MarketEngineManager::rebuildAccountOnStartup_(bool throw_on_fail)
         {
             account_mgr_.rebuildFromAccount(std::get<core::Account>(result));
 
-            // 마켓별 자본 현황 및 드리프트 관측 (avg_entry_price 기준 추정값)
-            {
-                auto budgets = account_mgr_.snapshot();
-                double total = 0.0;
-                for (const auto& [_, b] : budgets)
-                    total += b.available_krw + b.coin_balance * b.avg_entry_price;
-
-                const double target = budgets.empty() ? 0.0
-                                    : total / static_cast<double>(budgets.size());
-
-                for (const auto& [mkt, b] : budgets) {
-                    const double coin_val = b.coin_balance * b.avg_entry_price;
-                    const double equity   = b.available_krw + coin_val;
-                    const double drift    = equity - target;
-                    logger.info("[MarketEngineManager] budget: market=", mkt,
-                        " krw=", b.available_krw, " coin_val=", coin_val,
-                        " equity=", equity, " drift=", drift);
-                    if (target > 0 && std::abs(drift) > target * 0.2)
-                        logger.warn("[MarketEngineManager] Capital drift detected: market=", mkt,
-                            " drift=", drift, " (", drift / target * 100.0, "%)");
-                }
-            }
-
-            logger.info("[MarketEngineManager] Account synced (attempt ", attempt, ")");
+logger.info("[MarketEngineManager] Account synced (attempt ", attempt, ")");
             return true;
         }
 
@@ -296,12 +293,20 @@ void MarketEngineManager::workerLoop_(MarketContext& ctx, std::stop_token stoken
     using namespace std::chrono_literals;
     auto& logger = util::Logger::instance();
 
-    // 워커 스레드에서 발생한 로그를 마켓 파일로 분리하기 위한 태그 설정
-    util::Logger::setThreadTag(ctx.market);
-    struct ThreadTagGuard final
-    {
-        ~ThreadTagGuard() { util::Logger::clearThreadTag(); }
-    } tag_guard;
+    // stop 요청 없이 함수를 빠져나오면 비정상 종료로 판정
+    // bindToCurrentThread 실패 경로 포함, 미래 추가 경로도 자동 커버
+    struct AbnormalExitGuard {
+        MarketContext& ctx;
+        std::stop_token stoken;
+        util::Logger& logger;
+        ~AbnormalExitGuard() {
+            if (!stoken.stop_requested()) {
+                logger.error("[MarketEngineManager][", ctx.market,
+                    "] Worker exited abnormally");
+                ctx.exited_abnormally.store(true, std::memory_order_release);
+            }
+        }
+    } guard{ctx, stoken, logger};
 
     // 엔진을 현재 워커 스레드에 바인딩
     try { ctx.engine->bindToCurrentThread(); }
@@ -309,7 +314,7 @@ void MarketEngineManager::workerLoop_(MarketContext& ctx, std::stop_token stoken
     {
         logger.error("[MarketEngineManager][", ctx.market,
             "] bindToCurrentThread failed: ", e.what());
-        return;  // 이 마켓만 포기, 전체 프로그램은 유지
+        return;  // 이 마켓만 포기 → scope guard가 exited_abnormally 세팅
     }
 
     logger.info("[MarketEngineManager][", ctx.market, "] Worker loop started");
@@ -491,6 +496,16 @@ void MarketEngineManager::handleMarketData_(MarketContext& ctx,
     if (type.rfind("candle", 0) != 0)
         return;
 
+    const int configured_unit = util::AppConfig::instance().bot.live_candle_unit_minutes;
+    const auto parsed_unit = parseMinuteCandleUnit(type);
+    const int live_unit = parsed_unit.value_or(configured_unit);
+    if (!parsed_unit.has_value())
+    {
+        logger.warn("[MarketEngineManager][", ctx.market,
+            "] candle type unit parse failed, fallback to configured unit: type=",
+            type, " configured_unit=", configured_unit);
+    }
+
     // 1) JSON -> Candle DTO
     api::upbit::dto::CandleDto_Minute candleDto{};
     try
@@ -524,11 +539,12 @@ void MarketEngineManager::handleMarketData_(MarketContext& ctx,
     const core::Candle candle = *ctx.pending_candle;
     ctx.pending_candle = incoming;
 
-    // DB 확정 캔들 기록 (다음 분봉 도착 시점 = 이전 분봉 확정)
-    if (db_) db_->insertCandle(ctx.market, candle);
+    // 현재 구조는 단일 live unit 구독만 가정한다.
+    // 따라서 수신 type에서 해석한 unit을 이전 확정 캔들에도 그대로 적용한다.
+    if (db_) db_->insertCandle(ctx.market, candle, live_unit);
 
     logger.info("[Manager][", ctx.market, "][Candle] ts=",
-        candle.start_timestamp, " close=", candle.close_price);
+        candle.start_timestamp, " unit=", live_unit, " close=", candle.close_price);
 
     // 확정 캔들 close를 mark_price로 주입 (finalizeSellOrder dust 판정용)
     ctx.engine->setMarkPrice(candle.close_price);
@@ -629,6 +645,15 @@ trading::AccountSnapshot MarketEngineManager::buildAccountSnapshot_(
     }
 
     return snap;
+}
+
+// ========== hasFatalWorker ==========
+bool MarketEngineManager::hasFatalWorker() const
+{
+    for (const auto& [market, ctx] : contexts_)
+        if (ctx->exited_abnormally.load(std::memory_order_acquire))
+            return true;
+    return false;
 }
 
 // 복구 요청: atomic flag로 우선 처리

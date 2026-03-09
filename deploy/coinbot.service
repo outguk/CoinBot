@@ -3,10 +3,25 @@ Description=CoinBot - Upbit Trading Bot
 After=network-online.target
 Wants=network-online.target
 
+# /home/ubuntu/coinbot 는 별도 EBS 데이터 볼륨을 기대하는 경로다.
+# 마운트가 안 된 상태에서도 같은 경로명 폴더는 존재할 수 있으므로,
+# "폴더가 있다" 수준이 아니라 "실제 마운트포인트다"를 systemd가 확인하게 한다.
+RequiresMountsFor=/home/ubuntu/coinbot
+ConditionPathIsMountPoint=/home/ubuntu/coinbot
+
 [Service]
 Type=simple
 User=ubuntu
 WorkingDirectory=/home/ubuntu/coinbot
+
+# sentinel 파일:
+#   이 경로가 운영자가 준비한 데이터 볼륨이라는 표식
+#   잘못된 디스크나 빈 폴더에서 서비스가 뜨는 것을 막는다.
+ExecStartPre=/usr/bin/test -f /home/ubuntu/coinbot/.coinbot_volume_sentinel
+
+# DB 디렉토리:
+#   Config.h 의 상대 경로 db/coinbot.db 가 즉시 유효해야 하므로 시작 전에 확인
+ExecStartPre=/usr/bin/test -d /home/ubuntu/coinbot/db
 
 # 실행 파일 경로
 ExecStart=/home/ubuntu/coinbot/CoinBot
@@ -16,7 +31,7 @@ EnvironmentFile=/home/ubuntu/coinbot/.env
 
 # 비정상 종료 시 10초 후 재시작
 Restart=on-failure
-RestartSec=10
+RestartSec=5
 
 # 로그는 journald로 (systemctl status coinbot, journalctl -u coinbot)
 StandardOutput=journal

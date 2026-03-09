@@ -5,6 +5,7 @@
 #include <optional>
 #include <iostream>
 #include <json.hpp>
+#include "util/JsonOptional.h"
 
 // Upbit 내 자산과 주문 관련 JSON 데이터를 그대로 받는 구조체(Dto) 정의
 

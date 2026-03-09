@@ -43,7 +43,7 @@ namespace engine
 		[[nodiscard]] bool update(const core::Order& order);
 
 		// order_uuid로 주문 삭제
-		[[nodiscard]] bool erase(const std::string_view& order_uuid);
+		bool erase(const std::string_view& order_uuid);
 
 		// 이미 order 있으면 덮어쓰고, 없으면 추가(멱등성)
 		void upsert(const core::Order& order);

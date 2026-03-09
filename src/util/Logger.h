@@ -3,16 +3,13 @@
 #include <chrono>
 #include <ctime>
 #include <fstream>
-#include <filesystem>
 #include <iomanip>
 #include <iostream>
 #include <mutex>
 #include <sstream>
 #include <string>
 #include <string_view>
-#include <thread>
 #include <atomic>
-#include <unordered_map>
 
 namespace util
 {
@@ -67,23 +64,6 @@ namespace util
             }
         }
 
-        // 스레드 태그(마켓) 기준 파일 분리 출력 활성화
-        // 예: market_logs/KRW-BTC.log
-        void enableMarketFileOutput(const std::string& directory)
-        {
-            std::lock_guard<std::mutex> lock(mutex_);
-            market_file_output_enabled_ = true;
-            market_log_dir_ = directory;
-
-            std::error_code ec;
-            std::filesystem::create_directories(market_log_dir_, ec);
-            if (ec)
-            {
-                std::cerr << "[Logger] Failed to create market log directory: "
-                          << market_log_dir_ << " (" << ec.message() << ")\n";
-            }
-        }
-
         // 콘솔 출력 비활성화
         void disableConsoleOutput()
         {
@@ -116,18 +96,6 @@ namespace util
             log(LogLevel::LV_ERROR, std::forward<Args>(args)...);
         }
 
-
-        // 현재 스레드 로그 태그 설정/해제 (예: "KRW-BTC")
-        // 현재 스레드가 어떤 마켓(혹은 작업 단위)인지 표시
-        static void setThreadTag(std::string tag)
-        {
-            thread_tag_ = std::move(tag);
-        }
-
-        static void clearThreadTag()
-        {
-            thread_tag_.clear();
-        }
 
     private:
         Logger() = default;
@@ -201,31 +169,6 @@ namespace util
                 file_stream_ << message << std::flush;
             }
 
-            // 마켓별 파일 출력: 워커에서 setThreadTag("KRW-BTC") 설정 시 사용
-            if (market_file_output_enabled_ && !thread_tag_.empty())
-            {
-                // market_streams_ 맵에서 thread_tag_ 키에 해당하는 파일 스트림 참조를 가져옴
-                std::ofstream& stream = market_streams_[thread_tag_]; // 실제 파일에 사용
-
-				// 파일이 아직 열려 있지 않으면 연다 (최초 접근 시)
-                if (!stream.is_open())
-                {
-                    const std::filesystem::path p =
-                        std::filesystem::path(market_log_dir_) / (thread_tag_ + ".log");
-                    stream.open(p.string(), std::ios::app);
-
-					// 파일 열기 실패 시 에러 메시지 출력 (실패해도 계속 진행)
-                    if (!stream.is_open())
-                    {
-                        std::cerr << "[Logger] Failed to open market log file: "
-                                  << p.string() << "\n";
-                    }
-                }
-
-				// 파일이 열려 있으면 로그를 쓴다
-                if (stream.is_open())
-                    stream << message << std::flush;
-            }
         }
 
     private:
@@ -234,10 +177,6 @@ namespace util
         LogLevel min_level_{ LogLevel::INFO };
         bool console_enabled_{ true };
         std::ofstream file_stream_;
-        bool market_file_output_enabled_{ false };
-        std::string market_log_dir_{ "market_logs" };
-        std::unordered_map<std::string, std::ofstream> market_streams_;
-        inline static thread_local std::string thread_tag_{};
     };
 
     // 전역 로거 접근 헬퍼

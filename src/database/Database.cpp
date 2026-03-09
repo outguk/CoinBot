@@ -1,5 +1,5 @@
-﻿#include "db/Database.h"
-#include "db/sqlite3.h"
+﻿#include "database/Database.h"
+#include "database/sqlite3.h"
 #include "util/Logger.h"
 
 #include <algorithm>
@@ -252,7 +252,7 @@ int64_t Database::normalizeToEpochMs(const std::string& s)
 
 // ─── insertCandle ─────────────────────────────────────────────────────────────
 
-bool Database::insertCandle(const std::string& market, const core::Candle& c) 
+bool Database::insertCandle(const std::string& market, const core::Candle& c, int unit) 
 {
     if (!db_) {
         util::log().warn("[DB] insertCandle: DB가 열려 있지 않음");
@@ -263,7 +263,7 @@ bool Database::insertCandle(const std::string& market, const core::Candle& c)
     // ON CONFLICT 대상 (market,ts,unit)
     static constexpr const char* sql =
         "INSERT INTO candles (market, ts, open, high, low, close, volume, unit) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, 15) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
         "ON CONFLICT(market, ts, unit) DO NOTHING;";
 
 	// 컴파일된 SQL 실행 객체 (prepare가 성공하면 유효 포인터로 채워지고 실패시 nullptr 유지)
@@ -283,6 +283,7 @@ bool Database::insertCandle(const std::string& market, const core::Candle& c)
     sqlite3_bind_double(stmt, 5, c.low_price);
     sqlite3_bind_double(stmt, 6, c.close_price);
     sqlite3_bind_double(stmt, 7, c.volume);
+    sqlite3_bind_int   (stmt, 8, unit);
 
     // step을 통해 실행한다
     const bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
