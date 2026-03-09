@@ -43,6 +43,34 @@ namespace {
     volatile std::sig_atomic_t g_stop_requested = 0;
 
     void onSignal(int) { g_stop_requested = 1; }
+
+    bool isSupportedCandleUnit(int unit) noexcept
+    {
+        switch (unit)
+        {
+        case 1:
+        case 3:
+        case 5:
+        case 10:
+        case 15:
+        case 30:
+        case 60:
+        case 240:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    std::string buildLiveCandleType()
+    {
+        const int unit = util::AppConfig::instance().bot.live_candle_unit_minutes;
+        if (!isSupportedCandleUnit(unit))
+            throw std::runtime_error("[CoinBot] 지원하지 않는 live_candle_unit_minutes: "
+                + std::to_string(unit));
+
+        return "candle." + std::to_string(unit) + "m";
+    }
 }
 
 // ---- API 키 로딩 ----
@@ -105,14 +133,12 @@ static int run(const std::string& access_key,
                const std::vector<std::string>& markets)
 {
     auto& logger = util::Logger::instance();
-    // 로그 경로: 실행 디렉토리 기준 상대 경로
-    // EC2: systemd WorkingDirectory=/home/ubuntu/coinbot → 해당 디렉토리에 market_logs/ 생성
-    logger.enableMarketFileOutput("market_logs");
 
     // ---- 네트워크 컨텍스트 ----
     boost::asio::io_context   ioc;
     boost::asio::ssl::context ssl_ctx(boost::asio::ssl::context::tlsv12_client);
     ssl_ctx.set_default_verify_paths();  // 시스템 CA 인증서 사용
+    ssl_ctx.set_verify_mode(boost::asio::ssl::verify_peer); // 서버 인증서 체인 검증 활성화
 
     // ---- REST 클라이언트 ----
     api::auth::UpbitJwtSigner signer(access_key, secret_key);
@@ -150,13 +176,28 @@ static int run(const std::string& access_key,
     app::EventRouter router;
     engine_mgr.registerWith(router);
 
+    // ---- HealthCheck: WS fatal 감지 플래그 ----
+    // WS 재연결 한도 초과 또는 워커 비정상 종료 시 std::exit(1) → systemd Restart=on-failure 유발
+    std::atomic<bool> fatal_requested{false};
+
+    // compare_exchange로 중복 콜백(doReconnect 2중 호출) 시 로그 1회만 보장
+    auto onWsFatal = [&fatal_requested, &logger]() {
+        bool expected = false;
+        if (fatal_requested.compare_exchange_strong(expected, true,
+                std::memory_order_release, std::memory_order_relaxed))
+            logger.error("[HealthCheck] Fatal: WS reconnect limit exceeded");
+    };
+
     // ---- WebSocket: PUBLIC (캔들) ----
     api::ws::UpbitWebSocketClient ws_public(ioc, ssl_ctx);
     ws_public.setMessageHandler([&router](std::string_view json) {
         (void)router.routeMarketData(json);
     });
+    ws_public.setFatalCallback(onWsFatal);  // 비정상 종료 콜백을 start() 전 등록
     ws_public.connectPublic("api.upbit.com", "443", "/websocket/v1");
-    ws_public.subscribeCandles("candle.1m", markets, false, true);
+    const std::string live_candle_type = buildLiveCandleType();
+    logger.info("[CoinBot] Live candle type: ", live_candle_type);
+    ws_public.subscribeCandles(live_candle_type, markets, false, true);
 
     // ---- WebSocket: PRIVATE (myOrder) ----
     // JWT는 Private WS 핸드셰이크에서 한 번만 사용되므로 no-query 토큰으로 충분
@@ -172,6 +213,7 @@ static int run(const std::string& access_key,
     ws_private.setReconnectCallback([&engine_mgr]() {
         engine_mgr.requestReconnectRecovery();
     });
+    ws_private.setFatalCallback(onWsFatal);  // 비정상 종료 콜백을 start() 전 등록
     ws_private.connectPrivate("api.upbit.com", "443", "/websocket/v1/private", ws_bearer);
     ws_private.subscribeMyOrder(markets, true);
 
@@ -182,9 +224,15 @@ static int run(const std::string& access_key,
     ws_private.start();
     logger.info("[CoinBot] Running. Press Ctrl+C to stop.");
 
-    // ---- SIGINT / SIGTERM 대기 ----
-    while (!g_stop_requested)
+    // ---- SIGINT / SIGTERM 대기 + fatal 감지 ----
+    // WS 재연결 한도 초과 또는 워커 비정상 종료 시 즉시 exit(1) → systemd 재시작
+    while (!g_stop_requested) {
+        if (fatal_requested.load(std::memory_order_acquire) || engine_mgr.hasFatalWorker()) {
+            logger.error("[HealthCheck] Fatal state detected, exiting for systemd restart");
+            std::exit(1);
+        }
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
 
     // ---- 정지 ----
     // 주문 경로를 먼저 멈춰 종료 중 추가 주문 가능성을 줄인다.

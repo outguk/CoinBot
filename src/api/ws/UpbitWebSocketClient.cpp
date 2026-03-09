@@ -1,6 +1,7 @@
 ﻿// api/ws/UpbitWebSocketClient.cpp
 
 #include <algorithm>
+#include <boost/asio/ssl/host_name_verification.hpp>
 #include <chrono>
 #include <iostream>
 #include <random>
@@ -8,6 +9,7 @@
 #include <thread>
 
 #include "UpbitWebSocketClient.h"
+#include <json.hpp>
 #include "util/Config.h"
 
 namespace api::ws {
@@ -69,7 +71,10 @@ void UpbitWebSocketClient::stop()
         std::lock_guard lk(ws_mu_);
         if (ws_) {
             boost::system::error_code ec;
-            beast::get_lowest_layer(*ws_).socket().cancel(ec);
+            auto& sock = beast::get_lowest_layer(*ws_).socket();
+            // Linux: cancel()은 동기 블로킹 read()에 무효 → TCP 소켓 직접 닫아 즉시 깨움
+            sock.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
+            sock.close(ec);
         }
     }
 
@@ -87,6 +92,11 @@ void UpbitWebSocketClient::setMessageHandler(MessageHandler cb)
 void UpbitWebSocketClient::setReconnectCallback(ReconnectCallback cb)
 {
     on_reconnect_ = std::move(cb);
+}
+
+void UpbitWebSocketClient::setFatalCallback(FatalCallback cb)
+{
+    fatal_cb_ = std::move(cb);
 }
 
 // ========== 커맨드 큐 ==========
@@ -204,10 +214,8 @@ bool UpbitWebSocketClient::reconnectOnce_(std::stop_token stoken)
 
     {
         std::lock_guard lk(ws_mu_);
-        if (ws_ && ws_->is_open()) {
-            boost::system::error_code ignore;
-            ws_->close(websocket::close_code::normal, ignore);
-        }
+        // ws_->close() 제거: read 에러 후 재연결 시 이미 연결이 끊긴 상태
+        // ws_mu_ 보유 중 블로킹 금지 (stop()과 데드락 방지)
         ws_.reset();
     }
 
@@ -260,6 +268,9 @@ void UpbitWebSocketClient::connectImpl(
     }
     std::cout << "[WS] SNI: OK\n";
 
+    // TLS 인증서의 호스트명이 실제 접속 대상과 일치하는지 검증한다.
+    ws_->next_layer().set_verify_callback(boost::asio::ssl::host_name_verification(host));
+
     ws_->next_layer().handshake(boost::asio::ssl::stream_base::client, ec);
     std::cout << "[WS] tls handshake: " << (ec ? ec.message() : "OK") << "\n";
     if (ec) return;
@@ -303,6 +314,7 @@ void UpbitWebSocketClient::runReadLoop_(std::stop_token stoken)
             std::cout << "[WS] max reconnect attempts (" << max_reconnects
                       << ") reached, stopping\n";
             give_up = true;
+            if (fatal_cb_) fatal_cb_();
         }
     };
 
@@ -361,6 +373,8 @@ void UpbitWebSocketClient::runReadLoop_(std::stop_token stoken)
                 }
             }
         }
+        // fatal 상태로 전환됐으면 같은 반복에서 read/reconnect로 내려가지 않는다.
+        if (give_up) break;
 
         // 3) read
         if (!ws_ || !ws_->is_open()) {
@@ -383,8 +397,9 @@ void UpbitWebSocketClient::runReadLoop_(std::stop_token stoken)
         ws_->read(buffer, ec);
 
         if (ec) {
-            // stop()에서 socket.cancel() 호출 → 정상 종료 경로
-            if (ec == boost::asio::error::operation_aborted)
+            // socket.close() 후 eof/bad_descriptor/stream_truncated 등 다양한 에러가 올 수 있음
+            // stop_requested면 에러 종류 무관하게 즉시 탈출
+            if (ec == boost::asio::error::operation_aborted || stoken.stop_requested())
                 break;
 
             // [HYBRID v2 §4.1] timeout은 정상 wake-up으로 처리 (reconnect 사유 아님)
@@ -393,8 +408,7 @@ void UpbitWebSocketClient::runReadLoop_(std::stop_token stoken)
                 continue;
 
             std::cout << "[WS] read error: " << ec.message() << "\n";
-            if (!stoken.stop_requested())
-                doReconnect();
+            doReconnect();
             continue;
         }
 
@@ -415,8 +429,8 @@ void UpbitWebSocketClient::runReadLoop_(std::stop_token stoken)
             on_msg_(std::string_view(msg));
     }
 
-    // 루프 종료 시 정상 close
-    if (ws_ && ws_->is_open()) {
+    // stop 요청 시: 소켓이 이미 닫혔으므로 WS close 핸드셰이크 생략
+    if (!stoken.stop_requested() && ws_ && ws_->is_open()) {
         boost::system::error_code ignore;
         ws_->close(websocket::close_code::normal, ignore);
         std::cout << "[WS] closed: " << (ignore ? ignore.message() : "OK") << "\n";

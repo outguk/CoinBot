@@ -3,6 +3,7 @@
 // 네트워크(Asio) + HTTP/SSL(Beast) 구성요소를 사용하기 위해 필요한 Boost 헤더들.
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/error.hpp>
+#include <boost/asio/ssl/host_name_verification.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/ssl.hpp>
@@ -208,6 +209,9 @@ namespace api::rest
 			// 실패 시 handshake 자체가 꼬일 수 있어서 HandshakeFailed로 처리
 			return RestError{ RestErrorCode::HandshakeFailed, "SNI set failed", 0 };
 		}
+
+		// 인증서의 SAN/CN이 요청 host와 일치하는지 검증한다.
+		stream.set_verify_callback(ssl::host_name_verification(req.host));
 
 		// (4) TCP connect + timeout
 		beast::get_lowest_layer(stream).expires_after(req.timeout);	// 이 작업의 제한 시간 설정

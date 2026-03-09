@@ -23,7 +23,6 @@
 #include <unordered_map>
 #include <variant>
 #include <vector>
-#include <json.hpp>
 #include <cstdint>
 
 namespace api::ws
@@ -36,9 +35,10 @@ namespace api::ws
     class UpbitWebSocketClient final
     {
     public:
-        using WsStream       = websocket::stream<beast::ssl_stream<beast::tcp_stream>>;
+        using WsStream          = websocket::stream<beast::ssl_stream<beast::tcp_stream>>;
         using MessageHandler    = std::function<void(std::string_view)>; // raw JSON
         using ReconnectCallback = std::function<void()>;  // 재연결 성공 후 호출
+        using FatalCallback     = std::function<void()>;  // 재연결 한도 초과 시 호출
 
         UpbitWebSocketClient(boost::asio::io_context& ioc,
                              boost::asio::ssl::context& ssl_ctx);
@@ -82,6 +82,10 @@ namespace api::ws
 
         // 재연결 성공 + 재구독 완료 후 호출되는 콜백 (계좌 동기화 트리거 등)
         void setReconnectCallback(ReconnectCallback cb);
+
+        // 재연결 한도 초과 시 호출되는 콜백 (systemd 재시작 유발용)
+        // 주의: start() 전에만 호출할 것
+        void setFatalCallback(FatalCallback cb);
 
         // ---- 생명주기 ----
 
@@ -192,6 +196,9 @@ namespace api::ws
 
         // 재연결 성공 콜백
         ReconnectCallback on_reconnect_;
+
+        // 재연결 한도 초과 콜백
+        FatalCallback fatal_cb_{};
     };
 
 } // namespace api::ws

@@ -33,17 +33,19 @@ namespace app {
 
 class EventRouter;  // 전방 선언
 
+// GCC/Clang에서 중첩 struct의 default member initializer를
+// 외부 클래스 생성자 기본 인자로 사용 불가 → 네임스페이스 레벨로 분리
+struct MarketManagerConfig {
+    trading::strategies::RsiMeanReversionStrategy::Params strategy_params;
+    std::size_t queue_capacity = 5000;      // 마켓별 큐 최대 크기 (drop-oldest)
+    int sync_retry = 3;                     // 초기 계좌 동기화 재시도 횟수
+    std::chrono::seconds pending_timeout{120}; // Pending 상태 타임아웃 (2분)
+};
+
 class MarketEngineManager final {
 public:
     using PrivateQueue = core::BlockingQueue<engine::input::EngineInput>;
-
-    // 전략 파라미터 + 큐/폴링 설정
-    struct MarketManagerConfig {
-        trading::strategies::RsiMeanReversionStrategy::Params strategy_params;
-        std::size_t queue_capacity = 5000;      // 마켓별 큐 최대 크기 (drop-oldest)
-        int sync_retry = 3;                     // 초기 계좌 동기화 재시도 횟수
-        std::chrono::seconds pending_timeout{120}; // Pending 상태 타임아웃 (2분)
-    };
+    using MarketManagerConfig = app::MarketManagerConfig;  // 하위 호환 alias
 
     // 생성자: 계좌 동기화 + 마켓별 컨텍스트 생성 + 전략 복구
     // @param api: SharedOrderApi (thread-safe)
@@ -81,6 +83,9 @@ public:
     // atomic flag로 우선 처리 — 일반 큐 drop-oldest 영향 없음
     void requestReconnectRecovery();
 
+    // 비정상 종료된 워커 스레드가 있으면 true (HealthCheck용)
+    bool hasFatalWorker() const;
+
 private:
     // 마켓별 독립 컨텍스트 (스레드 + 엔진 + 전략 + 큐)
     struct MarketContext {
@@ -108,6 +113,9 @@ private:
         // requestReconnectRecovery 필터링용
         // worker thread(checkPendingTimeout_)에서만 쓰기, WS IO thread에서 읽기
         std::atomic<bool> has_active_pending{false};
+
+        // stop 요청 없이 workerLoop_를 탈출하면 비정상 종료로 판정
+        std::atomic<bool> exited_abnormally{false};
 
         explicit MarketContext(std::string m, std::size_t queue_capacity)
             : market(std::move(m))

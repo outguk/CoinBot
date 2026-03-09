@@ -70,8 +70,8 @@ namespace util
         double coin_epsilon = 1e-8;             // 0.00000001 = 업비트 최소 수량 단위
 
         // [2] KRW dust (원 단위 이하 잔량)
-        // 주문 완료 후 reserved_krw 정리
-        double krw_dust_threshold = 10.0;       // 10원 미만
+        // 주문 완료 후 reserved_krw 정리(남는 krw를 가용 가능 자산으로 복구)
+        double krw_dust_threshold = 1.0;       // 10원 미만
 
         // [3] 가치 기준 dust (거래 불가 잔량)
         // 코인 가치 < 이 값 → dust로 처리
@@ -88,9 +88,14 @@ namespace util
         // 환경 변수 UPBIT_MARKETS (CSV) 로 재정의 가능
         std::vector<std::string> markets = { "KRW-ADA", "KRW-TRX", "KRW-XRP" };
 
+        // 실시간 WS에서 구독할 분봉 단위 (분)
+        // 현재 구조는 단일 live unit만 가정한다.
+        // 기본값 15를 유지해 배치 수집/대시보드의 기존 기준과 맞춘다.
+        int live_candle_unit_minutes = 15;
+
         // SQLite DB 파일 경로 (실행 파일과 동일 디렉토리 기준 상대 경로)
         // EC2: systemd WorkingDirectory=/home/ubuntu/coinbot 설정 시 해당 위치에 생성
-        std::string db_path = "coinbot.db";
+        std::string db_path = "db/coinbot.db";
     };
 
     // 통합 설정 (나중에 JSON 로딩 추가 가능)

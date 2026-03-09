@@ -11,15 +11,6 @@ streamlit/app.py — CoinBot 대시보드
 
 실행: streamlit run streamlit/app.py  (repo root 기준)
 
-[레이아웃 개선 사항]
-1. render_analysis를 render_pnl / render_strategy 로 분리 → 분석 탭 내 서브탭 구성.
-2. P&L 바차트 + 누적곡선을 단일 make_subplots figure로 통합 (차트 2개 → 1개).
-3. 마켓별 성과 요약 + 거래 내역을 expander 하나로 묶어 기본 숨김.
-4. 전략 분석: RSI 히스토그램·청산사유 도넛을 동등한 2컬럼으로 배치 (기존 3컬럼 → 2컬럼).
-   보조 지표(평균 보유·부분청산)는 차트 아래 metric 2개로 배치.
-5. 백테스트 결과 영역을 [차트] / [거래내역] 서브탭으로 분리 → 수직 스크롤 제거.
-6. 차트 높이 상수(_H_*)로 통일하여 일관성 확보.
-
 [기존 설계 수정 사항 유지]
 1. signals에 paid_fee 없음 → P&L은 orders 단독 계산. signals는 전략 컨텍스트 전용.
 2. "BID created_at_ms 기준 BUY 창" 정의 불명확 → identifier 기반 페어링 + FIFO fallback 구현.
@@ -638,43 +629,41 @@ def render_strategy(
     start_ts: str, end_ts: str,
 ) -> None:
     """
-    [레이아웃 개선 #1] 기존 render_analysis에서 전략 분석 섹션만 분리.
-    분석 탭 내 [전략 분석] 서브탭으로 렌더링.
+    전략 분석 서브탭 렌더링.
+
+    signals + candles를 함께 보여줘야 진입/청산 맥락을 빠르게 파악할 수 있다.
     """
     if not markets:
         st.info("캔들 데이터 없음.")
         return
 
-    # 컨트롤 바: 마켓 선택
     market_sig = st.selectbox("마켓", markets, key="sig_mkt")
 
     signals = load_signals(db_path, market_sig, start_ms, end_ms)
-    candles = load_candles(db_path, market_sig, start_ts, end_ts, unit=15)  # 봇은 15분봉 전용
+    # 봇 실거래 기준이 15분봉이라 전략 분석도 동일 기준으로 맞춘다.
+    candles = load_candles(db_path, market_sig, start_ts, end_ts, unit=15)
 
     if candles.empty:
         st.info("캔들 데이터 없음. fetch_candles.py로 먼저 수집하세요.")
         return
 
-    # 메인 캔들차트 — 전체 폭 (RSI 기준선은 봇 기본값 oversold=50, overbought=70 고정)
-    fig_chart = make_candle_signal_chart(
-        candles, signals, f"{market_sig} 차트",
-    )
+    fig_chart = make_candle_signal_chart(candles, signals, f"{market_sig} 차트")
     st.plotly_chart(fig_chart, use_container_width=True)
 
     if signals.empty:
         st.info("신호 데이터 없음.")
         return
 
-    # [레이아웃 개선 #4] RSI 히스토그램 + 청산사유 도넛을 2컬럼 동등 배치
     col_rsi, col_pie = st.columns(2)
 
-    buy_rsi   = signals[(signals["side"] == "BUY") & signals["rsi"].notna()]["rsi"]
+    buy_rsi = signals[(signals["side"] == "BUY") & signals["rsi"].notna()]["rsi"]
     sell_sigs = signals[signals["side"] == "SELL"]
 
     with col_rsi:
         if not buy_rsi.empty:
             fig_rsi = go.Figure(go.Histogram(
-                x=buy_rsi, nbinsx=20,
+                x=buy_rsi,
+                nbinsx=20,
                 marker_color="#5b8dee",
                 marker_line=dict(color="#3366cc", width=0.5),
             ))
@@ -696,14 +685,16 @@ def render_strategy(
     with col_pie:
         if not sell_sigs.empty:
             reason_counts = sell_sigs["exit_reason"].value_counts()
-            kr_labels     = [_kr_exit_reason(r) for r in reason_counts.index]
+            kr_labels = [_kr_exit_reason(reason) for reason in reason_counts.index]
             fig_pie = go.Figure(go.Pie(
                 labels=kr_labels,
                 values=reason_counts.values,
                 hole=0.45,
                 marker=dict(
-                    colors=["#00e5a0", "#ff4d6d", "#f9c846", "#5b8dee",
-                            "#c084fc", "#fb923c", "#34d399", "#f472b6"],
+                    colors=[
+                        "#00e5a0", "#ff4d6d", "#f9c846", "#5b8dee",
+                        "#c084fc", "#fb923c", "#34d399", "#f472b6",
+                    ],
                     line=dict(color="#0d1117", width=2),
                 ),
                 textfont=dict(size=11),
@@ -720,15 +711,13 @@ def render_strategy(
         else:
             st.info("SELL 신호 데이터 없음.")
 
-    # 보조 지표 metric 2개
-    avg_hold    = compute_avg_hold_minutes(signals)
+    avg_hold = compute_avg_hold_minutes(signals)
     partial_cnt = int(signals[(signals["side"] == "SELL") & (signals["is_partial"] == 1)].shape[0])
-    full_cnt    = int(signals[(signals["side"] == "SELL") & (signals["is_partial"] == 0)].shape[0])
+    full_cnt = int(signals[(signals["side"] == "SELL") & (signals["is_partial"] == 0)].shape[0])
 
     m1, m2 = st.columns(2)
     m1.metric("평균 보유 기간", f"{avg_hold:.0f}분" if avg_hold is not None else "–")
-    m2.metric("부분청산",       f"{partial_cnt}건",
-              help=f"완전청산 {full_cnt}건 중 부분청산 {partial_cnt}건")
+    m2.metric("부분청산", f"{partial_cnt}건", help=f"완전청산 {full_cnt}건 중 부분청산 {partial_cnt}건")
 
 
 # ─── 백테스트 탭 ──────────────────────────────────────────────────────────────

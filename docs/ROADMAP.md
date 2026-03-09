@@ -276,64 +276,82 @@ Step 9  [완료] tools/candle_rsi_backtest.py                (2.5)
 ### 구현 태스크
 
 ```
-3.1 SignalHandler (1일)
-    - SIGTERM/SIGINT 처리
-    - stop_flag 전파
+3.1 SignalHandler [완료]
+    - SIGTERM/SIGINT 처리: CoinBot.cpp에 이미 구현됨
 
-3.2 GracefulShutdown (2일)
-    - 시장가 주문 체결 대기 (최대 30초)
-    - REST API로 주문 상태 확인
-    - 미체결 지정가 주문 정책 적용 (Cancel / KeepOpen)
-    - DB 쓰기 완료 확인 후 종료 (WAL checkpoint)
-    - 종료 요약 로그
+3.2 HealthChecker (1일)
+    목적: WS 재연결 한도 초과 시 프로세스가 살아있어 systemd가 재시작하지 않는 문제 해결
+    (max_reconnect_attempts=5 초과 → WS 스레드만 조용히 종료, 프로세스는 유지됨)
 
-3.3 HealthChecker (1일)
-    - WS 연결 상태
-    - SQLite 파일 접근 상태
-    - 마켓 스레드 상태
+    치명 상태 정의 (감지 시 std::exit(1) → systemd Restart=on-failure 유발):
+    - public WS 재연결 한도 초과 (캔들 수신 불가)
+    - private WS 재연결 한도 초과 (주문 체결 이벤트 수신 불가)
+    - 마켓 워커 스레드 비정상 종료
 
-3.4 Logger 개선 (1일)
-    - 구조화된 JSON 로깅
-    - CloudWatch 싱크 (선택적)
-    - 로그 레벨 동적 변경
+    관측 항목 (로그만, 즉시 종료 아님):
+    - 큐 포화 지속 / drop-oldest 증가
+      (EventRouter: marketData와 myOrder가 동일 bounded queue 공유,
+       burst 시 오래된 myOrder가 밀려날 수 있음 — 알려진 리스크)
 
-3.5 배포 스크립트 (1일)
-    - Dockerfile 작성
-    - coinbot.service (systemd)
-    - 환경 변수 템플릿
+3.3 journald 운영 정책 확인 (0.5일)
+    목적: 별도 파일 로그 없이 systemd/journald만 운영 기준으로 사용
+    - market_logs 제거 (stdout/stderr → journald 단일화)
+    - journalctl -u coinbot 로 조회 절차 문서화
+    - 필요 시 journald 보관 한도(SystemMaxUse 등) 확인
 
-3.6 인프라 구성 (2일)
-    - EC2 인스턴스 설정 + EBS 볼륨 마운트 (/opt/coinbot/data)
-    - CloudWatch 알림 설정
-    - Secrets Manager 연동 (API 키)
-    - S3 버킷 생성 + IAM 역할 (백업 전용 최소 권한)
-    - S3 일일 백업 cron 설정 (WAL 안전 백업):
-        sqlite3 coinbot.db ".backup /tmp/coinbot_snapshot.db"
+3.4 배포 스크립트 [완료]
+    - deploy/deploy.sh: 빌드 + 전송 + 서비스 재시작 자동화
+    - deploy/deploy.sh: db/ 디렉토리 생성 포함
+    - deploy/coinbot.service: /home/ubuntu/coinbot 기준, Restart=on-failure
+    - deploy/.env.template: API 키 템플릿
+
+3.5 인프라 구성 (1일)
+    경로 기준: WorkingDirectory=/home/ubuntu/coinbot
+               DB 실제 경로: /home/ubuntu/coinbot/db/coinbot.db (Config.h: db_path="db/coinbot.db")
+
+    필수:
+    - EC2 인스턴스 생성 (t3.small, Ubuntu 24.04)
+    - EBS 볼륨 마운트 (/home/ubuntu/coinbot)
+    - S3 버킷 + IAM 역할 (백업 전용 최소 권한)
+    - S3 일일 백업 cron (WAL 안전 백업):
+        sqlite3 /home/ubuntu/coinbot/db/coinbot.db ".backup /tmp/coinbot_snapshot.db"
         aws s3 cp /tmp/coinbot_snapshot.db s3://버킷/YYYY-MM-DD/coinbot.db
         rm /tmp/coinbot_snapshot.db
-      .backup 명령은 SQLite 온라인 백업 API를 사용 — 봇 실행 중에도
-      WAL 포함 일관된 스냅샷 생성 (단순 cp와 달리 -wal 데이터 누락 없음)
+      .backup은 SQLite 온라인 백업 API — 봇 실행 중에도 WAL 포함 일관된 스냅샷 생성
       EC2 장애 시 최대 하루치 데이터 손실로 제한
+
+    선택:
+    - CloudWatch Logs Agent (journald 로그를 콘솔 없이 조회하려는 경우)
+    ※ Secrets Manager 불필요 — .env + chmod 600으로 충분
+
+3.6 GracefulShutdown [운영 전 권장]
+    필요성: 계좌 안전은 StartupRecovery가 보장하나, 종료 순서 문제가 있음
+    현재 종료 순서: engine_mgr.stop() → ws_private.stop()
+    → 워커 종료 후 도착한 마지막 myOrder 이벤트를 처리하지 못해
+      DB 기록 누락 및 주문 상태 정합성 리스크 존재 (빈도가 낮아도 보장이 없음)
+    구현 시:
+    - EventRouter에 stopAccepting() public API 추가
+    - 진행 중 주문 체결 대기 (최대 30초, REST 폴링)
+    - 종료 요약 로그
 ```
 
 ### AWS 배포 구성
 
 ```
 EC2 Instance (t3.small 이상)
-  ├─ EBS Volume (/opt/coinbot/data)
-  │    └─ coinbot.db (SQLite, WAL 모드)
-  │         └─ cron 00:00 → S3 일일 백업
+  ├─ EBS Volume (/home/ubuntu/coinbot)
+  │    ├─ db/coinbot.db (SQLite, WAL 모드)  ← Config.h: db_path="db/coinbot.db"
+  │    │       └─ cron 00:00 → S3 일일 백업
   │
   └─ Systemd coinbot.service
        └─ CoinBot Process
             ├─ MarketEngineManager
             ├─ WebSocket Clients
             └─ MarketEngine × N
-                   └──► Database → coinbot.db (candles / orders / signals)
+                   └──► Database → db/coinbot.db (candles / orders / signals)
 
-Secrets Manager: API 키 주입
-S3:             coinbot.db 일일 스냅샷 보관
-CloudWatch:     로그 스트리밍 + 메트릭 수집
+S3:         /home/ubuntu/coinbot/db/coinbot.db 일일 스냅샷 보관
+CloudWatch: 로그 스트리밍 (선택)
 ```
 
 ### systemd 서비스 (예시)
@@ -341,18 +359,17 @@ CloudWatch:     로그 스트리밍 + 메트릭 수집
 ```ini
 [Unit]
 Description=CoinBot Multi-Market Trading Service
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
-User=coinbot
-WorkingDirectory=/opt/coinbot
-ExecStart=/opt/coinbot/bin/CoinBot
-Restart=always
-RestartSec=10
-EnvironmentFile=/etc/coinbot/env
-MemoryMax=512M
-TimeoutStopSec=90
+User=ubuntu
+WorkingDirectory=/home/ubuntu/coinbot
+ExecStart=/home/ubuntu/coinbot/CoinBot
+Restart=on-failure
+RestartSec=5
+EnvironmentFile=/home/ubuntu/coinbot/.env
 StandardOutput=journal
 StandardError=journal
 
@@ -362,10 +379,8 @@ WantedBy=multi-user.target
 
 ### Phase 3 완료 기준
 
-- [ ] systemd로 자동 재시작
-- [ ] SIGTERM 시 graceful shutdown
-- [ ] 진행 중 주문 안전하게 처리
-- [ ] CloudWatch에서 메트릭 확인 가능
+- [ ] WS 재연결 한도 초과 시 프로세스 종료 → systemd 자동 재시작 확인
+- [ ] journald 단일 로그 운영 확인 (`journalctl -u coinbot`)
 - [ ] S3 일일 백업 cron 동작 확인
 - [ ] 24시간 무중단 테스트 통과
 

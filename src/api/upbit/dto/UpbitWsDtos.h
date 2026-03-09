@@ -6,6 +6,7 @@
 #include <cstdint>
 
 #include <json.hpp>
+#include "util/JsonOptional.h"
 
 namespace api::upbit::dto
 {

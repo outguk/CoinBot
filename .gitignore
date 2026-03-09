@@ -50,6 +50,14 @@ Generated\ Files/
 TestResult.xml
 nunit-*.xml
 
+# Secrets / local deploy files
+.env
+.env.*
+!.env.template
+!deploy/.env.template
+deploy/.env
+*.pem
+
 # Build Results of an ATL Project
 [Dd]ebugPS/
 [Rr]eleasePS/
@@ -330,6 +338,12 @@ market_logs/
 # VS Code (launch.json에 API 키 포함 가능성)
 .vscode/
 
+# Codex / Claude local settings
+.claude/settings.local.json
+
+# CMake / vcpkg local build tree
+build/
+
 # Cake - Uncomment if you are using it
 # tools/**
 # !tools/packages.config
@@ -375,3 +389,7 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Agent/tooling files kept only in local workspace, not in Git
+CLAUDE.md
+.mcp.json

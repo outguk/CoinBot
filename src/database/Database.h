@@ -32,9 +32,10 @@ public:
     // 실패 시 std::runtime_error
     void open(const std::string& path);
 
-    // candle INSERT — ON CONFLICT(market, ts) DO NOTHING (중복 무시)
+    // candle INSERT — ON CONFLICT(market, ts, unit) DO NOTHING (중복 무시)
+    // 실시간 WS/배치 수집 모두 caller가 넘긴 unit을 그대로 저장한다.
     // 반환: true=성공(중복 포함), false=prepare/step 실패
-    bool insertCandle(const std::string& market, const core::Candle& c);
+    bool insertCandle(const std::string& market, const core::Candle& c, int unit);
 
     // order INSERT — 터미널 상태(Filled/Canceled/Rejected) 확정 시 1회 호출
     // ON CONFLICT(order_uuid) DO NOTHING: UNIQUE 중복만 무시 (WS 재연결 중복 수신 대응)
