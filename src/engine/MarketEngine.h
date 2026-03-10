@@ -73,7 +73,7 @@ namespace engine
 
         const std::string& market() const noexcept { return market_; }
 
-        // 확정 캔들 close 가격을 주입 (MarketEngineManager에서 캔들 확정 시 호출)
+        // 확정 캔들 close 가격을 주입 (MarketEngineManager에서 캔들마다 호출)
         // finalizeSellOrder의 가치 기준 dust 판정에 사용된다
         void setMarkPrice(core::Price p) noexcept { last_mark_price_ = p; }
 
