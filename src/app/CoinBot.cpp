@@ -137,8 +137,13 @@ static int run(const std::string& access_key,
     // ---- 네트워크 컨텍스트 ----
     boost::asio::io_context   ioc;
     boost::asio::ssl::context ssl_ctx(boost::asio::ssl::context::tlsv12_client);
+#ifdef _WIN32
+    // Windows 로컬 개발 환경: 시스템 CA 스토어 미지원으로 검증 생략
+    ssl_ctx.set_verify_mode(boost::asio::ssl::verify_none);
+#else
     ssl_ctx.set_default_verify_paths();  // 시스템 CA 인증서 사용
     ssl_ctx.set_verify_mode(boost::asio::ssl::verify_peer); // 서버 인증서 체인 검증 활성화
+#endif
 
     // ---- REST 클라이언트 ----
     api::auth::UpbitJwtSigner signer(access_key, secret_key);

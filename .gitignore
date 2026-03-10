@@ -339,6 +339,9 @@ market_logs/
 # VS Code (launch.json에 API 키 포함 가능성)
 .vscode/
 
+# Visual Studio 로컬 실행 설정 (팀원마다 환경 다름)
+launch.vs.json
+
 # Codex / Claude local settings
 .claude/settings.local.json
 
