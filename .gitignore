@@ -54,6 +54,7 @@ nunit-*.xml
 .env
 .env.*
 !.env.template
+!.env.local.example
 !deploy/.env.template
 deploy/.env
 *.pem

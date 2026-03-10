@@ -1,7 +1,7 @@
 """
 tools/seed_demo_data.py — Streamlit UI 전체 검증용 데모 데이터 생성
 
-출력: src/db/coinbot_demo.db  (메인 coinbot.db 오염 없음)
+출력: db/coinbot_demo.db  (메인 coinbot.db 오염 없음)
 실행: python tools/seed_demo_data.py [--db PATH]
 
 커버 시나리오
@@ -396,7 +396,7 @@ def _pnl(ask_order: dict, all_orders: list[dict]) -> float:
 
 if __name__ == "__main__":
     _repo_root  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    _default_db = os.path.join(_repo_root, "src", "db", "coinbot_demo.db")
+    _default_db = os.path.join(_repo_root, "db", "coinbot_demo.db")
 
     parser = argparse.ArgumentParser(description="Streamlit UI 검증용 데모 데이터 생성")
     parser.add_argument(

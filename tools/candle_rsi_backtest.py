@@ -57,7 +57,7 @@ def resolve_db_path(cli_path: str | None) -> str:
         path = os.environ["COINBOT_DB_PATH"]
     else:
         repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        path = os.path.join(repo_root, "src", "db", "coinbot.db")
+        path = os.path.join(repo_root, "db", "coinbot.db")
 
     if not os.path.exists(path):
         raise FileNotFoundError(
@@ -96,6 +96,51 @@ def load_candles(
     df["ts"] = pd.to_datetime(df["ts"])
     df = df.set_index("ts")
     return df
+
+
+def detect_candle_gaps(index: pd.Index, unit: int) -> dict:
+    """인접 캔들 간격을 검사해 누락 구간을 경고용으로 요약한다."""
+    empty = {
+        "has_gaps": False,
+        "gap_count": 0,
+        "missing_candles": 0,
+        "max_gap_minutes": 0,
+        "samples": [],
+    }
+    if len(index) < 2 or unit <= 0:
+        return empty
+
+    ts_index = pd.DatetimeIndex(index)
+    expected_gap = pd.Timedelta(minutes=unit)
+    diffs = ts_index.to_series().diff().dropna()
+    gap_rows = diffs[diffs > expected_gap]
+    if gap_rows.empty:
+        return empty
+
+    missing_total = 0
+    max_gap_minutes = 0
+    samples: list[str] = []
+    for gap_end, gap_delta in gap_rows.items():
+        gap_minutes = int(gap_delta.total_seconds() // 60)
+        missing = max((gap_minutes // unit) - 1, 0)
+        missing_total += missing
+        max_gap_minutes = max(max_gap_minutes, gap_minutes)
+
+        if len(samples) < 3:
+            gap_start = gap_end - gap_delta
+            samples.append(
+                f"{gap_start.strftime('%Y-%m-%d %H:%M')} -> "
+                f"{gap_end.strftime('%Y-%m-%d %H:%M')} "
+                f"(누락 {missing}캔들)"
+            )
+
+    return {
+        "has_gaps": True,
+        "gap_count": int(len(gap_rows)),
+        "missing_candles": int(missing_total),
+        "max_gap_minutes": int(max_gap_minutes),
+        "samples": samples,
+    }
 
 
 # ─── 지표 계산 ────────────────────────────────────────────────────────────────
@@ -204,6 +249,7 @@ def run_backtest(
             'trades':  DataFrame (entry_ts, exit_ts, entry_price, exit_price, pnl, pnl_pct, reason),
             'equity':  Series    (index=ts → 평가자산 KRW),
             'summary': dict      (total_trades, win_rate, total_pnl, avg_hold_minutes, open_position),
+            'data_quality': dict (중간 캔들 누락 경고 정보),
         }
     """
     p = {**DEFAULT_PARAMS, **(params or {})}
@@ -220,7 +266,11 @@ def run_backtest(
             "trades": pd.DataFrame(),
             "equity": pd.Series(dtype=float),
             "summary": empty_summary,
+            "data_quality": detect_candle_gaps(df.index, unit),
         }
+
+    # 결측 캔들은 자동 보정하지 않으므로, 실행은 계속하되 경고 정보를 별도로 만든다.
+    data_quality = detect_candle_gaps(df.index, unit)
 
     # 지표 계산
     df["rsi"],   df["rsi_ready"]   = _compute_wilder_rsi(df["close"], p["rsi_length"])
@@ -342,6 +392,7 @@ def run_backtest(
         "trades":  trades_df,
         "equity":  equity_s,
         "summary": summary,
+        "data_quality": data_quality,
     }
 
 
@@ -349,7 +400,7 @@ def run_backtest(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="RSI 평균회귀 전략 백테스트")
-    parser.add_argument("--db",     default=None,        help="SQLite DB 경로 (기본: src/db/coinbot.db)")
+    parser.add_argument("--db",     default=None,        help="SQLite DB 경로 (기본: db/coinbot.db)")
     parser.add_argument("--market", default="KRW-BTC",   help="마켓 (기본: KRW-BTC)")
     parser.add_argument("--days",   type=int, default=30, help="분석 기간 일 수 (기본: 30, --start 미지정 시 사용)")
     parser.add_argument("--start",  default=None,        help="시작 날짜 (YYYY-MM-DD, 지정 시 --days 무시)")
@@ -386,6 +437,15 @@ def main() -> None:
     actual_end   = candles.index.max()
     actual_days  = (actual_end - actual_start).total_seconds() / 86400
     print(f"[backtest] 실제 데이터: {actual_start} ~ {actual_end} ({len(candles)}캔들, {actual_days:.1f}일)")
+
+    dq = result.get("data_quality", {})
+    if dq.get("has_gaps"):
+        print(
+            f"[backtest] ⚠ 중간 데이터 누락 구간 {dq['gap_count']}개, "
+            f"누락 캔들 {dq['missing_candles']}개, 최대 공백 {dq['max_gap_minutes']}분"
+        )
+        for sample in dq.get("samples", []):
+            print(f"  - {sample}")
 
     # 요청 기간 대비 실제 데이터 비율 체크 (모든 케이스 공통)
     if args.start:

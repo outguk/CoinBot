@@ -673,6 +673,33 @@ sudo systemctl cat coinbot
 
 여기서 보이는 내용이 바로 `deploy/coinbot.service`가 EC2에 등록된 결과다.
 
+### 정상 동작 확인 순서
+
+배포 직후에는 아래 순서로 확인하면 된다.
+
+```bash
+sudo systemctl status coinbot
+sudo journalctl -u coinbot -n 50 --no-pager
+sqlite3 /home/ubuntu/coinbot/db/coinbot.db "SELECT COUNT(*) FROM candles;"
+sqlite3 /home/ubuntu/coinbot/db/coinbot.db "SELECT market, ts, close FROM candles ORDER BY id DESC LIMIT 5;"
+```
+
+판단 기준:
+
+- `systemctl status`가 `Active: active (running)` 이면 프로세스는 떠 있다.
+- 최근 로그에 시작 직후 fatal 로그가 없으면 초기 기동은 통과한 상태다.
+- `candles` 건수가 시간이 지나며 늘어나면 WS 수신과 DB 기록이 계속 동작 중이다.
+
+### 로그가 한동안 안 나와도 이상이 아닌 이유
+
+CoinBot은 매 순간 heartbeat 로그를 찍지 않는다.
+그래서 `journalctl -u coinbot -f`에서 한동안 새 로그가 없어도 곧바로 비정상이라고 볼 수는 없다.
+
+> [!note] 왜 로그가 드문가
+> 현재 구조는 15분봉 기준이고,
+> 캔들 raw 메시지는 고빈도라서 일부러 전부 로그로 남기지 않는다.
+> 따라서 "오류/재연결/주문/확정 캔들 처리" 중심으로만 로그가 보인다.
+
 ---
 
 ## 11. S3 일일 백업 cron 설정
@@ -751,9 +778,79 @@ cd ~/CoinBot
 - `/home/ubuntu/coinbot/db/coinbot.db`
 - cron 설정
 
+즉, 아래 항목은 재배포해도 그대로 유지된다.
+
+- EC2에서 직접 수정한 Upbit API 키
+- 운영 중 누적된 SQLite 데이터
+- EBS에 저장된 백업 스크립트/로그
+
+반대로 재배포 시 갱신되는 항목:
+
+- `CoinBot` 실행 바이너리
+- `coinbot.service`
+
 ---
 
-## 13. 운영 명령 모음
+## 13. 운영 DB 확인 및 로컬 복사
+
+운영 DB를 직접 확인할 때는 EC2의 SQLite CLI를 쓰는 것이 가장 빠르다.
+
+### EC2에서 바로 확인
+
+```bash
+sqlite3 /home/ubuntu/coinbot/db/coinbot.db
+```
+
+자주 쓰는 명령:
+
+```sql
+.tables
+.headers on
+.mode column
+SELECT COUNT(*) FROM candles;
+SELECT COUNT(*) FROM orders;
+SELECT COUNT(*) FROM signals;
+SELECT market, ts, close, unit FROM candles ORDER BY id DESC LIMIT 10;
+SELECT market, side, price, exit_reason FROM signals ORDER BY id DESC LIMIT 10;
+```
+
+### 운영 DB를 로컬로 복사해서 GUI로 보기
+
+운영 중인 SQLite 파일은 WAL 모드일 수 있으므로, 원본을 직접 복사하기보다 `.backup`으로 스냅샷을 뜨는 편이 안전하다.
+
+1. EC2에서 백업본 생성
+
+```bash
+sqlite3 /home/ubuntu/coinbot/db/coinbot.db ".backup /tmp/coinbot_view.db"
+ls -lh /tmp/coinbot_view.db
+```
+
+2. 로컬 WSL로 내려받기
+
+```bash
+scp coinbot:/tmp/coinbot_view.db ~/CoinBot/
+```
+
+`~/.ssh/config`를 쓰지 않는다면:
+
+```bash
+scp -i ~/.ssh/coinbot-key.pem ubuntu@<Elastic_IP>:/tmp/coinbot_view.db ~/CoinBot/
+```
+
+3. Windows GUI로 열기
+
+- Windows 탐색기 주소창에 `\\wsl$\Ubuntu-24.04\home\<사용자명>\CoinBot` 입력
+- `coinbot_view.db` 파일을 `DB Browser for SQLite`, `DBeaver`, `TablePlus` 등으로 열기
+
+4. 다 봤으면 EC2 임시 파일 정리
+
+```bash
+rm -f /tmp/coinbot_view.db
+```
+
+---
+
+## 14. 운영 명령 모음
 
 ```bash
 # 서비스 상태
@@ -783,7 +880,7 @@ sudo systemctl disable coinbot
 
 ---
 
-## 14. 트러블슈팅
+## 15. 트러블슈팅
 
 ### `Permission denied (publickey)`
 
@@ -840,6 +937,24 @@ cat /home/ubuntu/coinbot/.env
 chmod 600 /home/ubuntu/coinbot/.env
 ```
 
+### `This is not a verified IP.`
+
+Upbit API 키 허용 IP 문제다.
+
+```bash
+sudo systemctl stop coinbot
+```
+
+그 다음 Upbit API 키 관리 화면에서 **EC2 Elastic IP**를 허용 IP로 등록한다.
+새 키가 발급됐다면:
+
+```bash
+nano /home/ubuntu/coinbot/.env
+chmod 600 /home/ubuntu/coinbot/.env
+sudo systemctl start coinbot
+sudo journalctl -u coinbot -n 50 --no-pager
+```
+
 ### `Active: failed`
 
 원인 로그 확인:
@@ -847,6 +962,9 @@ chmod 600 /home/ubuntu/coinbot/.env
 ```bash
 sudo journalctl -u coinbot -n 100 --no-pager
 ```
+
+`Active: activating (auto-restart)` 도 같은 범주다.
+서비스가 살아난 것이 아니라, 실패 후 재시작 루프에 들어간 상태일 수 있으므로 반드시 `journalctl`로 실제 원인을 본다.
 
 ### `aws s3 cp`가 AccessDenied로 실패
 
