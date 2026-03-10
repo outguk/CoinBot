@@ -1,6 +1,6 @@
 ﻿# 구현 현황
 
-마지막 업데이트: 2026-03-05 (Phase 2 Step 8·9 완료)
+마지막 업데이트: 2026-03-10 (Phase 3 문서 상태 동기화)
 
 ---
 
@@ -10,7 +10,7 @@
 - [x] Phase 1: 멀티마켓 핵심 기능 구현 (완료)
 - [x] Phase 1.7: 장시간 부하/안정화 검증 (완료)
 - [x] Phase 2: Streamlit 대시보드 + SQLite 기록 (완료 — Steps 1~9 모두 완료)
-- [ ] Phase 3: AWS 운영 자동화 (미시작)
+- [ ] Phase 3: AWS 운영 자동화 (부분 진행 — HealthChecker/journald/배포 문서 반영, 운영 마감 항목 남음)
 
 참고: 상세 계획은 [ROADMAP.md](ROADMAP.md)
 
@@ -158,6 +158,45 @@
 
 ---
 
+## 2-C) Phase 3 현재 상태
+
+### 2-C-1. SignalHandler / HealthChecker
+
+- 상태: ✅ 부분 완료
+- 핵심:
+  - `SIGINT`, `SIGTERM` 처리 구현
+  - public/private WS 치명 상태 감지 시 `std::exit(1)`로 systemd 재시작 유도
+  - 마켓 워커 비정상 종료도 fatal 조건에 포함
+- 관련 파일:
+  - `src/app/CoinBot.cpp`
+  - `src/app/MarketEngineManager.cpp`
+  - `src/api/ws/UpbitWebSocketClient.cpp`
+
+### 2-C-2. journald / 배포 문서
+
+- 상태: ✅ 부분 완료
+- 핵심:
+  - `deploy/coinbot.service` 기준 `StandardOutput=journal`, `StandardError=journal`
+  - `docs/EC2_DEPLOY.md`에 journald 조회와 배포 절차 반영
+  - `deploy/deploy.sh`와 systemd 설정에 EBS mountpoint/sentinel 안전 장치 반영
+- 관련 파일:
+  - `deploy/coinbot.service`
+  - `deploy/deploy.sh`
+  - `docs/EC2_DEPLOY.md`
+
+### 2-C-3. Graceful shutdown
+
+- 상태: ❌ 미구현
+- 현재 판단:
+  - 현재 stop 순서는 실행 안정성 관점에서는 동작 가능
+  - 그러나 종료 직전 주문 상태 정합성까지 보장하지는 못함
+  - 순서 변경만으로는 한계가 있고, pending 주문 REST 최종 확인 경로가 필요
+- 관련 파일:
+  - `src/app/CoinBot.cpp`
+  - `src/app/MarketEngineManager.cpp`
+
+---
+
 ## 3) Phase 1.7 반영 사항 (2026-02-23 ~ 2026-03-03)
 
 ### 3-1. Self-Heal 제거 — `RsiMeanReversionStrategy` (2026-02-23)
@@ -269,12 +308,18 @@
 - 현재 정책: 외부 주문 체결은 무시
 - 운영 전제: 봇 단독 계좌 사용
 
+4. Graceful shutdown 미구현으로 종료 직전 주문 상태 정합성 리스크 존재
+- 현재 종료 순서: `engine_mgr.stop() -> ws_private.stop() -> ws_public.stop()`
+- 실행 안정성 관점에서는 큰 문제 없으나, 워커 종료 후 도착한 마지막 `myOrder`는 처리 보장이 없음
+- stop 순서만 바꾸는 것으로는 근본 해결이 어렵고, 종료 시 pending 주문 REST 확인 경로가 필요
+
 ---
 
 ## 6) 변경 이력
 
 | 날짜 | 구분 | 내용 |
 |------|------|------|
+| 2026-03-10 | Phase 3/문서 | HealthChecker/journald 완료 상태 반영, graceful shutdown(3.6) 미해결 리스크와 현재 stop 순서 평가 문서화 |
 | 2026-03-05 | Phase 2 | streamlit/app.py 구현 완료 — 분석 탭(P&L·전략 분석) + 백테스트 탭, Step 8·9 완료 |
 | 2026-03-05 | Phase 2 | signals.exit_reason 컬럼 추가 — identifier 파싱 의존 제거, pending_exit_reason_ 전략 멤버 추가 |
 | 2026-03-05 | Phase 2 | fetch_candles.py 캔들 주기 15분봉 확정, 일별 P&L 집계 설계 추가 |
@@ -310,6 +355,6 @@ CoinBot 프로젝트 테스트 정책:
 
 ## 8) 관련 문서
 
-- 구조 문서: [ARCHITECTURE.md](ARCHITECTURE.md)
+- 학습 문서: [PROJECT_FLOW_STUDY.md](PROJECT_FLOW_STUDY.md)
 - 계획 문서: [ROADMAP.md](ROADMAP.md)
 - 정산/복구 검토: [reports/review3.md](reports/review3.md)
