@@ -41,7 +41,7 @@ except ImportError:
     _backtest = None
 
 KST = ZoneInfo("Asia/Seoul")
-DEFAULT_DB_PATH = os.path.join(_REPO_ROOT, "src", "db", "coinbot.db")
+DEFAULT_DB_PATH = os.path.join(_REPO_ROOT, "db", "coinbot.db")
 
 # ─── 청산 이유 한글 매핑 ────────────────────────────────────────────────────────
 _EXIT_REASON_KR: dict[str, str] = {
@@ -840,6 +840,19 @@ def render_backtest(
                 f"요청: {_req_end.date()} / 실제: {_actual_end.date()}  \n"
                 f"`fetch_candles.py --end {_req_end.date()} --markets {bt_market}` 로 보강하세요."
             )
+
+        dq = result.get("data_quality", {})
+        if dq.get("has_gaps"):
+            sample_lines = dq.get("samples", [])
+            sample_text = "  \n".join(f"- {line}" for line in sample_lines)
+            message = (
+                f"중간 캔들 누락 구간 {dq['gap_count']}개가 감지되었습니다. "
+                f"(누락 캔들 {dq['missing_candles']}개, 최대 공백 {dq['max_gap_minutes']}분)  \n"
+                "백테스트는 계속 진행되지만, 지표와 손익 결과가 왜곡될 수 있습니다."
+            )
+            if sample_text:
+                message += f"  \n예시:  \n{sample_text}"
+            st.warning(message)
 
         trades_bt = result["trades"]
         rsi_col   = candles_bt.get("rsi")

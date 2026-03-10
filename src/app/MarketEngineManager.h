@@ -27,7 +27,7 @@
 #include "trading/allocation/AccountManager.h"
 #include "trading/strategies/RsiMeanReversionStrategy.h"
 #include "trading/strategies/StrategyTypes.h"
-#include "db/Database.h"
+#include "database/Database.h"
 
 namespace app {
 
@@ -174,5 +174,4 @@ private:
 };
 
 } // namespace app
-
 

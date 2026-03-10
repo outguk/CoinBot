@@ -7,7 +7,7 @@ fetch_candles.py — 과거/최신 캔들 수집기 (Phase 2 Step 7)
 DB 경로 우선순위:
   1. CLI --db 인자
   2. 환경변수 COINBOT_DB_PATH
-  3. __file__ 기준 repo root 자동 계산 (src/db/coinbot.db)
+  3. __file__ 기준 repo root 자동 계산 (db/coinbot.db)
 """
 
 import argparse
@@ -42,9 +42,9 @@ def resolve_db_path(cli_path: str | None) -> str:
     elif "COINBOT_DB_PATH" in os.environ:
         path = os.environ["COINBOT_DB_PATH"]
     else:
-        # __file__ 기준으로 repo root를 찾아 src/db/coinbot.db 반환
+        # __file__ 기준으로 repo root를 찾아 db/coinbot.db 반환
         repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        path = os.path.join(repo_root, "src", "db", "coinbot.db")
+        path = os.path.join(repo_root, "db", "coinbot.db")
 
     # 경로가 존재하지 않으면 즉시 에러 (자동 생성 금지 — 엉뚱한 위치에 빈 DB 생성 사고 방지)
     if not os.path.exists(path):
@@ -227,7 +227,7 @@ def fetch_market(conn: sqlite3.Connection, market: str, start_ts: str, end_ts: s
 def main() -> None:
     parser = argparse.ArgumentParser(description="Upbit 분봉 캔들 수집기")
     parser.add_argument("--db",      default=None,
-                        help="SQLite DB 경로 (기본: src/db/coinbot.db)")
+                        help="SQLite DB 경로 (기본: db/coinbot.db)")
     parser.add_argument("--markets", default=",".join(DEFAULT_MARKETS),
                         help="마켓 목록 (쉼표 구분, 기본: KRW-ADA,KRW-TRX,KRW-XRP)")
     parser.add_argument("--days",    type=int, default=DEFAULT_DAYS,

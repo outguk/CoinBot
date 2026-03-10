@@ -110,7 +110,7 @@
   - `SignalRecord` 구조체 + `SignalCallback` 타입 정의
   - `signals.exit_reason` 컬럼 추가 (2026-03-05, identifier 파싱 의존 제거)
 - 관련 파일:
-  - `src/db/schema.sql`, `src/db/Database.h/.cpp`
+  - `src/database/schema.sql`, `src/database/Database.h/.cpp`
   - `src/trading/strategies/StrategyTypes.h`
 
 ### 2-B-2. 봇 통합 (Steps 4~6)

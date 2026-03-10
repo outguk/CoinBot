@@ -9,7 +9,7 @@
 
 set -e
 
-EC2_HOST="ubuntu@<EC2_PUBLIC_IP>"   # ← EC2 IP로 변경
+EC2_HOST="coinbot"   # ← EC2 IP로 변경
 REMOTE_DIR="/home/ubuntu/coinbot"
 BINARY="out/build/linux-release/CoinBot"
 SENTINEL_FILE="$REMOTE_DIR/.coinbot_volume_sentinel"

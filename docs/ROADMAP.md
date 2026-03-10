@@ -69,7 +69,7 @@ Phase 3  [미시작] AWS 24시간 운영
   - signals: 전략 진입 시점의 RSI·손절가 등은 API가 제공하지 않음
 
 **의존성**:
-- **sqlite3**: amalgamation 단일 파일 번들 (`src/db/sqlite3.h`, `src/db/sqlite3.c`)
+- **sqlite3**: amalgamation 단일 파일 번들 (`src/database/sqlite3.h`, `src/database/sqlite3.c`)
 - **Streamlit**: Python 패키지 (`pip install streamlit plotly pandas numpy`)
 
 ---
@@ -158,7 +158,7 @@ CREATE INDEX idx_signals_market ON signals(market, ts_ms);
 ### 구현 순서
 
 #### 2.1 SQLite 기반 인프라
-- `src/db/Database.h/.cpp`: RAII `sqlite3*` 래퍼
+- `src/database/Database.h/.cpp`: RAII `sqlite3*` 래퍼
   - 공개 인터페이스: `open(path)`, `insertCandle`, `upsertOrder`, `insertSignal`
   - write 메서드는 `bool` 반환 (true=성공, false=실패+WARN 로그)
   - 초기화 PRAGMA: `journal_mode=WAL`, `synchronous=NORMAL`
@@ -167,8 +167,8 @@ CREATE INDEX idx_signals_market ON signals(market, ts_ms);
     - 숫자 문자열 → `stoll()` (WS 경로)
     - ISO8601 문자열 (UTC offset 포함) → 파싱 후 epoch ms (REST 경로)
     - 파싱 실패 → 0 반환 + WARN 로그
-- `src/db/sqlite3.h/.c`: amalgamation 단일 파일 번들
-- `src/db/schema.sql`: 스키마 문서 (런타임 로드 아님)
+- `src/database/sqlite3.h/.c`: amalgamation 단일 파일 번들
+- `src/database/schema.sql`: 스키마 문서 (런타임 로드 아님)
   - 스키마 SQL은 `Database.cpp`의 `kSchema` 문자열로 embed — 배포 시 파일 의존 없음
 - `CoinBot.cpp`에서 Database 생성 후 MarketEngineManager에 주입
 - **DB 쓰기 원칙**: 모든 DB write는 이벤트 처리 완료 후, 다음 pop 전 수행
@@ -245,7 +245,7 @@ CREATE INDEX idx_signals_market ON signals(market, ts_ms);
 ### 단계별 구현 현황
 
 ```
-Step 1  [완료] src/db/schema.sql 작성                    (2.1)
+Step 1  [완료] src/database/schema.sql 작성              (2.1)
 Step 2  [완료] sqlite3 번들 + Database 클래스 + CMake    (2.1)
 Step 3  [완료] SignalRecord + SignalCallback 타입 추가    (2.3 선행)
 Step 4  [완료] RsiMeanReversionStrategy setSignalCallback   (2.3)
