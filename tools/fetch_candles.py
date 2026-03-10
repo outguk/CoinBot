@@ -25,7 +25,6 @@ SUPPORTED_UNITS  = [1, 3, 5, 10, 15, 30, 60, 240]  # Upbit 지원 분봉 단위 
 DEFAULT_UNIT     = 15
 DEFAULT_MARKETS  = ["KRW-ADA", "KRW-TRX", "KRW-XRP"]
 DEFAULT_DAYS     = 90
-OVERLAP_CANDLES  = 2    # Incremental: 경계 누락 방지용 overlap 캔들 수 (unit에 비례해 분으로 환산)
 REQUEST_INTERVAL = 0.1  # rate limit: 분당 ~600회 상한 (0.1s 간격)
 BATCH_SIZE       = 200  # Upbit API 1회 최대 수신 개수
 REQUEST_TIMEOUT  = 10   # 단일 요청 타임아웃 (초)
@@ -98,22 +97,6 @@ def fetch_batch(market: str, to: str | None, unit: int) -> list[dict]:
 
 # ─── DB 헬퍼 ──────────────────────────────────────────────────────────────────
 
-def get_first_ts(conn: sqlite3.Connection, market: str, unit: int) -> str | None:
-    """candles 테이블에서 해당 마켓·unit의 가장 오래된 분봉 시간(ts)를 반환. 없으면 None."""
-    row = conn.execute(
-        "SELECT MIN(ts) FROM candles WHERE market = ? AND unit = ?", (market, unit)
-    ).fetchone()
-    return row[0] if row and row[0] else None
-
-
-def get_last_ts(conn: sqlite3.Connection, market: str, unit: int) -> str | None:
-    """candles 테이블에서 해당 마켓·unit의 최신 분봉 시간(ts)를 반환. 없으면 None."""
-    row = conn.execute(
-        "SELECT MAX(ts) FROM candles WHERE market = ? AND unit = ?", (market, unit)
-    ).fetchone()
-    return row[0] if row and row[0] else None
-
-
 def insert_candle_row(conn: sqlite3.Connection, market: str, c: dict, unit: int) -> int:
     """
     캔들 1건 INSERT (ON CONFLICT DO NOTHING — 봇 실시간 write와 충돌 없음).
@@ -178,48 +161,84 @@ def fetch_range(conn: sqlite3.Connection, market: str, start_ts: str, end_ts: st
     return count
 
 
+# ─── 공백 탐색 ────────────────────────────────────────────────────────────────
+
+def find_gaps(conn: sqlite3.Connection, market: str, unit: int,
+              start_ts: str, end_ts: str) -> list[tuple[str, str]]:
+    """
+    start_ts ~ end_ts 구간에서 DB에 누락된 캔들 구간 목록을 반환한다.
+
+    Upbit 분봉은 unit 간격 고정이므로 예상 ts 시퀀스와 DB 실제 ts를 비교해
+    누락된 ts를 찾고, 연속된 누락을 하나의 구간 (gap_start, gap_end)으로 묶는다.
+
+    start_ts가 unit 경계가 아닐 경우 첫 번째 경계로 올림 처리한다.
+    반환: [(gap_start, gap_end), ...] — 없으면 []
+    """
+    # DB에서 해당 구간 ts 전부 조회
+    rows = conn.execute(
+        "SELECT ts FROM candles WHERE market=? AND unit=? AND ts>=? AND ts<=?",
+        (market, unit, start_ts, end_ts)
+    ).fetchall()
+    existing = {row[0] for row in rows}
+
+    # start_ts를 unit 경계로 올림
+    t = datetime.strptime(start_ts, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=KST)
+    t = t.replace(second=0, microsecond=0)
+    remainder = (t.hour * 60 + t.minute) % unit
+    if remainder != 0:
+        t += timedelta(minutes=(unit - remainder))
+
+    end = datetime.strptime(end_ts, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=KST)
+
+    # 누락 ts 수집
+    missing = []
+    while t <= end:
+        ts_str = t.strftime("%Y-%m-%dT%H:%M:%S")
+        if ts_str not in existing:
+            missing.append(ts_str)
+        t += timedelta(minutes=unit)
+
+    if not missing:
+        return []
+
+    # 연속된 누락을 구간으로 묶기
+    gaps: list[tuple[str, str]] = []
+    gap_start = gap_end = missing[0]
+    for ts in missing[1:]:
+        prev = datetime.strptime(gap_end, "%Y-%m-%dT%H:%M:%S")
+        curr = datetime.strptime(ts,      "%Y-%m-%dT%H:%M:%S")
+        if int((curr - prev).total_seconds() / 60) == unit:
+            gap_end = ts
+        else:
+            gaps.append((gap_start, gap_end))
+            gap_start = gap_end = ts
+    gaps.append((gap_start, gap_end))
+
+    return gaps
+
+
 # ─── 마켓별 진입점 ────────────────────────────────────────────────────────────
 
 def fetch_market(conn: sqlite3.Connection, market: str, start_ts: str, end_ts: str, unit: int) -> None:
     """
-    요청 구간(start_ts ~ end_ts)을 기준으로 3가지 케이스를 처리한다.
+    start_ts ~ end_ts 구간에서 누락된 캔들을 모두 수집한다.
 
-      1. 데이터 없음            → 전체 구간 수집 (Bootstrap)
-      2. 요청 start < DB 최솟값 → 과거 구간 백필 (Backfill)
-      3. 요청 end   > DB 최댓값 → 최신 구간 보강 (Incremental, OVERLAP_CANDLES 포함)
-
-    케이스 2·3는 독립적으로 판단하므로 동시에 발생할 수 있다.
-    이미 수집된 구간은 ON CONFLICT DO NOTHING으로 무시된다.
+    find_gaps로 실제 공백 구간만 추출해 fetch_range 호출.
+    Bootstrap / Backfill / Incremental / 중간 공백 모두 동일 로직으로 처리된다.
     """
-    first_ts = get_first_ts(conn, market, unit)
-    last_ts  = get_last_ts(conn, market, unit)
-    count    = 0
+    gaps = find_gaps(conn, market, unit, start_ts, end_ts)
 
-    if last_ts is None:
-        # 데이터 없음 → 요청 구간 전체 수집
-        print(f"  [Bootstrap]   {market} (unit={unit}): {start_ts} ~ {end_ts}")
-        count = fetch_range(conn, market, start_ts, end_ts, unit)
+    if not gaps:
+        print(f"  [Skip]  {market} (unit={unit}): 요청 구간이 이미 수집됨 ({start_ts} ~ {end_ts})")
+        print(f"  → {market} (unit={unit}): 0건 삽입 완료")
+        return
 
-    else:
-        # 과거 구간 백필: 요청 start가 DB 최솟값보다 이전인 경우
-        if start_ts < first_ts:
-            print(f"  [Backfill]    {market} (unit={unit}): {start_ts} ~ {first_ts}")
-            count += fetch_range(conn, market, start_ts, first_ts, unit)
+    total = 0
+    for g_start, g_end in gaps:
+        print(f"  [Fetch] {market} (unit={unit}): {g_start} ~ {g_end}")
+        total += fetch_range(conn, market, g_start, g_end, unit)
 
-        # 최신 구간 보강: 요청 end가 DB 최댓값보다 이후인 경우
-        if end_ts > last_ts:
-            overlap_min   = unit * OVERLAP_CANDLES  # 캔들 수 기준 overlap → 분으로 환산
-            overlap_start = (
-                datetime.strptime(last_ts, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=KST)
-                - timedelta(minutes=overlap_min)
-            ).strftime("%Y-%m-%dT%H:%M:%S")
-            print(f"  [Incremental] {market} (unit={unit}): {overlap_start} ~ {end_ts} (last={last_ts})")
-            count += fetch_range(conn, market, overlap_start, end_ts, unit)
-
-        if count == 0:
-            print(f"  [Skip]        {market} (unit={unit}): 요청 구간이 이미 수집됨 ({start_ts} ~ {end_ts})")
-
-    print(f"  → {market} (unit={unit}): {count}건 삽입 완료")
+    print(f"  → {market} (unit={unit}): {total}건 삽입 완료")
 
 
 # ─── CLI 진입점 ───────────────────────────────────────────────────────────────
