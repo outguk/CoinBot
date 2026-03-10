@@ -385,8 +385,8 @@ namespace trading::strategies {
 
         // req 8: exit_reason은 기존 문자열 규칙 그대로 (stop/target 구분 유지)
         std::string reason_tag;
-        if (hitStop)   reason_tag = “exit_stop”;
-        if (hitTarget) reason_tag = reason_tag.empty() ? “exit_target” : reason_tag + “_target”;
+        if (hitStop)   reason_tag = "exit_stop";
+        if (hitTarget) reason_tag = reason_tag.empty() ? "exit_target" : reason_tag + "_target";
 
         // min_notional 체크 (기존 maybeExit와 동일)
         const double min_notional = util::AppConfig::instance().strategy.min_notional_krw;
