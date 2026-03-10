@@ -363,6 +363,60 @@ namespace trading::strategies {
         return Decision::submit(std::move(req));
     }
 
+    Decision RsiMeanReversionStrategy::onIntrabarCandle(
+        double intrabar_close, const AccountSnapshot& account)
+    {
+        // req 4: InPosition 상태에서만 동작
+        if (state_ != State::InPosition)
+            return Decision::noAction();
+
+        if (!account.canSell())
+            return Decision::noAction();
+
+        // stop/target 미설정 시 판단 불가
+        if (!stop_price_.has_value() || !target_price_.has_value())
+            return Decision::noAction();
+
+        const bool hitStop   = (intrabar_close <= *stop_price_);
+        const bool hitTarget = (intrabar_close >= *target_price_);
+
+        if (!hitStop && !hitTarget)
+            return Decision::noAction();
+
+        // req 8: exit_reason은 기존 문자열 규칙 그대로 (stop/target 구분 유지)
+        std::string reason_tag;
+        if (hitStop)   reason_tag = “exit_stop”;
+        if (hitTarget) reason_tag = reason_tag.empty() ? “exit_target” : reason_tag + “_target”;
+
+        // min_notional 체크 (기존 maybeExit와 동일)
+        const double min_notional = util::AppConfig::instance().strategy.min_notional_krw;
+        if (account.coin_available * intrabar_close < min_notional)
+            return Decision::noAction();
+
+        const std::string cid = makeIdentifier(reason_tag);
+        core::OrderRequest req = makeMarketSellByVolume(account.coin_available, reason_tag);
+        req.identifier = cid;
+
+        // 부분 체결 누적 초기화 (기존 maybeExit와 동일)
+        pending_filled_volume_ = 0.0;
+        pending_cost_sum_      = 0.0;
+        pending_last_price_    = 0.0;
+
+        // req 8: intrabar 스냅샷 — close만 있고 지표는 미준비
+        // → SignalRecord 기록 시 rsi/volatility/trend_strength = nullopt (DB NULL 자동)
+        Snapshot intrabar_snap{};
+        intrabar_snap.close = intrabar_close;
+        // rsi.ready=false, volatility.ready=false, trendReady=false (기본값)
+        signal_snapshot_ = intrabar_snap;
+
+        // req 6: InPosition → PendingExit 전이 (중복 청산 방지)
+        state_               = State::PendingExit;
+        pending_client_id_   = cid;
+        pending_exit_reason_ = reason_tag;
+
+        return Decision::submit(std::move(req));
+    }
+
     // “부분체결 대응 필요”
     void RsiMeanReversionStrategy::onFill(const FillEvent& fill)
     {

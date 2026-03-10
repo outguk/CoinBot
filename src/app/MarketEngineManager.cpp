@@ -524,15 +524,53 @@ void MarketEngineManager::handleMarketData_(MarketContext& ctx,
 
     // 동일 분봉 업데이트는 최신값으로 덮어쓰고,
     // 다음 분봉이 도착하면 이전 분봉을 "확정 close"로 처리한다.
+
+    // [Fix 3] mark price를 항상 최신 intrabar close로 갱신하고,
+    // InPosition 상태에서 stop/target 도달 시 즉시 시장가 매도를 제출하는 헬퍼.
+    // submit 성공/실패 여부와 무관하게 mark price는 intrabar close로 유지된다.
+    auto doIntrabarCheck = [&](double intrabar_close)
+    {
+        ctx.engine->setMarkPrice(intrabar_close);
+
+        if (ctx.strategy->state() !=
+            trading::strategies::RsiMeanReversionStrategy::State::InPosition)
+            return;
+
+        const trading::AccountSnapshot account = buildAccountSnapshot_(ctx.market);
+        const trading::Decision d =
+            ctx.strategy->onIntrabarCandle(intrabar_close, account);
+
+        if (!d.hasOrder()) return;
+
+        logger.info("[Manager][", ctx.market, "][IntrabarExit] close=",
+            intrabar_close, " reason=", d.order->client_tag);
+
+        const auto r = ctx.engine->submit(*d.order);
+        logger.info("[Manager][", ctx.market, "][Submit] success=", r.success,
+            " code=", static_cast<int>(r.code));
+
+        if (!r.success)
+        {
+            logger.warn("[Manager][", ctx.market,
+                "][IntrabarExit] FAILED -> rollback");
+            ctx.strategy->onSubmitFailed();
+            // mark price는 이미 intrabar_close로 갱신된 상태 — 최신 추정치로 유지
+        }
+    };
+
+    // [Fix 1] 경로 A: pending_candle이 비어 있는 첫 수신
     if (!ctx.pending_candle.has_value())
     {
         ctx.pending_candle = incoming;
+        doIntrabarCheck(static_cast<double>(incoming.close_price));
         return;
     }
 
+    // [Fix 1] 경로 B: 동일 ts 업데이트
     if (ctx.pending_candle->start_timestamp == incoming.start_timestamp)
     {
         ctx.pending_candle = incoming;
+        doIntrabarCheck(static_cast<double>(incoming.close_price));
         return;
     }
 
@@ -592,6 +630,10 @@ void MarketEngineManager::handleMarketData_(MarketContext& ctx,
             ctx.strategy->onSubmitFailed();
         }
     }
+
+    // [Fix 1] 경로 C: 새 분봉의 첫 close도 intrabar 체크
+    // (onCandle이 이미 PendingExit로 전이했다면 doIntrabarCheck 내부 guard에서 noAction)
+    doIntrabarCheck(static_cast<double>(incoming.close_price));
 }
 
 // ========== handleEngineEvents_ ==========
