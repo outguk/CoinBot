@@ -241,11 +241,11 @@ static int run(const std::string& access_key,
 
     // ---- 정지 ----
     // 주문 경로를 먼저 멈춰 종료 중 추가 주문 가능성을 줄인다.
-    engine_mgr.stop();
+    ws_public.stop();
     // WS는 이후 정리한다. (read 루프는 내부 timeout으로 빠르게 탈출)
+    engine_mgr.stop();
     logger.info("[CoinBot] Stopping...");
     ws_private.stop();
-    ws_public.stop();
 
     logger.info("[CoinBot] Goodbye.");
     return 0;

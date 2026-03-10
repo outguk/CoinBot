@@ -260,12 +260,12 @@ Step 9  [완료] tools/candle_rsi_backtest.py                (2.5)
 
 ### Phase 2 완료 기준
 
-- [ ] 봇 실행 중 캔들이 DB에 실시간 적재됨
-- [ ] 터미널 상태(Filled/Canceled/Rejected) 확정 시 orders 테이블에 1회 INSERT됨
-- [ ] BUY/SELL 확정 시 signals 테이블에 기록됨
-- [ ] WAL 모드에서 Streamlit과 봇의 동시 읽기/쓰기 정상 동작
-- [ ] Streamlit 분석 탭 전략 분석 섹션에서 캔들차트 + 신호 마커 표시
-- [ ] 백테스트 스크립트로 전략 손익 시뮬레이션 가능
+- [x] 봇 실행 중 캔들이 DB에 실시간 적재됨
+- [x] 터미널 상태(Filled/Canceled/Rejected) 확정 시 orders 테이블에 1회 INSERT됨
+- [x] BUY/SELL 확정 시 signals 테이블에 기록됨
+- [x] WAL 모드에서 Streamlit과 봇의 동시 읽기/쓰기 정상 동작
+- [x] Streamlit 분석 탭 전략 분석 섹션에서 캔들차트 + 신호 마커 표시
+- [x] 백테스트 스크립트로 전략 손익 시뮬레이션 가능
 
 ---
 
@@ -279,7 +279,7 @@ Step 9  [완료] tools/candle_rsi_backtest.py                (2.5)
 3.1 SignalHandler [완료]
     - SIGTERM/SIGINT 처리: CoinBot.cpp에 이미 구현됨
 
-3.2 HealthChecker (1일)
+3.2 HealthChecker [완료]
     목적: WS 재연결 한도 초과 시 프로세스가 살아있어 systemd가 재시작하지 않는 문제 해결
     (max_reconnect_attempts=5 초과 → WS 스레드만 조용히 종료, 프로세스는 유지됨)
 
@@ -293,7 +293,7 @@ Step 9  [완료] tools/candle_rsi_backtest.py                (2.5)
       (EventRouter: marketData와 myOrder가 동일 bounded queue 공유,
        burst 시 오래된 myOrder가 밀려날 수 있음 — 알려진 리스크)
 
-3.3 journald 운영 정책 확인 (0.5일)
+3.3 journald 운영 정책 확인 [완료]
     목적: 별도 파일 로그 없이 systemd/journald만 운영 기준으로 사용
     - market_logs 제거 (stdout/stderr → journald 단일화)
     - journalctl -u coinbot 로 조회 절차 문서화
@@ -326,11 +326,16 @@ Step 9  [완료] tools/candle_rsi_backtest.py                (2.5)
 
 3.6 GracefulShutdown [운영 전 권장]
     필요성: 계좌 안전은 StartupRecovery가 보장하나, 종료 순서 문제가 있음
-    현재 종료 순서: engine_mgr.stop() → ws_private.stop()
+    현재 종료 순서: engine_mgr.stop() → ws_private.stop() → ws_public.stop()
     → 워커 종료 후 도착한 마지막 myOrder 이벤트를 처리하지 못해
       DB 기록 누락 및 주문 상태 정합성 리스크 존재 (빈도가 낮아도 보장이 없음)
+    현재 판단:
+    - stop 호출 순서는 실행 안정성 관점에서는 큰 문제 없음
+    - 하지만 순서만 바꾸는 것으로는 3.6의 핵심(myOrder 최종 정합성) 해결이 어려움
+    - ws_public.stop() 선행은 새 캔들 유입을 줄이는 소폭 완화책일 뿐, 본질 해결은 아님
     구현 시:
-    - EventRouter에 stopAccepting() public API 추가
+    - 종료 시 pending 주문을 REST로 최종 확인하는 경로 필요 (`getOrder` / `runRecovery_` 재사용)
+    - 필요 시 종료 모드에서 marketData 기반 새 주문 제출 차단
     - 진행 중 주문 체결 대기 (최대 30초, REST 폴링)
     - 종료 요약 로그
 ```
@@ -379,8 +384,9 @@ WantedBy=multi-user.target
 
 ### Phase 3 완료 기준
 
-- [ ] WS 재연결 한도 초과 시 프로세스 종료 → systemd 자동 재시작 확인
-- [ ] journald 단일 로그 운영 확인 (`journalctl -u coinbot`)
+- [x] WS 재연결 한도 초과 시 프로세스 종료 → systemd 자동 재시작 경로 구현
+- [x] journald 단일 로그 운영 확인 (`journalctl -u coinbot`)
+- [ ] 종료 시 pending 주문 최종 확인 또는 graceful shutdown 경로 구현
 - [ ] S3 일일 백업 cron 동작 확인
 - [ ] 24시간 무중단 테스트 통과
 
