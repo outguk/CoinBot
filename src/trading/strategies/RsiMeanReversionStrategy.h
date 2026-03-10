@@ -82,6 +82,11 @@ namespace trading::strategies {
         // 메인 진입점: “봉 1개” 들어오면, 주문 의도가 있으면 Decision::submit 반환
         [[nodiscard]] Decision onCandle(const core::Candle& c, const AccountSnapshot& account);
 
+        // intrabar(미확정) 캔들의 close가 손절가/익절가에 도달했을 때 호출.
+        // InPosition 상태에서만 동작하며, RSI 기반 청산은 평가하지 않음.
+        [[nodiscard]] Decision onIntrabarCandle(double intrabar_close,
+                                                const AccountSnapshot& account);
+
         // 체결 이벤트(부분/복수 체결 누적)
         void onFill(const FillEvent& fill);
 
