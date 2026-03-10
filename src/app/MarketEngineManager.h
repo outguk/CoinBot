@@ -101,6 +101,10 @@ private:
         // 다음 분봉이 들어오면 이전 분봉(최종 close)을 확정 처리한다.
         std::optional<core::Candle> pending_candle;
 
+        // intrabar 청산 submit 실패 시 기록되는 캔들 ts.
+        // 동일 ts의 추가 업데이트에서 재시도를 막고, 다음 분봉에서만 재시도한다.
+        std::optional<std::string> intrabar_fail_ts{};
+
         // Pending 상태 타임아웃 추적
         bool tracking_pending{false};
         std::chrono::steady_clock::time_point pending_entered_at{};

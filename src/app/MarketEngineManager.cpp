@@ -532,6 +532,13 @@ void MarketEngineManager::handleMarketData_(MarketContext& ctx,
     {
         ctx.engine->setMarkPrice(intrabar_close);
 
+        // 같은 분봉 ts에서 이미 실패한 경우 다음 분봉까지 재시도하지 않는다.
+        // 새 분봉이 도착하면 ts가 달라지므로 자동으로 해제된다.
+        if (ctx.pending_candle.has_value() &&
+            ctx.intrabar_fail_ts.has_value() &&
+            ctx.pending_candle->start_timestamp == *ctx.intrabar_fail_ts)
+            return;
+
         if (ctx.strategy->state() !=
             trading::strategies::RsiMeanReversionStrategy::State::InPosition)
             return;
@@ -552,9 +559,11 @@ void MarketEngineManager::handleMarketData_(MarketContext& ctx,
         if (!r.success)
         {
             logger.warn("[Manager][", ctx.market,
-                "][IntrabarExit] FAILED -> rollback");
+                "][IntrabarExit] FAILED -> skip until next candle");
             ctx.strategy->onSubmitFailed();
-            // mark price는 이미 intrabar_close로 갱신된 상태 — 최신 추정치로 유지
+            // 이 분봉 ts를 기록 → 같은 분봉에서 재시도 금지
+            if (ctx.pending_candle.has_value())
+                ctx.intrabar_fail_ts = ctx.pending_candle->start_timestamp;
         }
     };
 
