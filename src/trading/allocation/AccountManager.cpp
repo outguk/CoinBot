@@ -37,27 +37,6 @@ namespace trading::allocation {
         other.active_ = false;
     }
 
-    // = 도 오버라이딩으로 move 처리
-    ReservationToken& ReservationToken::operator=(ReservationToken&& other) noexcept {
-        if (this != &other) {
-            // 기존 토큰이 active면 먼저 해제 (토큰 객체 없이)
-            if (active_ && manager_ != nullptr) {
-                manager_->releaseWithoutToken(market_, amount_ - consumed_);
-            }
-
-            manager_ = other.manager_;
-            market_ = std::move(other.market_);
-            amount_ = other.amount_;
-            consumed_ = other.consumed_;
-            id_ = other.id_;
-            active_ = other.active_;
-
-            other.manager_ = nullptr;
-            other.active_ = false;
-        }
-        return *this;
-    }
-
     ReservationToken::~ReservationToken() {
         // 안전망: active 상태로 파괴되면 자동 해제 (토큰 객체 없이)
         if (active_ && manager_ != nullptr) {
@@ -135,7 +114,7 @@ namespace trading::allocation {
         // 3단계: 남은 KRW를 코인이 없는 마켓에 균등 배분
         core::Amount remaining_krw = account.krw_free;
 
-        if (remaining_krw <= 0 && budgets_.size() > 0) {
+        if (remaining_krw <= 0) {
             // 모든 자산이 코인으로 전환된 상태 (정상)
             return;
         }
@@ -182,7 +161,7 @@ namespace trading::allocation {
                                                             core::Amount krw_amount) {
         std::unique_lock lock(mtx_);
 
-        auto it = budgets_.find(std::string(market));
+		auto it = budgets_.find(std::string(market)); // 못찾으면 .end() 반환
 		if (it == budgets_.end()) { // .end()는 마지막 요소 다음 위치를 가리킴
             stats_.reserve_failures.fetch_add(1, std::memory_order_relaxed);
             return std::nullopt;  // 마켓 미등록
@@ -247,11 +226,10 @@ namespace trading::allocation {
     void AccountManager::releaseWithoutToken(const std::string& market,
                                              core::Amount remaining_amount) noexcept {
         // 토큰 객체 없이 예약 해제 (락 포함, noexcept 보장)
-        // ReservationToken의 operator= 및 소멸자에서만 사용
+        // ReservationToken의 소멸자에서만 사용
         //
         // 설계 의도:
-        // - operator=와 소멸자에서는 토큰 객체를 release()에 전달할 수 없음
-        // - 따라서 마켓과 금액만으로 해제하는 별도 경로 필요
+        // - 소멸자에서는 토큰 객체를 release()에 전달할 수 없음
         // - noexcept 보장으로 소멸자와 move 연산 안전성 확보
         try {
             std::unique_lock lock(mtx_);
@@ -485,22 +463,22 @@ namespace trading::allocation {
 
         // 3단계: 코인이 없는 마켓 식별 (KRW 보유 가능 마켓)
         // coin_epsilon은 formatDecimalFloor로 인한 미세 잔량만 체크
-        std::vector<std::string> krw_markets;
+        std::vector<std::string> flat_markets;
         for (const auto& [market, budget] : budgets_) {
             if (budget.coin_balance < cfg.coin_epsilon) {
-                krw_markets.push_back(market);
+                flat_markets.push_back(market);
             }
         }
 
         // 모든 마켓이 코인 보유 중 → 정상 상태 (전량 매수 완료)
-        if (krw_markets.empty()) {
+        if (flat_markets.empty()) {
             return;
         }
 
         // 4단계: 실제 free KRW를 코인 없는 마켓에 전액 균등 분배
-        core::Amount per_market = actual_free_krw / static_cast<double>(krw_markets.size());
+        core::Amount per_market = actual_free_krw / static_cast<double>(flat_markets.size());
 
-        for (const auto& market : krw_markets) {
+        for (const auto& market : flat_markets) {
             auto it = budgets_.find(market);
             if (it != budgets_.end()) {
                 it->second.available_krw = per_market;

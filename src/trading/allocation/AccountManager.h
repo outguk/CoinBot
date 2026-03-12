@@ -100,7 +100,6 @@ namespace trading::allocation {
 
         // Move 가능
         ReservationToken(ReservationToken&& other) noexcept;
-        ReservationToken& operator=(ReservationToken&& other) noexcept;
 
         // 소멸자: active 상태면 자동 release (소멸자를 명시한다는건 수명 종료에 의미가 있다는 의미)
         ~ReservationToken();

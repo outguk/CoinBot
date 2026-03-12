@@ -100,7 +100,7 @@ void Database::open(const std::string& path)
         db_ = nullptr;
     }
 
-    // SQLite 열기 문법(실패 시 throw)
+	// SQLite 열기 문법(실패 시 throw) 파일이 없으면 생성, 존재하면 열기
     if (sqlite3_open(path.c_str(), &db_) != SQLITE_OK) 
     {
         std::string msg = db_ ? sqlite3_errmsg(db_) : "unknown";
@@ -125,6 +125,7 @@ void Database::open(const std::string& path)
     util::log().info("[DB] 열림: ", path);
 }
 
+// sql초기화, PRAGMA(옵션) 설정
 void Database::exec(const char* sql) 
 {
     char* err = nullptr;

@@ -57,6 +57,7 @@ void UpbitWebSocketClient::start()
 {
     if (thread_.joinable()) return; // 이미 실행 중
 
+    // jthread의 인자는 스레드가 실행할 함수 (class 내 this는 클래스 객체 자기자신)
     thread_ = std::jthread([this](std::stop_token stoken) {
         runReadLoop_(stoken);
     });
@@ -387,7 +388,7 @@ void UpbitWebSocketClient::runReadLoop_(std::stop_token stoken)
             continue;
         }
 
-        // [HYBRID v2 §4.1] read 전 TCP timeout 설정
+        // read 전 TCP timeout 설정
         // read 무한 블로킹 방지 → ping/command 처리 기회 보장 → 불필요한 reconnect 감소
         beast::get_lowest_layer(*ws_).expires_after(
             util::AppConfig::instance().websocket.idle_timeout);

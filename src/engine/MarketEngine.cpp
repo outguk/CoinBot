@@ -50,7 +50,7 @@ namespace engine
     {
         assertOwner_();
 
-        // 1) 주문 요청 검증
+        // 1) 주문 요청(req) 검증
         std::string reason;
         if (!validateRequest(req, reason))
             return EngineResult::Fail(EngineErrorCode::OrderRejected, reason);
@@ -63,12 +63,12 @@ namespace engine
         // 3) BUY: KRW 예약, SELL: 중복 체크
         if (req.position == core::OrderPosition::BID)
         {
-            // 중복 매수 방지 (전량 거래 모델: 동시에 1개 매수만 허용)
+            // 중복 매수 방지 매수 토큰 검증 (전량 거래 모델: 동시에 1개 매수만 허용)
             if (active_buy_token_.has_value())
                 return EngineResult::Fail(EngineErrorCode::OrderRejected,
                     "already has pending buy order for " + market_);
 
-            // 반대 포지션 방지 (전량 거래 모델: BUY/SELL 동시 불가)
+            // 반대 포지션 방지 매도 uuid 검증 (전량 거래 모델: BUY/SELL 동시 불가)
             if (!active_sell_order_uuid_.empty())
                 return EngineResult::Fail(EngineErrorCode::OrderRejected,
                     "cannot submit buy while sell order is active for " + market_);
@@ -79,7 +79,7 @@ namespace engine
                 return EngineResult::Fail(EngineErrorCode::InsufficientFunds,
                     "reserve failed for " + market_);
 
-            active_buy_token_ = std::move(*token);
+            active_buy_token_.emplace(std::move(*token));
             // order_uuid는 아직 모름 (주문 성공 후 저장)
         }
         else // ASK
@@ -98,10 +98,11 @@ namespace engine
         // 4) 거래소 주문 발송 (SharedOrderApi, variant(order_uuid or RestError) 반환)
         auto result = api_.postOrder(req);
 
+		// 주문 실패 시 처리: BUY 토큰 해제 + 실패 반환
         if (std::holds_alternative<api::rest::RestError>(result))
         {
             // 주문 실패 시 BUY 토큰 자동 해제
-            if (req.position == core::OrderPosition::BID && active_buy_token_.has_value())
+            if (req.position == core::OrderPosition::BID)
             {
                 account_mgr_.release(std::move(*active_buy_token_));
                 active_buy_token_.reset();
@@ -113,21 +114,11 @@ namespace engine
                 "postOrder failed: " + err.message);
         }
 
+		// uuid 처리
         const std::string& order_uuid = std::get<std::string>(result);
-        if (order_uuid.empty())
-        {
-            // 매도 시는 토큰을 사용하지 않음
-            if (req.position == core::OrderPosition::BID && active_buy_token_.has_value())
-            {
-                account_mgr_.release(std::move(*active_buy_token_));
-                active_buy_token_.reset();
-                active_buy_order_uuid_.clear();
-            }
-            return EngineResult::Fail(EngineErrorCode::InternalError, "postOrder returned empty order_uuid");
-        }
 
         // BID 주문 성공 시 order_uuid 저장 (토큰과 연결)
-        if (req.position == core::OrderPosition::BID && active_buy_token_.has_value())
+        if (req.position == core::OrderPosition::BID)
             active_buy_order_uuid_ = order_uuid;
 
         // ASK 주문 성공 시 order_uuid 저장 (중복 방지용)
@@ -186,7 +177,7 @@ namespace engine
 
         // identifier 확인 (EngineFillEvent 발행용)
         std::optional<std::string> id = t.identifier;
-        if (!id.has_value() && ordOpt.has_value())
+        if (!id.has_value())
             id = ordOpt->identifier;
 
         // 2) EngineFillEvent 발행
@@ -206,7 +197,6 @@ namespace engine
         if (t.side == core::OrderPosition::BID)
         {
             // 매수 체결: 현재 활성 토큰이 이 주문과 연결되었는지 검증
-            // 리스크 1 해결: MyTrade를 먼저 처리하므로 토큰이 살아있음
             if (active_buy_token_.has_value() && active_buy_order_uuid_ == t.order_uuid)
             {
                 const core::Amount executed_krw = t.executed_funds + t.fee;
@@ -293,16 +283,11 @@ namespace engine
         if (!snapshot.market.empty() && snapshot.market != market_)
             return;
 
-		// 바로 체결되어 store에 없으면 그냥 데이터 그래도 넣고 종료
+		// 바로 체결되어 store에 없으면 그냥 데이터 넣고 종료
         auto ordOpt = store_.get(snapshot.id);
         if (!ordOpt.has_value())
         {
-            // 이미 터미널 상태면 저장 의미 없음 (erase 대상 주문이 아니므로 skip)
-            const bool isAlreadyTerminal = (snapshot.status == core::OrderStatus::Filled
-                || snapshot.status == core::OrderStatus::Canceled
-                || snapshot.status == core::OrderStatus::Rejected);
-            if (!isAlreadyTerminal)
-                store_.upsert(snapshot);
+			// store에 없는 주문은 이 엔진이 제출한 주문이 아닐 가능성이 높음 (외부 주문 또는 store 누락)
             return;
         }
 
@@ -358,6 +343,7 @@ namespace engine
 
         if (isTerminal)
         {
+			// 동일 종결 상태 업데이트는 무시 (이벤트 중복 방지)
             if (o.status != old_status)
             {
                 if (o.identifier.has_value() && !o.identifier->empty())
@@ -416,7 +402,7 @@ namespace engine
         return store_.get(order_uuid);
     }
 
-    // ========== validateRequest (RealOrderEngine과 동일) ==========
+    // ========== validateRequest ==========
     bool MarketEngine::validateRequest(const core::OrderRequest& req, std::string& reason) noexcept
     {
         if (req.market.empty())
@@ -517,7 +503,7 @@ namespace engine
     // order_uuid: 토큰과 연결된 주문 ID (검증용)
     void MarketEngine::finalizeBuyToken_(std::string_view order_uuid)
     {
-        // 이중 검증: 토큰 존재 + order_uuid 일치
+        // 이중 검증: 토큰 존재 유뮤 + order_uuid 일치
         if (!active_buy_token_.has_value())
             return;
 
