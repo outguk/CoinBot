@@ -141,7 +141,7 @@ MarketEngineManager::MarketEngineManager(
             });
         }
 
-        // StartupRecovery: 미체결 취소 + 포지션 복구
+        // StartupRecovery: 미체결 취소 + 내부 전략 포지션 복구
         recoverMarketState_(*ctx);
 
         logger.info("[MarketEngineManager] Context created for market=", market);
@@ -226,6 +226,7 @@ void MarketEngineManager::stop()
     logger.info("[MarketEngineManager] All workers stopped");
 }
 
+// 계좌 동기화를 통한 AccountManager 구축
 // ========== rebuildAccountOnStartup_ ==========
 bool MarketEngineManager::rebuildAccountOnStartup_(bool throw_on_fail)
 {
@@ -239,7 +240,7 @@ bool MarketEngineManager::rebuildAccountOnStartup_(bool throw_on_fail)
         {
             account_mgr_.rebuildFromAccount(std::get<core::Account>(result));
 
-logger.info("[MarketEngineManager] Account synced (attempt ", attempt, ")");
+            logger.info("[MarketEngineManager] Account synced (attempt ", attempt, ")");
             return true;
         }
 
@@ -263,6 +264,7 @@ logger.info("[MarketEngineManager] Account synced (attempt ", attempt, ")");
     return false;
 }
 
+// 각 마켓 컨텍스트의 전략 상태 복구: 미체결 주문 취소 + 내부 포지션 재구성
 // ========== recoverMarketState_ ==========
 void MarketEngineManager::recoverMarketState_(MarketContext& ctx)
 {
@@ -330,15 +332,16 @@ void MarketEngineManager::workerLoop_(MarketContext& ctx, std::stop_token stoken
             // 큐에서 이벤트 대기 (종료 반응성/CPU 균형값)
             auto maybe = ctx.event_queue.pop_for(50ms);
 
+            // 1. 컨텍스트의 이벤트 큐에서 이벤트 처리
             if (maybe.has_value())
                 handleOne_(ctx, *maybe);
 
-            // 엔진이 쌓아둔 이벤트를 전략으로 전달
+            // 2. 이후 엔진이 쌓아둔 이벤트를 전략으로 전달
             auto out = ctx.engine->pollEvents();
             if (!out.empty())
                 handleEngineEvents_(ctx, out);
 
-            // Pending 상태 타임아웃 감시
+            // 3. Pending 상태 타임아웃 감시
             checkPendingTimeout_(ctx);
         }
         catch (const std::exception& e)
@@ -362,8 +365,10 @@ void MarketEngineManager::workerLoop_(MarketContext& ctx, std::stop_token stoken
 void MarketEngineManager::handleOne_(MarketContext& ctx,
     const engine::input::EngineInput& in)
 {
+    // in으로 들어온 variant에 따라 x에 적절한 타입을 넣어서 람다에서 타입별로 분기
     std::visit([&](const auto& x)
     {
+        // x의 타입 이름을 T로 뽑아두는 코드
         using T = std::decay_t<decltype(x)>;
 
         if constexpr (std::is_same_v<T, engine::input::MyOrderRaw>)
@@ -386,6 +391,7 @@ void MarketEngineManager::handleMyOrder_(MarketContext& ctx,
 {
     auto& logger = util::Logger::instance();
 
+	// 0) JSON 파싱 (초기 방어선)
     const nlohmann::json j = nlohmann::json::parse(raw.json, nullptr, false);
     if (j.is_discarded())
     {
@@ -446,6 +452,7 @@ void MarketEngineManager::handleMyOrder_(MarketContext& ctx,
 
             bool reconcile_ok = true;
 
+            // 만약 이번 이벤트가 부분체결없이 바로 완료되었다면, 정산 누락
             if (!has_trade && isTerminal)
             {
                 logger.info("[Manager][", ctx.market,
@@ -525,7 +532,7 @@ void MarketEngineManager::handleMarketData_(MarketContext& ctx,
     // 동일 분봉 업데이트는 최신값으로 덮어쓰고,
     // 다음 분봉이 도착하면 이전 분봉을 "확정 close"로 처리한다.
 
-    // [Fix 3] mark price를 항상 최신 intrabar close로 갱신하고,
+    // mark price를 항상 최신 intrabar close로 갱신하고,
     // InPosition 상태에서 stop/target 도달 시 즉시 시장가 매도를 제출하는 헬퍼.
     // submit 성공/실패 여부와 무관하게 mark price는 intrabar close로 유지된다.
     auto doIntrabarCheck = [&](double intrabar_close)
@@ -567,7 +574,7 @@ void MarketEngineManager::handleMarketData_(MarketContext& ctx,
         }
     };
 
-    // [Fix 1] 경로 A: pending_candle이 비어 있는 첫 수신
+    // 경로 A: pending_candle이 비어 있는 첫 수신
     if (!ctx.pending_candle.has_value())
     {
         ctx.pending_candle = incoming;
@@ -575,7 +582,7 @@ void MarketEngineManager::handleMarketData_(MarketContext& ctx,
         return;
     }
 
-    // [Fix 1] 경로 B: 동일 ts 업데이트
+    // 경로 B: 동일 ts 업데이트
     if (ctx.pending_candle->start_timestamp == incoming.start_timestamp)
     {
         ctx.pending_candle = incoming;
@@ -585,9 +592,8 @@ void MarketEngineManager::handleMarketData_(MarketContext& ctx,
 
     const core::Candle candle = *ctx.pending_candle;
     ctx.pending_candle = incoming;
-
-    // 현재 구조는 단일 live unit 구독만 가정한다.
-    // 따라서 수신 type에서 해석한 unit을 이전 확정 캔들에도 그대로 적용한다.
+    
+	// db에 확정된 캔들 기록 (중복은 DB에서 무시)
     if (db_) db_->insertCandle(ctx.market, candle, live_unit);
 
     logger.info("[Manager][", ctx.market, "][Candle] ts=",
@@ -640,7 +646,7 @@ void MarketEngineManager::handleMarketData_(MarketContext& ctx,
         }
     }
 
-    // [Fix 1] 경로 C: 새 분봉의 첫 close도 intrabar 체크
+    // 경로 C: 새 분봉의 첫 close도 intrabar 체크
     // (onCandle이 이미 PendingExit로 전이했다면 doIntrabarCheck 내부 guard에서 noAction)
     doIntrabarCheck(static_cast<double>(incoming.close_price));
 }
@@ -758,14 +764,10 @@ void MarketEngineManager::runRecovery_(MarketContext& ctx)
     {
         if (order_uuid.empty()) continue;
 
-        // 1차: getOrder(order_uuid) 직접 조회 (최대 3회 재시도)
+        // getOrder(order_uuid) 직접 조회 (최대 3회 재시도, 500ms 간격)
         std::optional<core::Order> order = queryOrderWithRetry_(order_uuid, 3);
 
-        // 2차 fallback: getOpenOrders에서 동일 order_uuid 탐색
-        if (!order.has_value())
-            order = findOrderInOpenOrders_(ctx.market, order_uuid);
-
-        // 3차: 모든 조회 실패 → 상태 유지, 다음 recovery 주기에서 재시도
+        // 조회 실패 → 상태 유지, 다음 recovery 주기에서 재시도
         // 오정산보다 미정산이 안전 — KRW/예약 불변식 보호
         if (!order.has_value())
         {
@@ -837,58 +839,23 @@ void MarketEngineManager::runRecovery_(MarketContext& ctx)
     ctx.pending_timeout_fired = false;
 }
 
-// getOrder 재시도 (1초 간격)
+// getOrder 재시도 (500ms 간격)
+// 불완전 스냅샷(executed_volume > 0 && executed_funds == 0)은 reconcileFromSnapshot에 위임
 std::optional<core::Order> MarketEngineManager::queryOrderWithRetry_(
     std::string_view order_uuid, int max_retries)
 {
     auto& logger = util::Logger::instance();
-
     for (int i = 1; i <= max_retries; ++i)
     {
         auto result = api_.getOrder(order_uuid);
         if (std::holds_alternative<core::Order>(result))
-        {
-            const auto order = std::get<core::Order>(result);
-
-            // 체결 수량은 있는데 체결 금액이 0이면 불완전 스냅샷일 수 있어 짧게 재조회한다.
-            const bool needs_funds_retry =
-                (order.executed_volume > 0.0 && order.executed_funds <= 0.0);
-
-            if (!needs_funds_retry || i == max_retries)
-                return order;
-
-            logger.warn("[MarketEngineManager] getOrder incomplete funds (attempt ",
-                i, "/", max_retries, "), retrying: order_uuid=", order_uuid,
-                " executed_volume=", order.executed_volume,
-                " executed_funds=", order.executed_funds);
-
-            std::this_thread::sleep_for(std::chrono::milliseconds(200));
-            continue;
-        }
+            return std::get<core::Order>(result);
 
         const auto& err = std::get<api::rest::RestError>(result);
         logger.warn("[MarketEngineManager] getOrder failed (attempt ",
             i, "/", max_retries, "): ", err.message);
-
         if (i < max_retries)
-            std::this_thread::sleep_for(std::chrono::seconds(1));
-    }
-    return std::nullopt;
-}
-
-// getOpenOrders에서 특정 order_uuid 탐색
-std::optional<core::Order> MarketEngineManager::findOrderInOpenOrders_(
-    std::string_view market, std::string_view order_uuid)
-{
-    auto result = api_.getOpenOrders(market);
-    if (!std::holds_alternative<std::vector<core::Order>>(result))
-        return std::nullopt;
-
-    const auto& orders = std::get<std::vector<core::Order>>(result);
-    for (const auto& o : orders)
-    {
-        if (o.id == order_uuid)
-            return o;
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
     return std::nullopt;
 }

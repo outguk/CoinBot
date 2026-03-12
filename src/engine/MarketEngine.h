@@ -45,7 +45,7 @@ namespace engine
         // WS 체결 이벤트 (AccountManager finalizeFill* 호출)
         void onMyTrade(const core::MyTrade& t);
 
-        // 주문 상태만 업데이트 (REST 폴링 등)
+        // 주문 상태만 업데이트 (REST 폴링 등) 현재 사용 x
         void onOrderStatus(std::string_view order_uuid, core::OrderStatus s);
 
         // WS/REST 스냅샷 동기화 (터미널 시 토큰 정리)
@@ -57,7 +57,7 @@ namespace engine
         // 주문 조회
         std::optional<core::Order> get(std::string_view order_uuid) const;
 
-        // 현재 활성 pending 주문 ID 반환 (복구 시 조회 대상 결정용)
+        // 현재 활성 pending 주문 ID 반환 (복구 시 접수중인 주문 조회 대상 결정용)
         struct PendingIds {
             std::string buy_order_uuid;
             std::string sell_order_uuid;

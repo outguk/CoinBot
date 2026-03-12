@@ -152,10 +152,6 @@ private:
     std::optional<core::Order> queryOrderWithRetry_(
         std::string_view order_uuid, int max_retries);
 
-    // 복구 헬퍼: getOpenOrders에서 특정 주문 탐색
-    std::optional<core::Order> findOrderInOpenOrders_(
-        std::string_view market, std::string_view order_uuid);
-
     // Pending 상태 타임아웃 감시 (workerLoop_ 내에서 매 반복마다 호출)
     void checkPendingTimeout_(MarketContext& ctx);
 
