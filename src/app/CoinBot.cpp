@@ -14,6 +14,7 @@
 #include <chrono>
 #include <csignal>
 #include <cstdlib>
+#include <filesystem>
 #include <iostream>
 #include <optional>
 #include <sstream>
@@ -219,6 +220,9 @@ static int run(const std::string& access_key,
         engine_mgr.requestReconnectRecovery();
     });
     ws_private.setFatalCallback(onWsFatal);  // 비정상 종료 콜백을 start() 전 등록
+    // Private WS는 주문 이벤트가 없으면 ~120s 후 서버가 끊는다 — 30s 텍스트 하트비트로 방지
+    ws_private.setHeartbeatMode(api::ws::UpbitWebSocketClient::HeartbeatMode::UpbitTextPing);
+    ws_private.setHeartbeatInterval(std::chrono::seconds(30));
     ws_private.connectPrivate("api.upbit.com", "443", "/websocket/v1/private", ws_bearer);
     ws_private.subscribeMyOrder(markets, true);
 
@@ -254,6 +258,28 @@ static int run(const std::string& access_key,
 int main()
 {
     auto& logger = util::Logger::instance();
+
+    // ---- 작업 디렉토리 설정 (Windows 개발 환경) ----
+    // 실행 파일이 out/build/<preset>/ 아래에 있어 db/ 경로가 틀릴 수 있으므로
+    // 실행 파일 위치에서 상위로 올라가며 db/ 폴더가 있는 디렉토리를 CWD로 설정한다.
+    // Linux(systemd) 환경은 WorkingDirectory로 CWD가 이미 올바르게 설정되므로 스킵.
+#ifdef _WIN32
+    {
+        char* pgm = nullptr;
+        _get_pgmptr(&pgm);
+        if (pgm) {
+            namespace fs = std::filesystem;
+            auto dir = fs::path(pgm).parent_path();
+            while (dir != dir.parent_path()) {
+                if (fs::exists(dir / "db")) {
+                    fs::current_path(dir);
+                    break;
+                }
+                dir = dir.parent_path();
+            }
+        }
+    }
+#endif
 
     // ---- 시그널 등록 ----
     std::signal(SIGINT,  onSignal);

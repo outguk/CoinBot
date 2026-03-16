@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <boost/asio/ssl/host_name_verification.hpp>
 #include <chrono>
-#include <iostream>
 #include <random>
 #include <sstream>
 #include <thread>
@@ -11,6 +10,7 @@
 #include "UpbitWebSocketClient.h"
 #include <json.hpp>
 #include "util/Config.h"
+#include "util/Logger.h"
 
 namespace api::ws {
 
@@ -153,6 +153,27 @@ void UpbitWebSocketClient::resetStream()
 {
     ws_ = std::make_unique<WsStream>(ioc_, ssl_ctx_);
 
+    // ping/pong 제어 프레임을 로그로 남겨 실제 keepalive 동작 여부를 진단한다.
+    ws_->control_callback(
+        [](websocket::frame_type kind, beast::string_view payload)
+        {
+            auto& logger = util::Logger::instance();
+            switch (kind)
+            {
+            case websocket::frame_type::ping:
+                logger.debug("[WS] control frame: ping payload=", std::string(payload));
+                break;
+            case websocket::frame_type::pong:
+                logger.debug("[WS] control frame: pong payload=", std::string(payload));
+                break;
+            case websocket::frame_type::close:
+                logger.info("[WS] control frame: close payload=", std::string(payload));
+                break;
+            default:
+                break;
+            }
+        });
+
     websocket::stream_base::timeout opt{};
     opt.handshake_timeout = std::chrono::seconds(30);
     // idle_timeout 제거: io_context 미실행 환경에서 동작하지 않으며
@@ -166,11 +187,11 @@ bool UpbitWebSocketClient::sendTextFrame(const std::string& text)
     if (!ws_ || !ws_->is_open()) return false;
 
     boost::system::error_code ec;
-    ws_->text(true);
-    ws_->write(boost::asio::buffer(text), ec);
+	ws_->text(true);     // 보낼 메시지가 텍스트임을 명시 (JSON 프레임)
+    ws_->write(boost::asio::buffer(text), ec); // 실제 전송
 
     if (ec) {
-        std::cout << "[WS] write error: " << ec.message() << "\n";
+        util::Logger::instance().error("[WS] write error: ", ec.message());
         return false;
     }
     return true;
@@ -178,9 +199,9 @@ bool UpbitWebSocketClient::sendTextFrame(const std::string& text)
 
 std::chrono::milliseconds UpbitWebSocketClient::computeReconnectDelay_()
 {
-    const std::uint32_t f   = reconnect_failures_;
-    const std::uint32_t exp = std::min<std::uint32_t>(f > 0 ? (f - 1) : 0, 10);
-    const long long base_ms = reconnect_min_backoff_.count() * (1LL << exp);
+    const std::uint32_t f        = reconnect_failures_;
+    const std::uint32_t backoff_exp = std::min<std::uint32_t>(f > 0 ? (f - 1) : 0, 10);
+    const long long base_ms      = reconnect_min_backoff_.count() * (1LL << backoff_exp);
     const long long capped  = std::min<long long>(base_ms, reconnect_max_backoff_.count());
 
     const double j  = std::max(0.0, reconnect_jitter_ratio_);
@@ -200,8 +221,8 @@ bool UpbitWebSocketClient::reconnectOnce_(std::stop_token stoken)
     ++reconnect_failures_;
 
     const auto delay = computeReconnectDelay_();
-    std::cout << "[WS] reconnect attempt=" << reconnect_failures_
-              << " sleep=" << delay.count() << "ms\n";
+    util::Logger::instance().info("[WS] reconnect attempt=", reconnect_failures_,
+                                  " sleep=", delay.count(), "ms");
 
     // 긴 backoff 중에도 stop 요청을 짧게 체크
     auto remaining = delay;
@@ -225,9 +246,9 @@ bool UpbitWebSocketClient::reconnectOnce_(std::stop_token stoken)
 
     if (ok) {
         reconnect_failures_ = 0;
-        std::cout << "[WS] reconnect success\n";
+        util::Logger::instance().info("[WS] reconnect success");
     } else {
-        std::cout << "[WS] reconnect failed (will backoff)\n";
+        util::Logger::instance().warn("[WS] reconnect failed (will backoff)");
     }
     return ok;
 }
@@ -237,7 +258,7 @@ void UpbitWebSocketClient::resubscribeAll()
     for (const auto& [key, frame] : last_sub_frames_)
         (void)sendTextFrame(frame);
 
-    std::cout << "[WS] resubscribe done. count=" << last_sub_frames_.size() << "\n";
+    util::Logger::instance().info("[WS] resubscribe done. count=", last_sub_frames_.size());
 }
 
 void UpbitWebSocketClient::connectImpl(
@@ -246,54 +267,63 @@ void UpbitWebSocketClient::connectImpl(
     const std::string& target,
     std::optional<std::string> bearer_jwt)
 {
+    // 재연결용 상태 저장
     host_       = host;
     port_       = port;
     target_     = target;
     bearer_jwt_ = std::move(bearer_jwt);
 
+    // 스트림 새로 생성
     resetStream();
 
     boost::system::error_code ec;
 
+    // 1. DNS 해석
     auto results = resolver_.resolve(host, port, ec);
-    std::cout << "[WS] resolve: " << (ec ? ec.message() : "OK") << "\n";
+    util::Logger::instance().info("[WS] resolve: ", (ec ? ec.message() : "OK"));
     if (ec) return;
 
+    // 2. TCP 연결 (TLS 핸드셰이크 전에 SNI 설정 필요)
     beast::get_lowest_layer(*ws_).connect(results, ec);
-    std::cout << "[WS] tcp connect: " << (ec ? ec.message() : "OK") << "\n";
+    util::Logger::instance().info("[WS] tcp connect: ", (ec ? ec.message() : "OK"));
     if (ec) return;
 
+    // 3. SNI 설정 : TLS 핸드셰이크 전에 서버에 호스트명 전달 (인증서 선택, 위조 방지)
     if (!SSL_set_tlsext_host_name(ws_->next_layer().native_handle(), host.c_str())) {
-        std::cout << "[WS] SNI: FAIL\n";
+        util::Logger::instance().error("[WS] SNI: FAIL");
         return;
     }
-    std::cout << "[WS] SNI: OK\n";
+    util::Logger::instance().info("[WS] SNI: OK");
 
-    // TLS 인증서의 호스트명이 실제 접속 대상과 일치하는지 검증한다.
+    // 4. TLS 인증서의 호스트명이 실제 접속 대상과 일치하는지 검증한다.
     ws_->next_layer().set_verify_callback(boost::asio::ssl::host_name_verification(host));
 
+    // 5. TLS 핸드셰이크
     ws_->next_layer().handshake(boost::asio::ssl::stream_base::client, ec);
-    std::cout << "[WS] tls handshake: " << (ec ? ec.message() : "OK") << "\n";
+    util::Logger::instance().info("[WS] tls handshake: ", (ec ? ec.message() : "OK"));
     if (ec) return;
 
+    // 6. private 연결 시 헤더 생성 및 삽입
     applyAuthorizationDecorator(*ws_, bearer_jwt_);
 
+    // 7. WebSocket 핸드셰이크 (HTTP Upgrade)
     ws_->handshake(host, target, ec);
-    std::cout << "[WS] ws handshake: " << (ec ? ec.message() : "OK") << "\n";
+    util::Logger::instance().info("[WS] ws handshake: ", (ec ? ec.message() : "OK"));
     if (ec) return;
 
-    std::cout << "[WS] Connected"
-              << (bearer_jwt_.has_value() ? " (private)" : " (public)") << "\n";
+    util::Logger::instance().info("[WS] Connected",
+                                  (bearer_jwt_.has_value() ? " (private)" : " (public)"));
 }
 
 // ========== 수신 루프 (jthread 진입점) ==========
-
 void UpbitWebSocketClient::runReadLoop_(std::stop_token stoken)
 {
     using namespace std::chrono_literals;
 
-    beast::flat_buffer buffer;
-    auto next_ping = std::chrono::steady_clock::now() + ping_interval_;
+    beast::flat_buffer buffer; // WS read 결과를 담는 버퍼
+    const auto loop_start = std::chrono::steady_clock::now();
+    auto next_ping    = loop_start + ping_interval_;
+    auto next_text_hb = loop_start + heartbeat_interval_;
 
     // max_reconnect_attempts 초과 시 루프를 정상 종료하기 위한 플래그
     const int max_reconnects =
@@ -312,8 +342,8 @@ void UpbitWebSocketClient::runReadLoop_(std::stop_token stoken)
         if (max_reconnects > 0 &&
             reconnect_failures_ >= static_cast<std::uint32_t>(max_reconnects))
         {
-            std::cout << "[WS] max reconnect attempts (" << max_reconnects
-                      << ") reached, stopping\n";
+            util::Logger::instance().error("[WS] max reconnect attempts (", max_reconnects,
+                                           ") reached, stopping");
             give_up = true;
             if (fatal_cb_) fatal_cb_();
         }
@@ -343,7 +373,7 @@ void UpbitWebSocketClient::runReadLoop_(std::stop_token stoken)
                         sc->is_only_snapshot, sc->is_only_realtime, sc->format);
                     last_sub_frames_[sc->type] = frame;
                     (void)sendTextFrame(frame);
-                    std::cout << "[WS] Candle subscribe sent: " << sc->type << "\n";
+                    util::Logger::instance().info("[WS] Candle subscribe sent: ", sc->type);
                     continue;
                 }
                 if (auto* sm = std::get_if<CmdSubMyOrder>(&c)) {
@@ -352,7 +382,7 @@ void UpbitWebSocketClient::runReadLoop_(std::stop_token stoken)
                         ticket, sm->markets, sm->is_only_realtime, sm->format);
                     last_sub_frames_["myOrder"] = frame;
                     (void)sendTextFrame(frame);
-                    std::cout << "[WS] MyOrder subscribe sent\n";
+                    util::Logger::instance().info("[WS] MyOrder subscribe sent");
                     continue;
                 }
             }
@@ -360,30 +390,45 @@ void UpbitWebSocketClient::runReadLoop_(std::stop_token stoken)
 
         if (stoken.stop_requested()) break;
 
-        // 2) ping
+        // 2) keepalive
+        //    - 컨트롤 ping : 죽은 TCP 연결 감지 (NAT 무음 드롭 등)
+        //    - 텍스트 PING : Upbit 앱 레벨 idle 차단 (120s 무연결 시 EOF 방지)
         const auto now = std::chrono::steady_clock::now();
-        if (now >= next_ping) {
-            next_ping = now + ping_interval_;
-            if (ws_ && ws_->is_open()) {
+        if (ws_ && ws_->is_open()) {
+            if (now >= next_ping) {
+                next_ping = now + ping_interval_;
                 boost::system::error_code ec;
                 ws_->ping({}, ec);
-                if (ec) {
-                    std::cout << "[WS] ping error: " << ec.message() << "\n";
+                if (!ec)
+                    util::Logger::instance().debug("[WS] ping sent");
+                else {
+                    util::Logger::instance().error("[WS] ping error: ", ec.message());
                     if (!stoken.stop_requested())
                         doReconnect();
                 }
             }
+            if (heartbeat_mode_ == HeartbeatMode::UpbitTextPing && now >= next_text_hb) {
+                next_text_hb = now + heartbeat_interval_;
+                if (!sendTextFrame("PING")) {
+                    util::Logger::instance().warn("[WS] text heartbeat send failed, reconnecting");
+                    doReconnect();
+                } else {
+                    util::Logger::instance().info("[WS] text heartbeat sent: PING");
+                }
+            }
         }
+
         // fatal 상태로 전환됐으면 같은 반복에서 read/reconnect로 내려가지 않는다.
         if (give_up) break;
 
-        // 3) read
+        // 3) read 전 점검
         if (!ws_ || !ws_->is_open()) {
             // host_가 있으면 이전에 연결됐다가 끊긴 것 → 재연결
             // host_가 없으면 아직 connect 커맨드 전 → 대기
             if (!host_.empty() && !stoken.stop_requested())
                 doReconnect();
             else
+                // 지금은 재연결 불가하니 잠깐 대기하고 다음 루프로 넘김
                 std::this_thread::sleep_for(50ms);
             continue;
         }
@@ -403,16 +448,17 @@ void UpbitWebSocketClient::runReadLoop_(std::stop_token stoken)
             if (ec == boost::asio::error::operation_aborted || stoken.stop_requested())
                 break;
 
-            // [HYBRID v2 §4.1] timeout은 정상 wake-up으로 처리 (reconnect 사유 아님)
+            // timeout은 정상 wake-up으로 처리 (reconnect 사유 아님)
             if (ec == beast::error::timeout ||
                 ec == boost::asio::error::timed_out)
                 continue;
 
-            std::cout << "[WS] read error: " << ec.message() << "\n";
+            util::Logger::instance().error("[WS] read error: ", ec.message());
             doReconnect();
             continue;
         }
 
+        // 수신 메시지 처리
         const std::string msg = beast::buffers_to_string(buffer.data());
 
         // 캔들 메시지는 동일 ts로 반복 업데이트가 자주 와서 로그 생략
@@ -422,8 +468,21 @@ void UpbitWebSocketClient::runReadLoop_(std::stop_token stoken)
 
         if (!is_candle) {
             constexpr std::size_t kMaxLog = 200;
-            if (msg.size() <= kMaxLog) std::cout << "[WS] RX: " << msg << "\n";
-            else                       std::cout << "[WS] RX: " << msg.substr(0, kMaxLog) << "...\n";
+            if (msg.size() <= kMaxLog) util::Logger::instance().debug("[WS] RX: ", msg);
+            else                       util::Logger::instance().debug("[WS] RX: ", msg.substr(0, kMaxLog), "...");
+        }
+
+        // Upbit 텍스트 하트비트 응답 {"status":"UP"} 필터 — 도메인 메시지 아님
+        // 부분 문자열 검색은 다른 payload와 오탐 가능성이 있으므로 JSON으로 정확히 확인
+        if (msg.find("\"status\"") != std::string::npos) {
+            try {
+                const auto j = nlohmann::json::parse(msg);
+                if (j.is_object() &&
+                    j.value("status", "") == "UP") {
+                    util::Logger::instance().debug("[WS] heartbeat ack: status=UP");
+                    continue;
+                }
+            } catch (...) { /* 파싱 실패 시 일반 메시지로 처리 */ }
         }
 
         if (on_msg_)
@@ -434,7 +493,7 @@ void UpbitWebSocketClient::runReadLoop_(std::stop_token stoken)
     if (!stoken.stop_requested() && ws_ && ws_->is_open()) {
         boost::system::error_code ignore;
         ws_->close(websocket::close_code::normal, ignore);
-        std::cout << "[WS] closed: " << (ignore ? ignore.message() : "OK") << "\n";
+        util::Logger::instance().info("[WS] closed: ", (ignore ? ignore.message() : "OK"));
     }
 }
 
@@ -457,9 +516,11 @@ std::string UpbitWebSocketClient::buildCandleSubJsonFrame(
     bool is_only_realtime,
     const std::string& format)
 {
+    // 구독 본문
     nlohmann::json root = nlohmann::json::array();
     root.push_back({ {"ticket", ticket} });
 
+    // 구독 내용
     nlohmann::json body;
     body["type"]              = type;
     body["codes"]             = markets;
