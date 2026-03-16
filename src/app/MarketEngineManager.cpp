@@ -5,17 +5,13 @@
 #include "app/StartupRecovery.h"
 
 #include <chrono>
-#include <charconv>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
 #include <thread>
 #include <variant>
 
-#include <json.hpp>
-
-#include "api/upbit/mappers/MyOrderMapper.h"
-#include "api/upbit/mappers/CandleMapper.h"
+#include "api/upbit/WsMessageParser.h"
 #include "util/Config.h"
 #include "util/Logger.h"
 
@@ -51,24 +47,6 @@ namespace {
                 oss << "<UNKNOWN_SIZE>";
             return oss.str();
         }, size);
-    }
-
-    std::optional<int> parseMinuteCandleUnit(std::string_view type) noexcept
-    {
-        constexpr std::string_view prefix = "candle.";
-        if (!type.starts_with(prefix) || type.size() <= prefix.size() + 1)
-            return std::nullopt;
-
-        if (type.back() != 'm')
-            return std::nullopt;
-
-        const std::string_view number = type.substr(prefix.size(), type.size() - prefix.size() - 1);
-        int unit = 0;
-        const auto [ptr, ec] = std::from_chars(number.data(), number.data() + number.size(), unit);
-        if (ec != std::errc{} || ptr != number.data() + number.size() || unit <= 0)
-            return std::nullopt;
-
-        return unit;
     }
 
 } // anonymous namespace
@@ -391,29 +369,9 @@ void MarketEngineManager::handleMyOrder_(MarketContext& ctx,
 {
     auto& logger = util::Logger::instance();
 
-	// 0) JSON 파싱 (초기 방어선)
-    const nlohmann::json j = nlohmann::json::parse(raw.json, nullptr, false);
-    if (j.is_discarded())
-    {
-        logger.error("[MarketEngineManager][", ctx.market, "] myOrder JSON parse failed");
-        return;
-    }
-
-    // 1) JSON -> DTO
-    api::upbit::dto::UpbitMyOrderDto dto{};
-    try
-    {
-        dto = j.get<api::upbit::dto::UpbitMyOrderDto>();
-    }
-    catch (const std::exception& e)
-    {
-        logger.error("[MarketEngineManager][", ctx.market,
-            "] myOrder dto convert failed: ", e.what());
-        return;
-    }
-
-    // 2) DTO -> (Order snapshot, MyTrade) 이벤트 분해
-    const auto events = api::upbit::mappers::toEvents(dto);
+    // 0~2) JSON 파싱 + DTO 변환 + 도메인 이벤트 분해를 파사드에 위임
+    const auto events = api::upbit::ws::parseMyOrder(raw.json, ctx.market);
+    if (events.empty()) return;
 
     // 3) MyTrade 존재 여부 사전 확인 (done-only(바로체결) 감지용)
     bool has_trade = false;
@@ -491,43 +449,12 @@ void MarketEngineManager::handleMarketData_(MarketContext& ctx,
 {
     auto& logger = util::Logger::instance();
 
-    const nlohmann::json j = nlohmann::json::parse(raw.json, nullptr, false);
-    if (j.is_discarded())
-    {
-        logger.error("[MarketEngineManager][", ctx.market, "] MarketData JSON parse failed");
-        return;
-    }
-
-    // candle 타입만 처리
-    const std::string type = j.value("type", "");
-    if (type.rfind("candle", 0) != 0)
-        return;
-
+    // 0~2) JSON 파싱 + 타입 확인 + DTO 변환 + 도메인 매핑을 파사드에 위임
     const int configured_unit = util::AppConfig::instance().bot.live_candle_unit_minutes;
-    const auto parsed_unit = parseMinuteCandleUnit(type);
-    const int live_unit = parsed_unit.value_or(configured_unit);
-    if (!parsed_unit.has_value())
-    {
-        logger.warn("[MarketEngineManager][", ctx.market,
-            "] candle type unit parse failed, fallback to configured unit: type=",
-            type, " configured_unit=", configured_unit);
-    }
-
-    // 1) JSON -> Candle DTO
-    api::upbit::dto::CandleDto_Minute candleDto{};
-    try
-    {
-        candleDto = j.get<api::upbit::dto::CandleDto_Minute>();
-    }
-    catch (const std::exception& e)
-    {
-        logger.error("[MarketEngineManager][", ctx.market,
-            "] candle dto convert failed: ", e.what());
-        return;
-    }
-
-    // 2) DTO -> core::Candle
-    const core::Candle incoming = api::upbit::mappers::toDomain(candleDto);
+    const auto result = api::upbit::ws::parseCandle(raw.json, configured_unit, ctx.market);
+    if (!result.has_value()) return;
+    const core::Candle incoming = result->candle;
+    const int live_unit = result->unit_minutes;
 
     // 동일 분봉 업데이트는 최신값으로 덮어쓰고,
     // 다음 분봉이 도착하면 이전 분봉을 "확정 close"로 처리한다.

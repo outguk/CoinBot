@@ -1,14 +1,15 @@
-#pragma once
-#include <string>
+﻿#pragma once
 #include <optional>
+#include <string>
+#include <string_view>
 #include <variant>
 #include <vector>
 
-#include "../src/core/domain/Account.h"
-#include "../src/api/auth/UpbitJwtSigner.h"
-#include "../src/api/rest/RestClient.h"
-#include "../src/core/domain/Order.h"
-#include "../src/core/domain/OrderRequest.h"
+#include "api/auth/UpbitJwtSigner.h"
+#include "api/rest/RestClient.h"
+#include "core/domain/Account.h"
+#include "core/domain/Order.h"
+#include "core/domain/OrderRequest.h"
 
 
 namespace api::rest {
@@ -31,7 +32,7 @@ namespace api::rest {
             cancelOrder(const std::optional<std::string>& order_uuid,
                 const std::optional<std::string>& identifier);
 
-        // [HYBRID v2 §4.4] GET /v1/order?uuid=...
+        // GET /v1/order?uuid=...
         // - 단건 주문 조회 (reconnect 복구용)
         std::variant<core::Order, api::rest::RestError>
             getOrder(std::string_view order_uuid);

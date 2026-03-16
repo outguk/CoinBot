@@ -106,7 +106,7 @@ void Database::open(const std::string& path)
         std::string msg = db_ ? sqlite3_errmsg(db_) : "unknown";
         sqlite3_close(db_);
         db_ = nullptr;
-        throw std::runtime_error("[DB] open 실패: " + msg);
+        throw std::runtime_error("[DB] open failed: " + msg);
     }
 
     // WAL 모드: Streamlit 읽기와 봇 쓰기 비차단
@@ -122,7 +122,7 @@ void Database::open(const std::string& path)
         db_ = nullptr;
         throw;
     }
-    util::log().info("[DB] 열림: ", path);
+    util::log().info("[DB] opened: ", path);
 }
 
 // sql초기화, PRAGMA(옵션) 설정
@@ -134,7 +134,7 @@ void Database::exec(const char* sql)
     {
         std::string msg = err ? err : "unknown";
         sqlite3_free(err);
-        throw std::runtime_error(std::string("[DB] exec 실패: ") + msg);
+        throw std::runtime_error(std::string("[DB] exec failed: ") + msg);
     }
 }
 
@@ -166,7 +166,7 @@ void Database::initSchema()
 
     if (!has_unit)
     {
-        util::log().info("[DB] candles 마이그레이션: unit 컬럼 추가 및 UNIQUE(market,ts,unit) 재설정");
+        util::log().info("[DB] candles migration: unit 컬럼 추가 및 UNIQUE(market,ts,unit) 재설정");
         exec("BEGIN;");
         exec(R"SQL(
             CREATE TABLE candles_new (
@@ -202,7 +202,7 @@ int64_t Database::normalizeToEpochMs(const std::string& s)
         int64_t val = 0;
         auto [ptr, ec] = std::from_chars(s.data(), s.data() + s.size(), val);
         if (ec == std::errc{}) return val;
-        util::log().warn("[DB] created_at 숫자 파싱 실패: ", s);
+        util::log().warn("[DB] created_at number parse failed: ", s);
         return 0;
     }
 
@@ -211,7 +211,7 @@ int64_t Database::normalizeToEpochMs(const std::string& s)
     if (sscanf(s.c_str(), "%d-%d-%dT%d:%d:%d",
                &year, &mon, &day, &hour, &min, &sec) != 6)
     {
-        util::log().warn("[DB] created_at ISO8601 파싱 실패: ", s);
+        util::log().warn("[DB] created_at ISO8601 parse failed: ", s);
         return 0;
     }
 
@@ -244,7 +244,7 @@ int64_t Database::normalizeToEpochMs(const std::string& s)
 #endif
     if (epoch_sec < 0)
     {
-        util::log().warn("[DB] created_at UTC 변환 실패: ", s);
+        util::log().warn("[DB] created_at UTC conversion failed: ", s);
         return 0;
     }
 
@@ -256,7 +256,7 @@ int64_t Database::normalizeToEpochMs(const std::string& s)
 bool Database::insertCandle(const std::string& market, const core::Candle& c, int unit) 
 {
     if (!db_) {
-        util::log().warn("[DB] insertCandle: DB가 열려 있지 않음");
+        util::log().warn("[DB] insertCandle: DB is not open");
         return false;
     }
 
@@ -272,7 +272,7 @@ bool Database::insertCandle(const std::string& market, const core::Candle& c, in
     // SQL 문자열을 파싱/컴파일해서 stmt 객체를 만든다
     if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK)
     {
-        util::log().warn("[DB] insertCandle prepare 실패: ", sqlite3_errmsg(db_));
+        util::log().warn("[DB] insertCandle prepare failed: ", sqlite3_errmsg(db_));
         return false;
     }
 
@@ -288,7 +288,7 @@ bool Database::insertCandle(const std::string& market, const core::Candle& c, in
 
     // step을 통해 실행한다
     const bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
-    if (!ok) util::log().warn("[DB] insertCandle step 실패: ", sqlite3_errmsg(db_));
+    if (!ok) util::log().warn("[DB] insertCandle step failed: ", sqlite3_errmsg(db_));
 
 	// stmt 객체를 해제한다 (메모리 누수 방지)
     sqlite3_finalize(stmt);
@@ -301,7 +301,7 @@ bool Database::insertOrder(const core::Order& o)
 {
     if (!db_) 
     {
-        util::log().warn("[DB] insertOrder: DB가 열려 있지 않음");
+        util::log().warn("[DB] insertOrder: DB is not open");
         return false;
     }
 
@@ -319,7 +319,7 @@ bool Database::insertOrder(const core::Order& o)
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) 
     {
-        util::log().warn("[DB] insertOrder prepare 실패: ", sqlite3_errmsg(db_));
+        util::log().warn("[DB] insertOrder prepare failed: ", sqlite3_errmsg(db_));
         return false;
     }
 
@@ -352,7 +352,7 @@ bool Database::insertOrder(const core::Order& o)
     sqlite3_bind_int64 (stmt, 13, created_ms);
 
     const bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
-    if (!ok) util::log().warn("[DB] insertOrder step 실패: ", sqlite3_errmsg(db_));
+    if (!ok) util::log().warn("[DB] insertOrder step failed: ", sqlite3_errmsg(db_));
 
     sqlite3_finalize(stmt);
     return ok;
@@ -364,7 +364,7 @@ bool Database::insertSignal(const trading::SignalRecord& sig)
 {
     if (!db_) 
     {
-        util::log().warn("[DB] insertSignal: DB가 열려 있지 않음");
+        util::log().warn("[DB] insertSignal: DB is not open");
         return false;
     }
 
@@ -377,7 +377,7 @@ bool Database::insertSignal(const trading::SignalRecord& sig)
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK)
     {
-        util::log().warn("[DB] insertSignal prepare 실패: ", sqlite3_errmsg(db_));
+        util::log().warn("[DB] insertSignal prepare failed: ", sqlite3_errmsg(db_));
         return false;
     }
 
@@ -407,7 +407,7 @@ bool Database::insertSignal(const trading::SignalRecord& sig)
     sqlite3_bind_int64(stmt, 14, sig.ts_ms);
 
     const bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
-    if (!ok) util::log().warn("[DB] insertSignal step 실패: ", sqlite3_errmsg(db_));
+    if (!ok) util::log().warn("[DB] insertSignal step failed: ", sqlite3_errmsg(db_));
 
     sqlite3_finalize(stmt);
     return ok;

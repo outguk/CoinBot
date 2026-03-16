@@ -160,13 +160,19 @@ namespace util
             // 콘솔 출력
             if (console_enabled_)
             {
-                std::cout << message << std::flush;
+                if (level >= LogLevel::WARN)
+                    std::cout << message << std::flush;
+                else
+                    std::cout << message;
             }
 
             // 파일 출력
             if (file_stream_.is_open())
             {
-                file_stream_ << message << std::flush;
+                if (level >= LogLevel::WARN)
+                    file_stream_ << message << std::flush;
+                else
+                    file_stream_ << message;
             }
 
         }

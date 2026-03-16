@@ -1,13 +1,16 @@
 ﻿#include "UpbitExchangeRestClient.h"
 
+#include <algorithm>
 #include <json.hpp>
 #include <sstream>
 #include <iomanip>
-#include <iostream>
+
+#include "util/Logger.h"
 
 #include "api/upbit/dto/UpbitAssetOrderDtos.h"
 #include "api/upbit/mappers/AccountMapper.h"
 #include "api/upbit/mappers/OpenOrdersMapper.h"
+#include "util/UrlCodec.h"
 
 /*
 * UpbitExchangeRestClient.cpp
@@ -24,6 +27,12 @@
 namespace api::rest {
 
     namespace {
+        struct OrderPayloadFields
+        {
+            std::optional<std::string> price_field;
+            std::optional<std::string> volume_field;
+        };
+
         inline bool isSuccessStatus(int status) noexcept { return status >= 200 && status <= 299; }
 
         inline std::string bodySnippet(const std::string& body, std::size_t maxLen = 256) {
@@ -49,6 +58,15 @@ namespace api::rest {
             return e;
         }
 
+        inline RestError makeInvalidArgumentError(std::string_view message)
+        {
+            RestError e{};
+            e.code = RestErrorCode::InvalidArgument;
+            e.http_status = 0;
+            e.message = std::string(message);
+            return e;
+        }
+
 
         // --------------------------------------
         // encode, decode
@@ -59,39 +77,12 @@ namespace api::rest {
             std::string hash; // JWT의 query_hash를 만들 입력 문자열 용도 (인코딩 결과를 다시 percent-decode 해서 “인코딩되지 않은 형태”로 맞춤)
         };
 
-        inline std::string urlEncode(std::string_view s)
-        {
-            std::ostringstream oss;
-            oss << std::uppercase << std::hex;
-
-            for (unsigned char c : std::string(s))
-            {
-                const bool unreserved =
-                    (c >= 'A' && c <= 'Z') ||
-                    (c >= 'a' && c <= 'z') ||
-                    (c >= '0' && c <= '9') ||
-                    c == '-' || c == '_' || c == '.' || c == '~';
-
-                if (unreserved)
-                {
-                    oss << static_cast<char>(c);
-                }
-                else
-                {
-                    oss << '%'
-                        << std::setw(2) << std::setfill('0')
-                        << static_cast<int>(c);
-                }
-            }
-            return oss.str();
-        }
-
         inline void appendQueryParam(std::string& q, std::string_view key, std::string_view value)
         {
             if (!q.empty()) q.push_back('&');
             q.append(key);
             q.push_back('=');
-            q.append(urlEncode(value));
+            q.append(util::url::encodeComponent(value));
         }
 
 
@@ -112,56 +103,31 @@ namespace api::rest {
         //   전송 문자열(예: %3A)과 서버가 재구성하는 파라미터 문자열(예: :)의
         //   표현이 달라질 수 있어 invalid_query_payload(401)가 발생할 수 있다.
         // --------------------------------------
-        inline int fromHex_(char c) noexcept
-        {
-            if (c >= '0' && c <= '9') return c - '0';
-            if (c >= 'A' && c <= 'F') return 10 + (c - 'A');
-            if (c >= 'a' && c <= 'f') return 10 + (c - 'a');
-            return -1;
-        }
-
-        inline std::string percentDecodeForHash(std::string_view s)
-        {
-            // 주의: '+' -> 공백 변환은 하지 않는다.
-            //       (우리 urlEncode는 공백도 %20으로 보내며, '+'를 만들지 않는다)
-            std::string out;
-            out.reserve(s.size());
-
-            for (std::size_t i = 0; i < s.size(); ++i)
-            {
-                const char c = s[i];
-                if (c == '%' && i + 2 < s.size())
-                {
-                    const int hi = fromHex_(s[i + 1]);
-                    const int lo = fromHex_(s[i + 2]);
-                    if (hi >= 0 && lo >= 0)
-                    {
-                        out.push_back(static_cast<char>((hi << 4) | lo));
-                        i += 2;
-                        continue;
-                    }
-                }
-                out.push_back(c);
-            }
-
-            return out;
-        }
-
+        // GET/DELETE 호출 사이트용: braced-init({ {"key", sv} }) 패턴
+        // 모든 원소가 lvalue(string_view 파라미터 또는 const string& 역참조)이므로 dangling 없음
         inline QueryStrings makeQueryStrings(
             std::initializer_list<std::pair<std::string_view, std::string_view>> items)
         {
             QueryStrings qs{};
             qs.encoded.reserve(128);
-
             for (const auto& kv : items)
-            {
                 appendQueryParam(qs.encoded, kv.first, kv.second);
-            }
-
-            // query_hash는 "디코딩된 형태"를 입력으로 사용
-            qs.hash = percentDecodeForHash(qs.encoded);
+            qs.hash = util::url::decodePercent(qs.encoded);
             return qs;
         }
+
+        // postOrder 전용: 조건부로 구성된 vector (소유된 string, dangling 없음)
+        inline QueryStrings makeQueryStrings(
+            const std::vector<std::pair<std::string, std::string>>& items)
+        {
+            QueryStrings qs{};
+            qs.encoded.reserve(128);
+            for (const auto& kv : items)
+                appendQueryParam(qs.encoded, kv.first, kv.second);
+            qs.hash = util::url::decodePercent(qs.encoded);
+            return qs;
+        }
+
         inline std::string toUpbitSide(core::OrderPosition p)
         {
             return (p == core::OrderPosition::BID) ? "bid" : "ask";
@@ -203,6 +169,67 @@ namespace api::rest {
             // "0"이나 "" 방지
             if (s.empty()) s = "0";
             return s;
+        }
+
+        std::variant<OrderPayloadFields, RestError> buildOrderPayloadFields(
+            const core::OrderRequest& request, std::string_view ord_type)
+        {
+            // 주문 타입별 검증과 문자열 포맷을 한 곳에 모아 postOrder 본문을 단순하게 유지한다.
+            OrderPayloadFields fields;
+
+            if (ord_type == "limit")
+            {
+                if (!request.price.has_value())
+                {
+                    return makeInvalidArgumentError("postOrder: limit order requires price");
+                }
+
+                if (!std::holds_alternative<core::VolumeSize>(request.size))
+                {
+                    return makeInvalidArgumentError("postOrder: limit order requires VolumeSize");
+                }
+
+                const double volume = std::get<core::VolumeSize>(request.size).value;
+                if (volume <= 0.0)
+                {
+                    return makeInvalidArgumentError("postOrder: limit volume must be > 0");
+                }
+
+                fields.price_field = formatDecimalFloor(*request.price, 0);
+                fields.volume_field = formatDecimalFloor(volume, 8);
+                return fields;
+            }
+
+            if (ord_type == "price")
+            {
+                if (!std::holds_alternative<core::AmountSize>(request.size))
+                {
+                    return makeInvalidArgumentError("postOrder: ord_type=price requires AmountSize");
+                }
+
+                const double amount = std::get<core::AmountSize>(request.size).value;
+                if (amount <= 0.0)
+                {
+                    return makeInvalidArgumentError("postOrder: amount must be > 0");
+                }
+
+                fields.price_field = formatDecimalFloor(amount, 0);
+                return fields;
+            }
+
+            if (!std::holds_alternative<core::VolumeSize>(request.size))
+            {
+                return makeInvalidArgumentError("postOrder: ord_type=market requires VolumeSize");
+            }
+
+            const double volume = std::get<core::VolumeSize>(request.size).value;
+            if (volume <= 0.0)
+            {
+                return makeInvalidArgumentError("postOrder: volume must be > 0");
+            }
+
+            fields.volume_field = formatDecimalFloor(volume, 8);
+            return fields;
         }
     } // namespace
 
@@ -362,11 +389,7 @@ namespace api::rest {
     {
         // Upbit: uuid 또는 identifier 중 하나는 필수
         if (!order_uuid.has_value() && !identifier.has_value()) {
-            RestError e{};
-            e.code = RestErrorCode::InvalidArgument;
-            e.http_status = 0;
-            e.message = "cancelOrder requires order_uuid or identifier";
-            return e;
+            return makeInvalidArgumentError("cancelOrder requires order_uuid or identifier");
         }
 
         // query 생성: uuid 우선, 없으면 identifier
@@ -406,113 +429,27 @@ namespace api::rest {
     std::variant<std::string, api::rest::RestError>
         UpbitExchangeRestClient::postOrder(const core::OrderRequest& reqIn)
     {
-        // 케이스 C: 실제로 POST가 아예 실행되지 않았는지 확인(이 로그 나타나면 실행된거
-        std::cout << "[REST][postOrder] ENTER market=" << reqIn.market
-            << " type=" << static_cast<int>(reqIn.type)
-            //<< " ident=" << reqIn.identifier
-            << "\n";
+        // 주문 파라미터를 먼저 남겨두면 실거래 실패 시 어떤 요청이 나갔는지 추적하기 쉽다.
+        util::Logger::instance().debug("[REST][postOrder] ENTER market=", reqIn.market,
+                                       " type=", static_cast<int>(reqIn.type));
 
         // 0) 입력 검증 (실거래에서 가장 취약한 부분이 입력 값 오류로 인한 BadRequest)
         if (reqIn.market.empty())
         {
-            RestError e{};
-            e.code = RestErrorCode::InvalidArgument;
-            e.http_status = 0;
-            e.message = "postOrder: market is empty";
-            return e;
+            return makeInvalidArgumentError("postOrder: market is empty");
         }
 
         // 1) 주문 필드 계산
         const std::string side = toUpbitSide(reqIn.position);
         const std::string ordType = toUpbitOrdType(reqIn);
-        std::optional<std::string> price_field;
-        std::optional<std::string> volume_field;
-
-        // 2) 주문 타입 별 필수 필드
-        // - limit  : price + volume
-        // - price  : (market buy) price=KRW amount, volume omitted
-        // - market : (market sell) volume=coin amount, price omitted
-        if (ordType == "limit")
+        // 거래소 호출 전에 필수 필드를 검증해 Bad Request를 조기에 차단한다.
+        const auto payload_fields_result = buildOrderPayloadFields(reqIn, ordType);
+        if (std::holds_alternative<RestError>(payload_fields_result))
         {
-            if (!reqIn.price.has_value())
-            {
-                RestError e{};
-                e.code = RestErrorCode::InvalidArgument;
-                e.http_status = 0;
-                e.message = "postOrder: limit order requires price";
-                return e;
-            }
-
-            if (!std::holds_alternative<core::VolumeSize>(reqIn.size))
-            {
-                RestError e{};
-                e.code = RestErrorCode::InvalidArgument;
-                e.http_status = 0;
-                e.message = "postOrder: limit order requires VolumeSize";
-                return e;
-            }
-
-            const auto vol = std::get<core::VolumeSize>(reqIn.size).value;
-            if (vol <= 0.0)
-            {
-                RestError e{};
-                e.code = RestErrorCode::InvalidArgument;
-                e.http_status = 0;
-                e.message = "postOrder: limit volume must be > 0";
-                return e;
-            }
-
-            price_field = formatDecimalFloor(*reqIn.price, 0);
-            volume_field = formatDecimalFloor(vol, 8);
+            return std::get<RestError>(payload_fields_result);
         }
-        else if (ordType == "price")
-        {
-            // market buy by KRW amount
-            if (!std::holds_alternative<core::AmountSize>(reqIn.size))
-            {
-                RestError e{};
-                e.code = RestErrorCode::InvalidArgument;
-                e.http_status = 0;
-                e.message = "postOrder: ord_type=price requires AmountSize";
-                return e;
-            }
-
-            const auto amount = std::get<core::AmountSize>(reqIn.size).value;
-            if (amount <= 0.0)
-            {
-                RestError e{};
-                e.code = RestErrorCode::InvalidArgument;
-                e.http_status = 0;
-                e.message = "postOrder: amount must be > 0";
-                return e;
-            }
-
-            price_field = formatDecimalFloor(amount, 0);
-        }
-        else // ordType == "market"
-        {
-            // market sell by volume
-            if (!std::holds_alternative<core::VolumeSize>(reqIn.size))
-            {
-                RestError e{};
-                e.code = RestErrorCode::InvalidArgument;
-                e.http_status = 0;
-                e.message = "postOrder: ord_type=market requires VolumeSize";
-                return e;
-            }
-
-            const auto vol = std::get<core::VolumeSize>(reqIn.size).value;
-            if (vol <= 0.0)
-            {
-                RestError e{};
-                e.code = RestErrorCode::InvalidArgument;
-                e.http_status = 0;
-                e.message = "postOrder: volume must be > 0";
-                return e;
-            }
-
-            volume_field = formatDecimalFloor(vol, 8);
-        }
+        const OrderPayloadFields payload_fields =
+            std::get<OrderPayloadFields>(payload_fields_result);
 
         // 3) JSON body 구성 (현재 Upbit 공식 문서 기준: 주문 생성은 JSON body 사용)
         nlohmann::json jsonBody;
@@ -523,22 +460,32 @@ namespace api::rest {
         if (!reqIn.identifier.empty())
             jsonBody["identifier"] = reqIn.identifier;
 
-        if (price_field.has_value())
-            jsonBody["price"] = *price_field;
-        if (volume_field.has_value())
-            jsonBody["volume"] = *volume_field;
+        if (payload_fields.price_field.has_value())
+            jsonBody["price"] = *payload_fields.price_field;
+        if (payload_fields.volume_field.has_value())
+            jsonBody["volume"] = *payload_fields.volume_field;
 
         // query_hash 입력 문자열은 body 파라미터와 완전히 동일해야 한다.
-        // JSON body를 만든 동일 객체에서 query string을 생성해 순서 불일치를 방지한다.
-        std::string q;
-        q.reserve(256);
-        for (const auto& [k, v] : jsonBody.items())
-        {
-            if (v.is_string())
-                appendQueryParam(q, k, v.get_ref<const std::string&>());
-            else
-                appendQueryParam(q, k, v.dump());
-        }
+        std::vector<std::pair<std::string, std::string>> params;
+        params.reserve(6);
+        params.emplace_back("market", reqIn.market);
+        params.emplace_back("side", side);
+        params.emplace_back("ord_type", ordType);
+        if (!reqIn.identifier.empty())
+            params.emplace_back("identifier", reqIn.identifier);
+        if (payload_fields.price_field.has_value())
+            params.emplace_back("price", *payload_fields.price_field);
+        if (payload_fields.volume_field.has_value())
+            params.emplace_back("volume", *payload_fields.volume_field);
+
+		// 파라미터 순서 고정: query_hash 계산을 위해 키 기준으로 정렬
+        auto hash_params = params;
+        std::sort(hash_params.begin(), hash_params.end(),
+                  [](const auto& lhs, const auto& rhs) {
+                      return lhs.first < rhs.first;
+                  });
+
+        const auto qs = makeQueryStrings(hash_params);
 
         // 4) HTTP request
         api::rest::HttpRequest http;
@@ -549,30 +496,25 @@ namespace api::rest {
 
         http.headers.emplace("Accept", "application/json");
         http.headers.emplace("Content-Type", "application/json; charset=utf-8");
-        // JWT query_hash는 "percent-decode된 query_string"을 입력으로 사용해야 한다.
-        // q 문자열(key=value&...)은 query_hash 계산용으로만 유지
-        const std::string q_hash = percentDecodeForHash(q);
-        http.headers.emplace("Authorization", signer_.makeBearerToken(q_hash));
+        // Authorization은 body와 동일한 파라미터 집합으로 계산한 query_hash를 사용한다.
+        http.headers.emplace("Authorization", signer_.makeBearerToken(qs.hash));
 
         // body는 JSON으로 전송
         http.body = jsonBody.dump();
 
         // 요청이 어떤 ord_type/size로 만들어졌는지 확인
-        std::cout << "[UpbitExchangeRestClient][postOrder] REQ target=" << http.target
-            << " body=" << http.body
-            << "\n";
+        util::Logger::instance().debug("[REST][postOrder] REQ target=", http.target,
+                                       " body=", http.body);
 
         auto r = rest_.perform(http);
 
         if (std::holds_alternative<api::rest::RestError>(r))
         {
             const auto& e = std::get<api::rest::RestError>(r);
-            std::cout << "[UpbitExchangeRestClient][postOrder] PERFORM FAIL restCode="
-                << static_cast<int>(e.code)
-                << " http=" << e.http_status
-                << " msg=" << e.message
-                << "\n";
-
+            util::Logger::instance().error("[REST][postOrder] PERFORM FAIL restCode=",
+                                           static_cast<int>(e.code),
+                                           " http=", e.http_status,
+                                           " msg=", e.message);
             return std::get<api::rest::RestError>(r);
         }
 
@@ -580,11 +522,8 @@ namespace api::rest {
         const auto& resp = std::get<api::rest::HttpResponse>(r);
         if (!isSuccessStatus(resp.status))
         {
-            std::cout << "[UpbitExchangeRestClient][postOrder] HTTP REJECT status="
-                << resp.status
-                << " body=" << resp.body.substr(0, 400)
-                << "\n";
-
+            util::Logger::instance().error("[REST][postOrder] HTTP REJECT status=", resp.status,
+                                           " body=", resp.body.substr(0, 400));
             return makeHttpStatusError(resp.status, "Upbit POST /v1/orders", resp.body);
         }
 

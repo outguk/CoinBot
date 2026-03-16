@@ -1,7 +1,8 @@
 #include "app/StartupRecovery.h"
 
 #include <algorithm>
-#include <iostream>
+
+#include "util/Logger.h"
 
 namespace app {
 
@@ -35,14 +36,14 @@ namespace app {
             const StartupRecovery::Options& opt)
         {
             if (opt.bot_identifier_prefix.empty()) {
-                std::cout << "[Startup][Warn] bot_identifier_prefix is empty. skip cancel.\n";
+                util::Logger::instance().warn("[Startup] bot_identifier_prefix is empty. skip cancel.");
                 return;
             }
 
             auto r = api.getOpenOrders(market);
             if (std::holds_alternative<api::rest::RestError>(r)) {
                 const auto& e = std::get<api::rest::RestError>(r);
-                std::cout << "[Startup][Warn] getOpenOrders failed: " << e.message << "\n";
+                util::Logger::instance().warn("[Startup] getOpenOrders failed: ", e.message);
                 return;
             }
 
@@ -72,12 +73,12 @@ namespace app {
 
                 if (ok) {
                     ++cancel_count;
-                    std::cout << "[Startup] cancel ok: order_uuid=" << o.id
-                        << " identifier=" << *o.identifier << "\n";
+                    util::Logger::instance().info("[Startup] cancel ok: order_uuid=", o.id,
+                                                  " identifier=", *o.identifier);
                 }
                 else {
-                    std::cout << "[Startup][Warn] cancel failed: order_uuid=" << o.id
-                        << " identifier=" << *o.identifier << "\n";
+                    util::Logger::instance().warn("[Startup] cancel failed: order_uuid=", o.id,
+                                                  " identifier=", *o.identifier);
                 }
             }
 
@@ -98,10 +99,10 @@ namespace app {
                 if (!anyBotRemain)
                     break;
 
-                std::cout << "[Startup] bot open orders remain. re-check #" << (v + 1) << "\n";
+                util::Logger::instance().info("[Startup] bot open orders remain. re-check #", (v + 1));
             }
 
-            std::cout << "[Startup] cancelBotOpenOrders done. cancel_count=" << cancel_count << "\n";
+            util::Logger::instance().info("[Startup] cancelBotOpenOrders done. cancel_count=", cancel_count);
         }
 
         template <class ApiT>
@@ -112,7 +113,7 @@ namespace app {
             auto ar = api.getMyAccount();
             if (std::holds_alternative<api::rest::RestError>(ar)) {
                 const auto& e = std::get<api::rest::RestError>(ar);
-                std::cout << "[Startup][Warn] getMyAccount failed: " << e.message << "\n";
+                util::Logger::instance().warn("[Startup] getMyAccount failed: ", e.message);
                 return pos;
             }
 
@@ -122,7 +123,7 @@ namespace app {
             const std::string_view unit = unitCurrencyImpl(market);
 
             if (base.empty() || unit.empty()) {
-                std::cout << "[Startup][Warn] invalid market format: " << market << "\n";
+                util::Logger::instance().warn("[Startup] invalid market format: ", market);
                 return pos;
             }
 
@@ -136,9 +137,9 @@ namespace app {
                 }
             }
 
-            std::cout << "[Startup] PositionSnapshot: coin=" << pos.coin
-                << " avg_entry_price=" << pos.avg_entry_price
-                << " (market=" << market << ")\n";
+            util::Logger::instance().info("[Startup] PositionSnapshot: coin=", pos.coin,
+                                          " avg_entry_price=", pos.avg_entry_price,
+                                          " (market=", market, ")");
 
             return pos;
         }

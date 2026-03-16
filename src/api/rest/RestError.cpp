@@ -1,5 +1,6 @@
-﻿#include <ostream>
 #include "RestError.h"
+
+#include <ostream>
 
 namespace api::rest {
 
@@ -16,7 +17,7 @@ namespace api::rest {
 		case RestErrorCode::BadStatus:         return os << "BadStatus";
 		case RestErrorCode::InvalidArgument:   return os << "InvalidArgument";
 		case RestErrorCode::ParseError:        return os << "ParseError";
-		case RestErrorCode::Unknown:            return os << "Unknown";
+		case RestErrorCode::Unknown:           return os << "Unknown";
 		default:                               return os << "Unknown";
 		}
 	}

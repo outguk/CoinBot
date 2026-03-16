@@ -1,10 +1,7 @@
 ﻿#pragma once
 
-#include <string>
-
-#include "../src/api/upbit/dto/UpbitQuotationDtos.h"
-#include "../src/core/domain/Candle.h"
-#include "TimeFrameMapper.h"
+#include "api/upbit/dto/UpbitQuotationDtos.h"
+#include "core/domain/Candle.h"
 
 namespace api::upbit::mappers
 {
@@ -26,16 +23,4 @@ namespace api::upbit::mappers
 
 		return c;
 	}
-
-	// 캔들 + 타임프레임
-	/*inline core::CandleWithTimeFrame toDomainWithTimeFrame(
-		const dto::CandleDto_Minute& d,
-		int unit) noexcept
-	{
-		core::CandleWithTimeFrame out;
-		out.candle = toDomain(d);
-		out.unit_minutes = unit;
-		out.c_info = toTimeFrameFromMinuteUnit(unit);
-		return out;
-	}*/
 }

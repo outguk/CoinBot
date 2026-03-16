@@ -1,44 +1,37 @@
 ﻿#pragma once
+#include <chrono>
+#include <variant>
+
+#include <boost/asio/io_context.hpp>
+#include <boost/asio/ssl/context.hpp>
+
 #include "HttpTypes.h"
 #include "RestError.h"
 #include "RetryPolicy.h"
 
-#include <boost/asio/io_context.hpp>
-#include <boost/asio/ssl/context.hpp>
-#include <variant>
-#include <chrono>
-
-/*
-* RestClient.h
-* RestClient의 공용 인터페이스
-* 
-*/
-
+// 동기 HTTPS 호출과 재시도 정책 적용을 캡슐화한다.
+// 호출자는 HttpRequest만 구성하고, 실패는 RestError로 일관되게 받는다.
 
 namespace api::rest
 {
-	// 요청에 성공하면 HttpResponse, 실패 시 RestError
-	// - 예외를 남발하지 않고 호출자가 분기 처리 가능
+	// 예외 대신 성공/실패를 같은 반환 경로로 묶어 호출부 분기를 단순하게 한다.
 	using Result = std::variant< HttpResponse, RestError>;
 
 	class RestClient
 	{
 	public:
-		// io_context/ssl_context는 앱에서 1개를 만들고 공유하는 구조가 보통 안정적
-		// &를 통해 사용만하고 소유 x
+		// io_context와 ssl_context는 외부가 수명을 관리하고 RestClient는 재사용만 한다.
 		RestClient(boost::asio::io_context& ioc,
 			boost::asio::ssl::context& ssl_ctx);
 
-		// perform - 재시도를 포함한 "고수준" 호출
-		// RetryPolicy를 파라미터로 받아 호출마다 다르게 적용 가능
+		// perform은 1회 호출과 재시도 정책 적용을 함께 처리한다.
 		Result perform(const HttpRequest& req, const RetryPolicy& retry = RetryPolicy{}) const;
 
 	private:
-		// performOnce - 재시도 없는 1회 시도
-		// - 실제 HTTPS 요청/응답 처리의 핵심
+		// performOnce는 재시도 없이 HTTPS 요청 1회를 수행한다.
 		Result performOnce(const HttpRequest& req) const;
 
-		// 재시도 판단 로직 분리 (가독성/테스트성↑)
+		// 재시도 판단을 분리해 호출 흐름과 정책을 따로 읽을 수 있게 한다.
 		static bool shouldRetryStatus(int status, const RetryPolicy& p) noexcept;
 		static bool shouldRetryError(const RestError& e, const RetryPolicy& p) noexcept;
 		static std::chrono::milliseconds nextDelay(std::chrono::milliseconds cur, double mult) noexcept;

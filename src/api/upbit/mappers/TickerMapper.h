@@ -1,9 +1,7 @@
 ﻿#pragma once
 
-#include <string>
-
-#include "../src/api/upbit/dto/UpbitQuotationDtos.h"
-#include "../src/core/domain/Ticker.h"
+#include "api/upbit/dto/UpbitQuotationDtos.h"
+#include "core/domain/Ticker.h"
 
 namespace api::upbit::mappers
 {

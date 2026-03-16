@@ -102,7 +102,7 @@ namespace trading::strategies {
         // DB 기록용 콜백 등록 (MarketEngineManager에서 주입)
         // BUY: PendingEntry→InPosition 확정 시 호출
         // SELL: PendingExit→Flat(완전) 또는 PendingExit→InPosition(부분) 확정 시 호출
-        void setSignalCallback(trading::SignalCallback fn) { signal_callback_ = std::move(fn); }
+        void setSignalCallback(trading::SignalHandler fn) { signal_callback_ = std::move(fn); }
 
         // 테스트/리셋
         void reset();
@@ -165,7 +165,7 @@ namespace trading::strategies {
         Snapshot signal_snapshot_{};
 
         // DB 신호 콜백 (MarketEngineManager가 등록, 없으면 no-op)
-        trading::SignalCallback signal_callback_{};
+        trading::SignalHandler signal_callback_{};
 
         // 같은 1분 캔들이 여러 번(업데이트 형태로) 들어오는 경우 중복 누적 방지용
         std::optional<std::string> last_candle_ts_{};

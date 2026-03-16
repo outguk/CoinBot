@@ -86,7 +86,7 @@ namespace util
     {
         // 거래할 마켓 목록
         // 환경 변수 UPBIT_MARKETS (CSV) 로 재정의 가능
-        std::vector<std::string> markets = { "KRW-ADA", "KRW-TRX", "KRW-XRP" };
+        std::vector<std::string> markets = { "KRW-ADA", "KRW-ETH", "KRW-XRP" };
 
         // 실시간 WS에서 구독할 분봉 단위 (분)
         // 현재 구조는 단일 live unit만 가정한다.

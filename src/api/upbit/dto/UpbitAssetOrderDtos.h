@@ -3,7 +3,6 @@
 #include <string>
 #include <vector>
 #include <optional>
-#include <iostream>
 #include <json.hpp>
 #include "util/JsonOptional.h"
 
@@ -294,13 +293,11 @@ namespace api::upbit::dto
 		else
 			o.executed_volume = "0";
 
-		// 누락 시 nullopt 유지하되 경고 — 정산 시 0으로 해석될 수 있음
+		// 누락을 0으로 확정하지 않고 남겨 상위 계층이 보강 여부를 판단하게 한다.
 		if (j.contains("executed_funds") && !j.at("executed_funds").is_null())
 			j.at("executed_funds").get_to(o.executed_funds);
 		else {
 			o.executed_funds.reset();
-			std::cerr << "[DTO] WARN: executed_funds missing in OrderResponseDto"
-				" uuid=" << o.uuid << "\n";
 		}
 
 		if (j.contains("reserved_fee") && !j.at("reserved_fee").is_null())
@@ -426,14 +423,11 @@ namespace api::upbit::dto
 		else
 			o.executed_volume = "0";
 
-		// executed_funds는 스펙상 존재(없을 수도 있으니 방어)
-		// 누락 시 0 치환하되 경고 — 정산 delta 계산에 영향을 줄 수 있음
+		// 이 DTO는 누락 필드를 문자열 "0"으로 정규화해 후속 매퍼 분기를 단순하게 유지한다.
 		if (j.contains("executed_funds") && !j.at("executed_funds").is_null())
 			j.at("executed_funds").get_to(o.executed_funds);
 		else {
 			o.executed_funds = "0";
-			std::cerr << "[DTO] WARN: executed_funds missing in SingleOrderResponse"
-				" uuid=" << o.uuid << "\n";
 		}
 
 		if (j.contains("reserved_fee") && !j.at("reserved_fee").is_null())

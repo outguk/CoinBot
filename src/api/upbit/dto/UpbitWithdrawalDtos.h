@@ -46,7 +46,6 @@ namespace api::upbit
 			std::string			net_type;			// 출금 네트워크 유형("ETH", "TRX")
 			std::string			network_name;		// 출금 네트워크 이름
 			std::string			withdraw_address;	// 디지털 자산 출금 시 수신 주소(등록된 주소만 사용 가능)
-			std::string			withdraw_address;	// 디지털 자산 출금 시 수신 주소(등록된 주소만 사용 가능)
 
 			std::optional<std::string>		secondary_address;			// 2차 출금 주소 (일부 디지털 자산용)
 			std::optional<std::string>		beneficiary_name;			// 수취 지갑 소유주명, 개인이면 null
