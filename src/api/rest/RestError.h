@@ -1,17 +1,14 @@
 ﻿#pragma once
-#include <string>
 #include <iosfwd>
+#include <string>
 
-/*
-* RestError.h
-* 실패를 “한 가지 타입”으로 통일해서 상위 레이어가 처리하기 쉽게 함
-* 네트워크/프로토콜 오류와 HTTP status 오류를 같은 규격으로 포장
-*/
+// Rest 계층은 실패를 이 공용 분류로 묶어 호출부 분기를 단순하게 한다.
+// 원본 에러 문자열과 HTTP status를 함께 보관해 로그 맥락을 잃지 않게 한다.
 
 namespace api::rest
 {
 
-	// RestClinet 레벨(공통 레벨)에서 발생 가능한 오류를 분류
+	// 네트워크 실패와 프로토콜 실패를 한 enum으로 정리한다.
 
 	enum class RestErrorCode
 	{
@@ -28,13 +25,12 @@ namespace api::rest
 		Unknown					// 모르는 오류
 	};
 
-	// 오류를 표준화한 데이터 구조
-	// - 상위 계층이 "왜 실패했는지" 일관되게 처리하기 위함
+	// 호출부가 예외 없이 실패 맥락을 함께 다루도록 하는 공용 에러 타입이다.
 	struct RestError
 	{
-		RestErrorCode code = RestErrorCode::Unknown;	// Unknown으로 초기화
-		std::string	message;							// error 또는 커스텀 메시지
-		int http_status{ 0 };							// BadStatus 에서 사용
+		RestErrorCode code = RestErrorCode::Unknown;
+		std::string	message;
+		int http_status{ 0 };
 	};
 
 

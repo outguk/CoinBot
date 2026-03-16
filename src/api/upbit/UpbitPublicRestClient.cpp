@@ -1,7 +1,15 @@
 ﻿#include <algorithm>
+#include "api/upbit/UpbitPublicRestClient.h"
+
 #include <json.hpp>
 
-#include "../src/api/upbit/UpbitPublicRestClient.h"
+#include <sstream>
+
+#include "api/upbit/dto/UpbitQuotationDtos.h"
+#include "api/upbit/mappers/CandleMapper.h"
+#include "api/upbit/mappers/MarketMapper.h"
+#include "api/upbit/mappers/OrderbookMapper.h"
+#include "api/upbit/mappers/TickerMapper.h"
 
 /*
 * UpbitPublicRestClient.cpp
@@ -15,7 +23,7 @@ namespace api::upbit
 	namespace
 	{
 		// 파싱 에러와 status 성공 여부는 UpbitPublicRestClient에서 관리
-		inline bool isSuccessStatus(int status) noexcept { return (status >= 200 && status <= 299); }
+		inline bool isSuccessStatus(int status) noexcept { return status >= 200 && status <= 299; }
 
 		// 너무 긴 에러를 받을 경우 잘라서 받기 위한 snippet
 		inline std::string bodySnippet(const std::string& body, std::size_t maxLen = 256)
@@ -46,7 +54,7 @@ namespace api::upbit
 			api::rest::RestError e{};
 			e.code = api::rest::RestErrorCode::BadStatus;
 			e.http_status = status;
-			e.message = where + "failed, http = " + std::to_string(status)
+			e.message = where + " failed, http = " + std::to_string(status)
 				+ ", body = " + bodySnippet(body);
 
 			return e;
@@ -63,7 +71,7 @@ namespace api::upbit
 			api::rest::RestError e{};
 			e.code = api::rest::RestErrorCode::ParseError;
 			e.http_status = status;
-			e.message = where + "parse failed : " + what
+			e.message = where + " parse failed: " + what
 				+ ", body = " + bodySnippet(body);
 
 			return e;
@@ -79,17 +87,15 @@ namespace api::upbit
 		req.host = "api.upbit.com";
 		req.port = "443";
 		req.method = api::rest::HttpMethod::Get;
-		// 여기 오류 주의
+		// 쿼리 키 이름은 Upbit 스펙과 맞춰야 응답이 안정적으로 일치한다.
 		req.target = std::string("/v1/market/all?is_details=") + (isDetails ? "true" : "false");
 
-		// RestClient가 Host/User-Agent를 세팅하더라도 Accept는 명확히 주는게 안전 (뭔솔?)
-		// Accept는 요청 헤더(Request Header), “이 요청은 JSON 형식의 응답을 기대한다” 는 뜻
+		// 공개 API도 응답 포맷 기대치를 분명히 남긴다.
 		req.headers.emplace("Accept", "application/json");
 
 		// 2) 인프라 호출 (retry/timeout/SSL/에러표준화는 RestClient가 전담)
 		auto r = rest_.perform(req);
 
-		// 중복은 아닌지 유의
 		if (std::holds_alternative<api::rest::RestError>(r))
 		{
 			return std::get<api::rest::RestError>(r);
@@ -144,17 +150,21 @@ namespace api::upbit
 		req.port = "443";
 		req.method = api::rest::HttpMethod::Get;
 
-		// GET /v1/ticker?markets=KRW-BTC,KRW-ETH
+		// ticker API는 마켓 목록을 쉼표로 이어 붙인 한 개의 쿼리 값으로 받는다.
 		req.target = std::string("/v1/ticker?markets=") + joinMarkets(markets);
 		req.headers.emplace("Accept", "application/json");
 
 		auto r = rest_.perform(req);
 		if (std::holds_alternative<api::rest::RestError>(r))
+		{
 			return std::get<api::rest::RestError>(r);
+		}
 
 		const auto& resp = std::get<api::rest::HttpResponse>(r);
 		if (!isSuccessStatus(resp.status))
+		{
 			return makeHttpStatusError(resp.status, "Upbit GET /v1/ticker", resp.body);
+		}
 
 		nlohmann::json j;
 		try { j = nlohmann::json::parse(resp.body); }
@@ -173,7 +183,9 @@ namespace api::upbit
 		std::vector<core::Ticker> out;
 		out.reserve(dtos.size());
 		for (const auto& d : dtos)
+		{
 			out.push_back(api::upbit::mappers::toDomain(d));
+		}
 
 		return out;
 	}
@@ -196,18 +208,25 @@ namespace api::upbit
 			<< "?market=" << market
 			<< "&count=" << count;
 		if (to && !to->empty())
+		{
+			// to가 없으면 최신 구간을 조회하므로, 값이 있을 때만 쿼리에 넣는다.
 			target << "&to=" << *to;
+		}
 
 		req.target = target.str();
 		req.headers.emplace("Accept", "application/json");
 
 		auto r = rest_.perform(req);
 		if (std::holds_alternative<api::rest::RestError>(r))
+		{
 			return std::get<api::rest::RestError>(r);
+		}
 
 		const auto& resp = std::get<api::rest::HttpResponse>(r);
 		if (!isSuccessStatus(resp.status))
+		{
 			return makeHttpStatusError(resp.status, "Upbit GET /v1/candles/minutes/{unit}", resp.body);
+		}
 
 		nlohmann::json j;
 		try { j = nlohmann::json::parse(resp.body); }
@@ -226,7 +245,9 @@ namespace api::upbit
 		std::vector<core::Candle> out;
 		out.reserve(dtos.size());
 		for (const auto& d : dtos)
+		{
 			out.push_back(api::upbit::mappers::toDomain(d));
+		}
 
 		return out;
 	}
@@ -245,24 +266,32 @@ namespace api::upbit
 		std::ostringstream target;
 		target << "/v1/orderbook?markets=" + joinMarkets(markets);
 
-		// level: string (문서 기준)
+		// level은 선택 옵션이므로 기본 호가 단위를 쓰는 경우 아예 보내지 않는다.
 		if (level && !level->empty())
+		{
 			target << "&level=" << *level;
+		}
 
-		// count: int
+		// count도 생략 가능하므로 유효한 값일 때만 명시한다.
 		if (count && *count > 0)
+		{
 			target << "&count=" << *count;
+		}
 
 		req.target = target.str();
 		req.headers.emplace("Accept", "application/json");
 
 		auto r = rest_.perform(req);
 		if (std::holds_alternative<api::rest::RestError>(r))
+		{
 			return std::get<api::rest::RestError>(r);
+		}
 
 		const auto& resp = std::get<api::rest::HttpResponse>(r);
 		if (resp.status < 200 || resp.status > 299)
+		{
 			return makeHttpStatusError(resp.status, "Upbit GET /v1/orderbook", resp.body);
+		}
 
 		nlohmann::json j;
 		try { j = nlohmann::json::parse(resp.body); }
@@ -280,8 +309,10 @@ namespace api::upbit
 
 		std::vector<core::Orderbook> out;
 		out.reserve(dtos.size());
-		for (auto& d : dtos)
+		for (const auto& d : dtos)
+		{
 			out.push_back(api::upbit::mappers::toDomain(d));
+		}
 
 		return out;
 	}

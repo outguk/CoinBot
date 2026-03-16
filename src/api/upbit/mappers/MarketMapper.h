@@ -1,9 +1,7 @@
 ﻿#pragma once
 
-#include <string>
-
-#include "../src/api/upbit/dto/UpbitQuotationDtos.h"
-#include "../src/core/domain/MarketInfo.h"
+#include "api/upbit/dto/UpbitQuotationDtos.h"
+#include "core/domain/MarketInfo.h"
 
 namespace api::upbit::mappers
 {
@@ -14,9 +12,6 @@ namespace api::upbit::mappers
 		m.market = dto.market;
 		m.ko_name = dto.korean_name;
 		m.en_name = dto.english_name;
-		
-		/*m.is_warning = dto.market_event.has_value() ? dto.market_event->warning : false;*/
-
 		return m;
 	}
 }

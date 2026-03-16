@@ -163,6 +163,6 @@ namespace trading {
     };
 
     // MarketEngineManager가 등록, 전략이 상태 전이 시 호출
-    using SignalCallback = std::function<void(const SignalRecord&)>;
+    using SignalHandler = std::function<void(const SignalRecord&)>;
 
 } // namespace trading

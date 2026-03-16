@@ -3,43 +3,38 @@
 #include <map>
 #include <string>
 
-/*
-* HttpTypes.h
-* REST 호출에 필요한 요청/응답의 ‘공통 데이터 구조’를 정의
-* 어떤 API(Upbit 말고 다른 거래소 등)에도 재사용 가능하게 “범용 형태”로 유지
-*/
+// Rest 계층은 요청/응답을 이 공용 타입으로 주고받는다.
+// 거래소별 client는 값을 채우고, RestClient는 전송과 재시도를 맡는다.
 
 namespace api::rest
 {
-	// HTTP 메서드 종류 정리
+	// 전송 계층이 이해해야 하는 HTTP 메서드만 노출한다.
 	enum class HttpMethod {Get, Post, Put, Delete};
 
-	// "요청에 필요한 공통 정보"를 담는 구조체
-	// - 순수 네트워크 계층 타입
+	// 재시도와 전송 로직이 공유하는 최소 요청 정보.
 	struct HttpRequest
 	{
-		HttpMethod method{ HttpMethod::Get };		// 기본 http 요청 타입을 GET으로
+		HttpMethod method{ HttpMethod::Get };
 		
-		// 공통으로 요청하는 host/port/target을 분리
-		std::string host;							// "api.upbit.com"
-		std::string port{ "443" };					// https는 443 사용
-		std::string target;							// "/v1/ticker?markets=KRW-BTC"  (path + query)
+		std::string host;
+		std::string port{ "443" };
+		// target은 path + query만 담아 host/port 교체와 재시도 로직을 단순하게 유지한다.
+		std::string target;
 
-		// 추가 헤더 (인증 등은 상위 client에서)
+		// 인증 같은 프로토콜 세부값은 상위 client가 채운다.
 		std::map<std::string, std::string> headers;
 
-		// request body (POST/PUT에서 주로 사용, GET은 주로 빈 문자열)
 		std::string body;
 
-		// 네트워크 timeout (connect/write/read에 적용)
-		std::chrono::milliseconds timeout{ 5000 };  // 5초 (microseconds 오기 수정)
+		// 동일한 상한을 각 네트워크 단계에 적용해 동기 호출 지연을 제한한다.
+		std::chrono::milliseconds timeout{ 5000 };
 	};
 
-	// "응답 오는 공통 정보"를 담는 구조체
+	// 파싱 전 원시 응답을 그대로 보관한다.
 	struct HttpResponse
 	{
-		int status = 0;								// HTTP satus code (200, 429, 500 등)
+		int status = 0;
 		std::map<std::string, std::string> headers;
-		std::string	body;							// JSON 원문(문자열), DTO 파싱을 이걸 받아서 수행
+		std::string	body;
 	};
 }

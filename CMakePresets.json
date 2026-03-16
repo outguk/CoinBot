@@ -9,7 +9,10 @@
             "installDir": "${sourceDir}/out/install/${presetName}",
             "cacheVariables": {
                 "CMAKE_C_COMPILER": "cl.exe",
-                "CMAKE_CXX_COMPILER": "cl.exe"
+                "CMAKE_CXX_COMPILER": "cl.exe",
+                "COINBOT_BOOST_ROOT": "C:/git-repository/boost_1_89_0",
+                "COINBOT_OPENSSL_ROOT": "C:/git-repository/OpenSSL-Win64",
+                "COINBOT_NLOHMANN_DIR": "C:/git-repository/nlohmann_json"
             },
             "condition": {
                 "type": "equals",

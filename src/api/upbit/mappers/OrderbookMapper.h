@@ -1,12 +1,12 @@
 ﻿// api/upbit/mappers/OrderbookMapper.h
 #pragma once
 
-#include "../src/core/domain/Orderbook.h"
-#include "../src/api/upbit/dto/UpbitQuotationDtos.h"
+#include "api/upbit/dto/UpbitQuotationDtos.h"
+#include "core/domain/Orderbook.h"
 
 namespace api::upbit::mappers {
 
-    inline core::Orderbook toDomain(api::upbit::dto::OrderbookDto& dto)
+    inline core::Orderbook toDomain(const api::upbit::dto::OrderbookDto& dto)
     {
         core::Orderbook ob;
 

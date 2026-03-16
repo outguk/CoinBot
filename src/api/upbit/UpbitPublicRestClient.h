@@ -1,14 +1,15 @@
 ﻿#pragma once
+#include <optional>
 #include <string>
-#include <vector>
 #include <variant>
+#include <vector>
 
-#include "../src/api/rest/RestClient.h"
-//#include "../src/api/upbit/dto/UpbitQuotationDtos.h"
-#include "../src/api/upbit/mappers/MarketMapper.h"
-#include "../src/api/upbit/mappers/TickerMapper.h"
-#include "../src/api/upbit/mappers/CandleMapper.h"
-#include "../src/api/upbit/mappers/OrderbookMapper.h"
+#include "api/rest/RestError.h"
+#include "api/rest/RestClient.h"
+#include "core/domain/Candle.h"
+#include "core/domain/MarketInfo.h"
+#include "core/domain/Orderbook.h"
+#include "core/domain/Ticker.h"
 
 namespace api::upbit
 {
@@ -40,7 +41,8 @@ namespace api::upbit
 				std::optional<int> count = std::nullopt) const;
 
 	private:
-		const api::rest::RestClient rest_;
+		// RestClient의 수명은 외부가 관리한다.
+		const api::rest::RestClient& rest_;
 
 	};
 }

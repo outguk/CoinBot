@@ -1,9 +1,10 @@
-﻿#pragma once
-#include "../src/core/domain/Candle.h"
+#pragma once
+
+#include "core/domain/Candle.h"
 
 namespace api::upbit::mappers {
 
-    // 추후 day와 week으로 늘려간다
+    // 현재 WS 캔들은 minute 단위만 쓰므로 변환 범위도 minute enum으로 제한한다.
     inline core::TimeFrame toTimeFrameFromMinuteUnit(int unit)
     {
         switch (unit)
@@ -16,9 +17,6 @@ namespace api::upbit::mappers {
         case 60:  return core::TimeFrame::MIN_60;
         case 240: return core::TimeFrame::MIN_240;
         default:
-            // 프로젝트 스타일에 맞춰 처리:
-            // 1) throw 금지 선호면 기본값 선택
-            // 2) 또는 optional/expected로 위로 전파
             return core::TimeFrame::MIN_5;
         }
     }
