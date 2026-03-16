@@ -1,7 +1,7 @@
 ﻿// api/ws/UpbitWebSocketClient.h
 //
 // 업비트 WebSocket 클라이언트
-// - TLS 연결, 캔들/myOrder 구독, raw JSON 수신
+// - TLS 연결, 캔들/myOrder 구독, raw JSON EventRouter로 수신
 // - 전략/도메인 파싱은 담당하지 않음
 //
 // 생명주기: setMessageHandler → connectPublic/Private → subscribeXxx → start() → stop()
@@ -35,6 +35,7 @@ namespace api::ws
     class UpbitWebSocketClient final
     {
     public:
+        // TCP 위에 TLS를 올리고, 그 위에 WebSocket을 올린 최종 통신 객체
         using WsStream          = websocket::stream<beast::ssl_stream<beast::tcp_stream>>;
         using MessageHandler    = std::function<void(std::string_view)>; // raw JSON
         using ReconnectCallback = std::function<void()>;  // 재연결 성공 후 호출
@@ -48,14 +49,14 @@ namespace api::ws
         UpbitWebSocketClient(const UpbitWebSocketClient&) = delete;
         UpbitWebSocketClient& operator=(const UpbitWebSocketClient&) = delete;
 
-        // ---- 연결 예약 (커맨드 큐 경유, start() 전후 어느 시점에든 호출 가능) ----
+        // ---- 연결 명령 등록 API (커맨드 큐 경유, start() 전후 어느 시점에든 호출 가능) ----
 
-        // PUBLIC 채널 (캔들 등 인증 불필요)
+        // PUBLIC 채널 연결 (캔들 등 인증 불필요)
         void connectPublic(const std::string& host,
                            const std::string& port,
                            const std::string& target);
 
-        // PRIVATE 채널 (myOrder 등 JWT 인증 필요)
+        // PRIVATE 채널 연결 (myOrder 등 JWT 인증 필요)
         void connectPrivate(const std::string& host,
                             const std::string& port,
                             const std::string& target,
@@ -74,6 +75,14 @@ namespace api::ws
         void subscribeMyOrder(const std::vector<std::string>& markets,
                               bool is_only_realtime = true,
                               const std::string& format = "DEFAULT");
+
+        // ---- 애플리케이션 레벨 하트비트 ----
+
+        enum class HeartbeatMode { None, UpbitTextPing };
+
+        // start() 전에만 호출할 것 — runReadLoop_()와 데이터 레이스 방지
+        void setHeartbeatMode(HeartbeatMode mode) { heartbeat_mode_ = mode; }
+        void setHeartbeatInterval(std::chrono::seconds s) { heartbeat_interval_ = s; }
 
         // ---- 수신 콜백 ----
 
@@ -121,7 +130,7 @@ namespace api::ws
         // ws_ 생성/정리
         void resetStream();
 
-        // thread-safe send
+        // WS 스레드 전용 텍스트 프레임 송신
         bool sendTextFrame(const std::string& text);
 
         // 재연결 + 재구독
@@ -155,7 +164,8 @@ namespace api::ws
             bool is_only_realtime,
             const std::string& format);
 
-    private:
+        // ---- 멤버 변수 ----
+
         boost::asio::io_context&  ioc_;
         boost::asio::ssl::context& ssl_ctx_;
 
@@ -170,9 +180,11 @@ namespace api::ws
         // 내부 수신 스레드 (stop_token 내장)
         std::jthread thread_;
 
-        // ping 주기 / 재연결 backoff
+        // ping 주기 / 재연결 backoff / 텍스트 하트비트
         std::chrono::seconds      ping_interval_{ 25 };
-        std::chrono::milliseconds reconnect_min_backoff_{ 800 };
+        HeartbeatMode             heartbeat_mode_{ HeartbeatMode::None };
+        std::chrono::seconds      heartbeat_interval_{ 60 };
+        std::chrono::milliseconds reconnect_min_backoff_{ 500 };
         std::chrono::milliseconds reconnect_max_backoff_{ 30'000 };
         double                    reconnect_jitter_ratio_{ 0.20 };
 
