@@ -1,191 +1,159 @@
-# CoinBot
-
-![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C?style=for-the-badge&logo=c%2B%2B&logoColor=white)
-![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![CMake](https://img.shields.io/badge/CMake-064F8C?style=for-the-badge&logo=cmake&logoColor=white)
-![Boost](https://img.shields.io/badge/Boost-000000?style=for-the-badge&logo=boost&logoColor=white)
-![SQLite](https://img.shields.io/badge/SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
-![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)
+<h1 align="center">CoinBot</h1>
 
 Upbit REST/WebSocket과 직접 연결되는 C++20 기반 멀티마켓 자동매매 시스템입니다.  
-여러 마켓을 동시에 처리하면서도 각 마켓 상태는 단일 워커 스레드에 고정해 동시성 복잡도를 줄였습니다.  
-주문 제출 전 KRW를 RAII 토큰으로 예약하고, 주문 상태와 포지션 효과를 분리해 부분 체결과 이벤트 유실 상황에서도 상태 전이를 안정화했습니다.  
-재시작 시에는 봇의 미체결 주문을 취소하고 포지션만 복구하며, 런타임에서는 pending timeout과 WS 재연결 뒤 `getOrder()` 기반 복구를 수행합니다.  
-실거래 데이터는 SQLite WAL에 적재되고, Streamlit 대시보드와 Python 도구가 같은 데이터를 기반으로 분석과 백테스트를 수행합니다.
+마켓별 워커 스레드, RAII 기반 자금 예약, 주문 상태 복구, SQLite 기록, Streamlit 분석 도구까지 하나의 저장소에서 다룹니다.
 
-## 내가 해결한 문제
+## 개발 환경
 
-- 실시간 public/private WebSocket 이벤트를 함께 처리하면서도, 마켓별 상태는 순차적으로 다루는 구조가 필요했습니다.
-- 주문 제출, 부분 체결, 취소, WS 유실, 재연결 같은 상황에서도 자금 정합성이 무너지지 않아야 했습니다.
-- 봇 실행 자체에서 끝나지 않고, 실거래 데이터를 누적해 운영 분석과 전략 검증까지 이어지는 흐름이 필요했습니다.
+### Language
+![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C?style=for-the-badge&logo=c%2B%2B&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
 
-## 핵심 설계 포인트
+### Build & Runtime
+![CMake](https://img.shields.io/badge/CMake-064F8C?style=for-the-badge&logo=cmake&logoColor=white)
+![MSVC](https://img.shields.io/badge/MSVC-5C2D91?style=for-the-badge&logo=visualstudio&logoColor=white)
+![Ninja](https://img.shields.io/badge/Ninja-000000?style=for-the-badge&logo=ninja&logoColor=white)
+![Boost](https://img.shields.io/badge/Boost-000000?style=for-the-badge&logo=boost&logoColor=white)
+![OpenSSL](https://img.shields.io/badge/OpenSSL-721412?style=for-the-badge&logo=openssl&logoColor=white)
 
-- **Exchange Integration Layer**: `UpbitJwtSigner -> RestClient -> UpbitExchangeRestClient -> SharedOrderApi`로 외부 거래소 연동을 분리했습니다.
-- **Market-Per-Worker Concurrency**: `MarketEngineManager`가 마켓당 하나의 `std::jthread`를 소유하고, `EventRouter -> BlockingQueue -> worker` 흐름으로 입력을 분배합니다.
-- **RAII ReservationToken**: 매수 전 KRW를 예약하고, 주문 실패/취소 시 자동 반환되도록 자금 흐름을 토큰 수명과 연결했습니다.
-- **PositionEffect 기반 상태 전이**: `Filled/Canceled` 같은 거래소 상태 이름과 실제 포지션 변화를 분리해 전략 상태를 더 안전하게 확정합니다.
-- **Recovery + Persistence**: 시작 복구, 런타임 복구, SQLite WAL 기록, Streamlit/백테스트 도구를 하나의 운영 흐름으로 연결했습니다.
+### Database & Data
+![SQLite](https://img.shields.io/badge/SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
+![JSON](https://img.shields.io/badge/nlohmann%2Fjson-000000?style=for-the-badge)
 
-## 프로젝트 결과
+### Analytics & Tooling
+![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)
+![Pandas](https://img.shields.io/badge/Pandas-150458?style=for-the-badge&logo=pandas&logoColor=white)
+![Plotly](https://img.shields.io/badge/Plotly-3F4F75?style=for-the-badge&logo=plotly&logoColor=white)
 
-- 기본 설정 기준 `KRW-ADA`, `KRW-ETH`, `KRW-XRP` 3개 마켓 예시를 동시에 처리하며, 마켓 목록은 `UPBIT_MARKETS`로 변경할 수 있습니다.
-- public 캔들 스트림과 private `myOrder` 스트림을 분리 처리하고, private WS에는 30초 텍스트 heartbeat를 넣어 idle EOF를 방지했습니다.
-- pending 주문은 timeout과 재연결 시점에 `getOrder()` 기반으로 복구하며, 봇 재시작 시에는 이전 봇 주문을 취소하고 포지션만 이어받습니다.
-- 실거래 데이터는 `candles`, `orders`, `signals` 테이블에 기록되며, SQLite WAL 모드로 봇 쓰기와 분석 읽기를 병행합니다.
-- `streamlit/app.py`, `tools/fetch_candles.py`, `tools/candle_rsi_backtest.py`를 통해 실거래 분석, 과거 데이터 적재, 전략 근사 백테스트까지 이어집니다.
+### Ops
+![systemd](https://img.shields.io/badge/systemd-000000?style=for-the-badge)
+![EC2](https://img.shields.io/badge/AWS_EC2-FF9900?style=for-the-badge&logo=amazon-ec2&logoColor=white)
 
-## 시스템 범위
+<hr>
 
-- **C++ Runtime**: 실시간 이벤트 수신, 전략 실행, 주문 제출, 주문/포지션 상태 관리
-- **Persistence**: SQLite 기반 `candles`, `orders`, `signals` 적재
-- **Analysis Tooling**: Streamlit 대시보드, 과거 캔들 수집기, RSI 백테스트 스크립트
-- **Operations**: Linux `systemd` 서비스와 EC2 배포 스크립트
+## Key Dependencies and Features
+
+### 1. Upbit Exchange Integration
+- `UpbitJwtSigner -> RestClient -> UpbitExchangeRestClient -> SharedOrderApi` 계층으로 외부 거래소 연동을 분리했습니다.
+- 엔진은 `IOrderApi` 인터페이스에만 의존하고, 실제 REST 구현 세부 사항은 하위 계층에 캡슐화했습니다.
+- private REST, public/private WebSocket, JWT 인증을 하나의 런타임 흐름으로 통합했습니다.
+
+### 2. Market-Per-Worker Concurrency
+- `MarketEngineManager`가 마켓당 하나의 `std::jthread`를 소유합니다.
+- WebSocket IO 스레드는 raw JSON을 `EventRouter`로 전달하고, `EventRouter`는 마켓별 `BlockingQueue`로 이벤트를 라우팅합니다.
+- 각 마켓 상태는 단일 워커만 수정하므로, 멀티마켓 병렬 처리와 마켓 내부 순차 처리를 동시에 만족합니다.
+
+### 3. ReservationToken Pattern
+- 매수 주문 전 KRW를 예약하고, 주문 실패/취소 시 예약 금액이 자동 반환되도록 `ReservationToken`을 사용합니다.
+- 토큰은 move-only RAII 객체이며, 비정상 경로에서도 잔액 누수를 줄이도록 설계했습니다.
+- `available_krw`, `reserved_krw`, `coin_balance`를 분리해 pending 상태와 부분 체결을 명시적으로 처리합니다.
+
+### 4. PositionEffect 기반 상태 전이
+- `Filled`, `Canceled`, `Rejected` 같은 주문 상태와 실제 포지션 변화는 같은 의미가 아니므로 분리해서 다룹니다.
+- `PositionEffect::Opened`, `Reduced`, `Closed`를 계산해 전략이 terminal 상태 이름이 아니라 실제 계좌 반영 결과로 상태를 확정합니다.
+- 이 구조로 부분 체결 후 취소, WS 체결 유실, snapshot 기반 복구에서 잘못된 상태 전이를 줄였습니다.
+
+### 5. Recovery and Operational Resilience
+- 시작 복구에서는 봇이 이전에 낸 미체결 주문을 취소하고, 현재 계좌 포지션만 읽어 전략 상태를 복구합니다.
+- 런타임에서는 pending timeout 또는 private WS 재연결 뒤 `getOrder()` 재시도로 주문 상태를 다시 확인합니다.
+- 치명 상태는 `exit(1)`로 종료하고, Linux 운영 환경에서는 `systemd Restart=on-failure`로 재시작합니다.
+
+### 6. SQLite + Streamlit + Backtest Pipeline
+- 봇은 `candles`, `orders`, `signals`를 SQLite WAL DB에 기록합니다.
+- `streamlit/app.py`는 실거래 데이터를 기반으로 P&L, 전략 분석, 백테스트 비교 기능을 제공합니다.
+- `tools/fetch_candles.py`, `tools/candle_rsi_backtest.py`로 과거 데이터 적재와 전략 근사 검증이 가능합니다.
+
+<hr>
 
 ## 아키텍처
 
-### Runtime Overview
+### 소프트웨어 아키텍처
 
-```mermaid
-flowchart TD
-    A[Upbit REST / WebSocket] --> B[JWT / REST / WS Client]
-    B --> C[SharedOrderApi / EventRouter]
-    C --> D[MarketEngineManager]
-    D --> E[Market Worker]
-    E --> F[MarketEngine]
-    F --> G[RsiMeanReversionStrategy]
-    F --> H[AccountManager / OrderStore]
-    E --> I[SQLite]
-    I --> J[Streamlit Dashboard]
-    I --> K[Backtest / Candle Fetch Tools]
-```
+이 프로젝트는 단일 바이너리 안에서 역할별 계층을 분리한 구조입니다.
 
-### Recovery Flow
+| 계층 | 주요 역할 |
+| --- | --- |
+| `core` | 도메인 타입, 공통 자료구조, `BlockingQueue` |
+| `util` | 설정, 로깅, 공통 유틸리티 |
+| `api` | JWT, REST, WebSocket, Upbit DTO/Mapper |
+| `trading` | 전략, 지표, 자금 관리 |
+| `engine` | 주문 처리, 상태 반영, 엔진 이벤트 |
+| `app` | 런타임 조립, 마켓 워커 관리, 이벤트 라우팅, 시작 복구 |
+| `database` | SQLite RAII 래퍼와 스키마 |
 
-```mermaid
-flowchart TD
-    A[Process Start] --> B[getMyAccount]
-    B --> C[AccountManager::rebuildFromAccount]
-    C --> D[StartupRecovery]
-    D --> E[Cancel bot open orders]
-    E --> F[Read current position]
-    F --> G[strategy.syncOnStart]
+### 시스템 아키텍처
 
-    H[Runtime Pending Timeout / WS Reconnect] --> I[getOrder retry]
-    I --> J[MarketEngine::reconcileFromSnapshot]
-    J --> K[Account / Order state update]
-    K --> L[PositionEffect -> Strategy]
-```
+저장소는 C++ 실거래 런타임만 포함하지 않습니다. 실거래 데이터 적재, 분석, 백테스트, 운영 배포까지 하나의 시스템으로 구성됩니다.
 
-## 설계 상세
+| 영역 | 설명 |
+| --- | --- |
+| **C++ Runtime** | Upbit REST/WebSocket 연결, 전략 실행, 주문 제출, 상태 복구 |
+| **Persistence** | `candles`, `orders`, `signals`를 SQLite WAL DB에 저장 |
+| **Analysis Tooling** | Streamlit 대시보드, 과거 캔들 수집기, RSI 백테스트 |
+| **Operations** | Linux `systemd` 서비스와 EC2 배포 스크립트 |
 
-### 1. Exchange Integration Layer
+### 이벤트 처리 흐름
 
-이 프로젝트는 HTTP 서버가 아니라, **외부 거래소를 직접 호출하는 클라이언트 시스템**입니다.  
-REST는 `UpbitJwtSigner`, `RestClient`, `UpbitExchangeRestClient`, `SharedOrderApi`로 나뉘며, 엔진 계층은 최종적으로 `IOrderApi` 인터페이스만 의존합니다.
+1. public/private WebSocket이 raw JSON을 수신합니다.
+2. `EventRouter`가 JSON에서 마켓 식별자만 추출해 마켓별 큐로 전달합니다.
+3. 각 마켓 워커가 이벤트를 순차 처리하며 `MarketEngine`와 전략 상태를 갱신합니다.
+4. 주문 및 체결 결과는 `AccountManager`, `OrderStore`, SQLite에 반영됩니다.
+5. 저장된 데이터는 Streamlit과 Python 도구가 재사용합니다.
 
-이 구조 덕분에 거래소 세부 구현과 엔진 로직이 분리되고, 멀티마켓 환경에서도 하나의 REST 클라이언트를 직렬화해서 공유할 수 있습니다.
+### ReservationToken Pattern
 
-### 2. Concurrency Model
+이 프로젝트의 핵심 설계는 주문 제출과 자금 상태를 분리하지 않는 데 있습니다.
 
-마켓 하나당 `MarketEngine`, 전략, 큐, 워커 스레드를 하나씩 두고, 각 마켓 상태는 그 워커만 수정합니다.  
-즉 멀티마켓은 병렬이지만, **마켓 내부 상태는 단일 스레드 소유권**으로 단순화했습니다.
+#### 패턴 개요
+- 주문 제출 전에 KRW를 먼저 예약합니다.
+- 매수 체결 시 예약 금액을 점진적으로 소비합니다.
+- 주문 실패, 취소, 미사용 잔액은 토큰 종료 시 자동으로 반환합니다.
 
-```cpp
-ctx->worker = std::jthread([this, &ctx_ref = *ctx](std::stop_token stoken) {
-    workerLoop_(ctx_ref, stoken);
-});
-```
-
-입력은 `EventRouter`가 raw JSON에서 마켓만 추출해 `BlockingQueue`로 넘기고, 실제 파싱과 처리 책임은 마켓 워커가 집니다.  
-이렇게 해서 IO 스레드 부하를 줄이면서도 마켓별 이벤트 순서를 보존했습니다.
-
-### 3. ReservationToken 기반 자금 관리
-
-매수 주문은 먼저 KRW를 예약한 뒤 제출합니다.  
-예약은 `ReservationToken`이라는 move-only RAII 객체로 표현했고, 주문 실패나 취소로 토큰이 비활성화되지 못하면 소멸자 경로에서 자동 반환됩니다.
-
+#### 핵심 코드
 ```cpp
 auto token = account_mgr_.reserve(market_, reserve_amount);
 active_buy_token_.emplace(std::move(*token));
 ```
 
-이 방식으로 자금 부족, 중복 매수, 실패 후 잔액 누수 같은 문제를 줄였습니다.  
-자금 모델은 `available_krw`, `reserved_krw`, `coin_balance`를 분리한 전량 거래 모델이며, pending 상태와 부분 체결 같은 중간 상태를 명시적으로 다룹니다.
+#### 효과
+- 중복 매수 방지
+- 실패 경로에서 잔액 누수 방지
+- 부분 체결과 주문 종료를 다른 단계로 분리한 정산 가능
 
-### 4. PositionEffect 기반 상태 전이
+### PositionEffect 기반 주문 상태 처리
 
-거래소가 보내는 `Filled`, `Canceled`, `Rejected`는 주문 상태일 뿐, 그것만으로 실제 포지션이 열렸는지 닫혔는지를 항상 안전하게 알 수는 없습니다.  
-이 프로젝트는 `PositionEffect::Opened`, `Reduced`, `Closed`를 별도로 계산해 전략에 전달합니다.
+거래소가 보내는 주문 상태만으로는 실제 포지션이 열렸는지 닫혔는지 안전하게 알 수 없습니다.  
+그래서 엔진은 주문 종결 이후 실제 계좌 반영 결과를 기준으로 `PositionEffect`를 계산하고, 전략은 이 effect를 보고 상태를 전이합니다.
 
-핵심은 **주문 상태 이름과 포지션 변화 효과를 분리했다는 점**입니다.  
-이 덕분에 부분 체결 후 취소, WS 체결 유실, snapshot 기반 복구 상황에서도 전략 상태를 더 일관되게 유지할 수 있습니다.
+#### 핵심 코드
+```cpp
+ev.position_effect = resolvePositionEffect_(o);
+ctx.strategy->onOrderUpdate(out);
+```
 
-### 5. Recovery and Operational Resilience
+#### 효과
+- 부분 체결 후 취소 처리 안정화
+- WS 유실 후 snapshot 복구와 전략 상태 동기화
+- terminal 상태 이름과 포지션 변화를 분리한 명확한 모델
 
-복구는 시작 시점과 런타임 시점을 분리했습니다.
+### 복구 구조
 
-- **시작 복구**: 봇이 이전에 낸 미체결 주문을 취소하고, 현재 계좌의 포지션만 읽어 전략 상태를 복구합니다.
-- **런타임 복구**: pending timeout 또는 private WS 재연결 후 `getOrder()` 재시도로 주문 상태를 다시 확인하고, `reconcileFromSnapshot()`으로 delta를 정산합니다.
+복구는 시작 시점과 런타임 시점을 분리해서 설계했습니다.
 
-치명 상태는 프로세스를 살려 두기보다 `exit(1)`로 종료하고, Linux 운영 환경에서는 `systemd Restart=on-failure`가 재시작을 담당합니다.
+| 구분 | 동작 |
+| --- | --- |
+| **시작 복구** | 봇 미체결 주문 취소 후, 현재 포지션만 읽어 `syncOnStart()` 수행 |
+| **런타임 복구** | pending timeout / WS 재연결 뒤 `getOrder()` 재조회 후 `reconcileFromSnapshot()` 수행 |
+| **운영 복구** | 치명 상태 감지 시 프로세스 종료, `systemd`가 자동 재시작 |
 
-### 6. Persistence and Analysis Pipeline
+<hr>
 
-봇은 실시간 실행에서 끝나지 않고, 거래 데이터를 SQLite에 남깁니다.
-
-- `candles`: 캔들 저장
-- `orders`: 터미널 주문 이력 저장
-- `signals`: 전략 관점의 BUY/SELL 신호 저장
-
-SQLite는 `WAL` 모드로 열어 봇 쓰기와 Streamlit 읽기가 서로 덜 막히도록 했습니다.  
-이 데이터는 Streamlit 대시보드의 P&L/전략 분석, 과거 캔들 적재, RSI 백테스트로 이어집니다.
-
-## 전략
-
-현재 기본 전략은 **RSI Mean Reversion**입니다.
-
-- RSI 과매도 구간에서 진입
-- RSI 과매수 구간에서 청산
-- 변동성 필터와 trend strength 필터로 평균회귀가 부적합한 구간을 제외
-- `onIntrabarCandle()`에서 손절/익절 가격을 실시간 체크
-- 확정봉에서는 RSI 기반 청산을 평가
-
-즉 이 프로젝트의 전략은 단순 지표 계산보다, **실시간 이벤트와 주문 상태 변화에 전략 상태를 연결하는 방식**에 더 초점이 있습니다.
-
-## 도구와 운영
-
-### Streamlit Dashboard
-
-`streamlit/app.py`는 SQLite에 저장된 실거래 데이터를 기반으로 아래 기능을 제공합니다.
-
-- P&L 분석
-- 전략 신호와 캔들 차트 시각화
-- RSI/청산 사유 분석
-- 백테스트 결과와 실거래 신호 비교
-
-### Python Tools
-
-- `tools/fetch_candles.py`: 과거 캔들을 DB에 적재
-- `tools/candle_rsi_backtest.py`: C++ 전략 파라미터와 정렬된 근사 백테스트 수행
-
-### Deployment
-
-`deploy/coinbot.service`와 `deploy/deploy.sh`를 통해 Linux 운영 환경에 배포할 수 있습니다.
-
-- `Restart=on-failure` 기반 자동 재시작
-- `WorkingDirectory=/home/ubuntu/coinbot`
-- mountpoint / sentinel 파일 검증으로 잘못된 디스크 배포 방지
-
-## Build / Run
+## 로컬 실행 및 도구
 
 ### Windows Development
-
-Windows는 Visual Studio 2022 + MSVC + CMake preset 기준입니다.
-
+- Visual Studio 2022 + MSVC + CMake preset 기준입니다.
 - `CMakePresets.json`의 Windows preset은 로컬 Boost/OpenSSL/nlohmann 경로를 전제로 합니다.
 - 개발용 preset: `x64-debug`, `x64-release`
-- 편의 스크립트: `build_and_check.cmd`
 
 ### Local Linux / WSL
 
@@ -196,15 +164,13 @@ cp .env.local.example .env.local
 bash scripts/run_local.sh
 ```
 
-필수 환경 변수는 아래 3개입니다.
-
+필수 환경 변수:
 - `UPBIT_ACCESS_KEY`
 - `UPBIT_SECRET_KEY`
 - `UPBIT_MARKETS`
 
 ### Streamlit / Tools
-
-먼저 봇을 한 번 실행해 `db/coinbot.db`가 생성되어 있어야 합니다.
+- 먼저 봇을 한 번 실행해 `db/coinbot.db`가 생성되어 있어야 합니다.
 
 ```bash
 pip install -r streamlit/requirements.txt
@@ -216,6 +182,10 @@ pip install -r tools/requirements.txt
 python tools/fetch_candles.py --days 90 --unit 15
 python tools/candle_rsi_backtest.py --market KRW-XRP --days 30
 ```
+
+### Deployment
+- `deploy/coinbot.service`, `deploy/deploy.sh` 기준으로 Linux 운영 환경에 배포합니다.
+- `Restart=on-failure`, `WorkingDirectory`, mountpoint/sentinel 검증을 사용합니다.
 
 ## 저장소 구조
 
@@ -230,7 +200,7 @@ src/
   database/    # SQLite 래퍼와 스키마
 
 streamlit/
-  app.py       # 분석 대시보드
+  app.py       # 실거래 분석 대시보드
 
 tools/
   fetch_candles.py
@@ -243,18 +213,14 @@ deploy/
 
 ## Trade-offs / Known Limits
 
-- 이벤트 큐는 bounded queue + `drop-oldest` 정책이라, 극단적 포화 상황에서는 유실 가능성이 있습니다.
+- 이벤트 큐는 bounded queue + `drop-oldest` 정책이라 극단적 포화 상황에서는 유실 가능성이 있습니다.
 - graceful shutdown은 아직 완전하지 않아 종료 직전 pending 주문 정합성 보장은 제한적입니다.
 - 백테스트는 실전 엔진의 근사 모델이며, 체결가와 슬리피지 처리에 단순화가 있습니다.
-- 봇 외부 수동 거래와 로컬 상태가 어긋날 수 있으므로, 기본 전제는 봇 단독 계좌 사용입니다.
+- 봇 외부 수동 거래와 로컬 상태가 어긋날 수 있으므로 기본 전제는 봇 단독 계좌 사용입니다.
 
-## 문서
+## 관련 문서
 
 - [docs/EC2_DEPLOY.md](docs/EC2_DEPLOY.md)
 - [docs/IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md)
 - [docs/PROJECT_FLOWSRUDY.md](docs/PROJECT_FLOWSRUDY.md)
 - [docs/review.md](docs/review.md)
-
-## 한 줄 요약
-
-CoinBot은 단순한 RSI 자동매매 예제가 아니라, **C++로 구현한 실시간 이벤트 처리, 상태 복구, 자금 정합성 관리, 분석 파이프라인까지 포함한 멀티마켓 트레이딩 시스템**입니다.
