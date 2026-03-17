@@ -1,4 +1,4 @@
-src/app : 엔트리 포인트, 콘솔 UI, 메인 루프
+﻿src/app : 엔트리 포인트, 콘솔 UI, 메인 루프
 
 src/core : 공통 타입, 설정, 기본 인터페이스 (예: IOrderExecutor, IStrategy)
 
@@ -13,6 +13,17 @@ src/util : 로깅, 시간 유틸, 문자열 변환 등
 include/coinbot/... : 외부에서 재사용 가능한 퍼블릭 헤더들 정리
 
 ## 최근 변경 사항
+
+### 2026-03-17
+
+- `PositionEffect` 기반 주문 상태 전이를 도입했다.
+  - 기존에는 `Filled`/`Canceled` + 내부 상태로 포지션 변화를 추론했다. 잘못된 상태 전이(Issue 1: Canceled+전량체결 → 항상 InPosition, Issue 2: WS 체결 유실 시 SELL volume=0)가 발생할 수 있었다.
+  - `core::PositionEffect` 열거형(`None`/`Opened`/`Reduced`/`Closed`)을 추가하고, `MarketEngine::resolvePositionEffect_()`에서 finalize 이후 계좌 잔고 기준으로 effect를 확정해 이벤트에 실어 전략에 전달한다.
+  - `RsiMeanReversionStrategy::onOrderUpdate()`는 effect만 보고 상태 전이를 결정한다. 상태와 체결 여부를 조합하던 이전 추론 로직은 제거됐다.
+  - `EngineOrderStatusEvent`와 `trading::OrderStatusEvent` 모두에 `position_effect` 필드가 추가됐다
+- `Config.h` 중복 임계값을 정리했다.
+  - `StrategyConfig::dust_exit_threshold_krw`를 제거하고 전략 코드 전체에서 `min_notional_krw`로 통합했다.
+  - 두 값이 항상 동일하다는 제약을 각 필드 주석에 명시했다.
 
 ### 2026-03-16
 

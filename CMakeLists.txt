@@ -1,4 +1,4 @@
-# CMakeLists.txt : CMake project for CoinBot
+﻿# CMakeLists.txt : CMake project for CoinBot
 
 cmake_minimum_required(VERSION 3.8)
 
@@ -35,6 +35,7 @@ add_subdirectory(src/api)
 add_subdirectory(src/trading)
 add_subdirectory(src/engine)
 add_subdirectory(src/app)
+# add_subdirectory(tests)
 
 # 최종 실행 파일
 add_executable(CoinBot src/app/CoinBot.cpp)

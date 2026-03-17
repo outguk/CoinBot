@@ -220,60 +220,6 @@ namespace engine
         }
     }
 
-    // ========== onOrderStatus ==========
-    //void MarketEngine::onOrderStatus(std::string_view order_uuid, core::OrderStatus s)
-    //{
-    //    assertOwner_();
-
-    //    auto ordOpt = store_.get(order_uuid);
-    //    if (!ordOpt.has_value()) return;
-
-    //    auto o = *ordOpt;
-
-    //    // 마켓 격리 검증 (OrderStore 공유 환경에서 크로스 마켓 오염 방지)
-    //    if (!o.market.empty() && o.market != market_)
-    //    {
-    //        util::Logger::instance().warn(
-    //            "[MarketEngine][", market_, "] Ignoring order status for other market: ",
-    //            "order_market=", o.market, ", order_uuid=", order_uuid);
-    //        return;
-    //    }
-
-    //    const core::OrderStatus old_status = o.status;
-    //    o.status = s;
-
-    //    if (s == core::OrderStatus::Filled)
-    //        o.remaining_volume = 0.0;
-
-    //    if (!store_.update(o))
-    //    {
-    //        util::Logger::instance().warn(
-    //            "[MarketEngine][", market_, "] update miss in onOrderStatus, skip: order_uuid=", o.id);
-    //        return;
-    //    }
-
-    //    // 터미널 상태 전환 시 BID 토큰 정리
-    //    // ASK 주문은 snapshot 최종 정산(onOrderSnapshot)까지 erase를 미룬다
-    //    const bool isTerminal = (s == core::OrderStatus::Filled
-    //        || s == core::OrderStatus::Canceled
-    //        || s == core::OrderStatus::Rejected);
-
-    //    if (old_status != s && isTerminal)
-    //    {
-    //        // BID 주문 터미널 → 현재 활성 주문인 경우에만 토큰 정리
-    //        if (o.position == core::OrderPosition::BID && o.id == active_buy_order_uuid_)
-    //            finalizeBuyToken_(o.id);
-
-    //        // ASK 주문 터미널: 상태만 확인하고 ID 정리는 snapshot 최종 정산으로 미룬다.
-    //        if (o.position == core::OrderPosition::ASK && o.id == active_sell_order_uuid_)
-    //        {
-    //            util::Logger::instance().info(
-    //                "[MarketEngine][", market_, "] onOrderStatus terminal ASK observed, "
-    //                "waiting snapshot finalize, id=", o.id);
-    //        }
-    //    }
-    //}
-
     // ========== onOrderSnapshot ==========
     void MarketEngine::onOrderSnapshot(const core::Order& snapshot)
     {
@@ -336,7 +282,7 @@ namespace engine
             return;
         }
 
-        // 터미널 상태 도달 시 이벤트 발행 + 토큰 정리 + store 제거
+        // 터미널 상태 도달 시 자산 정리 + 이벤트 발행 + store 제거
         const bool isTerminal = (o.status == core::OrderStatus::Filled
             || o.status == core::OrderStatus::Canceled
             || o.status == core::OrderStatus::Rejected);
@@ -346,19 +292,6 @@ namespace engine
 			// 동일 종결 상태 업데이트는 무시 (이벤트 중복 방지)
             if (o.status != old_status)
             {
-                if (o.identifier.has_value() && !o.identifier->empty())
-                {
-                    EngineOrderStatusEvent ev;
-                    ev.identifier = *o.identifier;
-                    ev.order_uuid = o.id;
-                    ev.status = o.status;
-                    ev.position = o.position;
-                    ev.executed_volume = o.executed_volume;
-                    ev.remaining_volume = o.remaining_volume;
-                    ev.executed_funds = o.executed_funds;  // WS 유실 시 전략 vwap 폴백용
-                    pushEvent_(EngineEvent{ std::move(ev) });
-                }
-
                 // BID 주문 터미널 → 현재 활성 주문인 경우에만 토큰 정리
                 if (o.position == core::OrderPosition::BID && o.id == active_buy_order_uuid_)
                     finalizeBuyToken_(o.id);
@@ -372,6 +305,20 @@ namespace engine
                         (last_mark_price_ > 0.0) ? std::optional<core::Price>(last_mark_price_) : std::nullopt;
                     account_mgr_.finalizeSellOrder(market_, mark);
                     active_sell_order_uuid_.clear();
+                }
+
+                if (o.identifier.has_value() && !o.identifier->empty())
+                {
+                    EngineOrderStatusEvent ev;
+                    ev.identifier = *o.identifier;
+                    ev.order_uuid = o.id;
+                    ev.status = o.status;
+                    ev.position = o.position;
+                    ev.executed_volume = o.executed_volume;
+                    ev.remaining_volume = o.remaining_volume;
+                    ev.executed_funds = o.executed_funds;  // WS 유실 시 전략 vwap 폴백용
+                    ev.position_effect = resolvePositionEffect_(o);
+                    pushEvent_(EngineEvent{ std::move(ev) });
                 }
             }
 
@@ -497,6 +444,22 @@ namespace engine
         const double volume = std::get<core::VolumeSize>(req.size).value;
         const double price = req.price.value_or(0.0);
         return price * volume * cfg.reserve_margin;
+    }
+
+    core::PositionEffect MarketEngine::resolvePositionEffect_(const core::Order& order) const
+    {
+        if (order.executed_volume <= 0.0)
+            return core::PositionEffect::None;
+
+        const auto budget = account_mgr_.getBudget(market_);
+        const auto& cfg = util::AppConfig::instance().account;
+        const bool has_coin = budget->coin_balance >= cfg.coin_epsilon;
+
+        if (order.position == core::OrderPosition::BID)
+            return core::PositionEffect::Opened;  // executed_volume > 0 이면 진입 확정
+
+        return has_coin ? core::PositionEffect::Reduced
+                        : core::PositionEffect::Closed;
     }
 
     // ========== finalizeBuyToken_ ==========

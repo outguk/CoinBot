@@ -105,6 +105,9 @@ namespace engine
         // order_uuid: 토큰과 연결된 주문 ID (검증용)
         void finalizeBuyToken_(std::string_view order_uuid);
 
+        // terminal 주문이 실제 포지션에 어떤 효과를 냈는지 계좌 기준으로 판정한다.
+        [[nodiscard]] core::PositionEffect resolvePositionEffect_(const core::Order& order) const;
+
     private:
         std::string market_;
         api::upbit::IOrderApi& api_;

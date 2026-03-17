@@ -936,9 +936,19 @@ def render_backtest(
         # ── 거래내역 탭 ──────────────────────────────────────────────────────
         with rt_trades:
             if not trades_bt.empty:
-                disp = trades_bt.copy()
+                disp = trades_bt[["entry_ts", "exit_ts", "entry_price", "exit_price",
+                                   "pnl", "pnl_pct", "reason", "intrabar"]].copy()
                 disp["reason"] = disp["reason"].map(_kr_exit_reason)
-                disp.columns   = ["진입시각", "청산시각", "진입가", "청산가", "손익", "손익률", "청산사유"]
+                disp = disp.rename(columns={
+                    "entry_ts":    "진입시각",
+                    "exit_ts":     "청산시각",
+                    "entry_price": "진입가",
+                    "exit_price":  "청산가",
+                    "pnl":         "손익",
+                    "pnl_pct":     "손익률",
+                    "reason":      "청산사유",
+                    "intrabar":    "봉내청산",
+                })
 
                 def _color_bt_row(row) -> list[str]:
                     try:

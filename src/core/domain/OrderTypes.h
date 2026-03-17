@@ -30,6 +30,17 @@ namespace core
 		Rejected	// 주문 거부됨
 	};
 
+	// 주문이 실제 포지션에 준 효과를 표현한다.
+	// terminal 상태 이름(Filled/Canceled)과 분리해 전략이 상태를 확정할 때 사용한다.
+	enum class PositionEffect
+	{
+		Unknown = 0,
+		None,
+		Opened,
+		Reduced,
+		Closed
+	};
+
 	enum class PriceChangeState {
 		Even,
 		Rise,

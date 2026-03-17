@@ -9,6 +9,8 @@ candle_rsi_backtest.py — 캔들 기반 RSI 평균회귀 전략 백테스트
   - 상태머신을 2상태로 축소 (실전: Flat/PendingEntry/InPosition/PendingExit)
   - 슬리피지: 고정 비율(slippage_rate) 반영 (매수=close×1.0005, 매도=close×0.9995)
   - 파라미터·신호 판단 규칙은 C++와 정렬 → 전략 방향성 검증 용도에 적합
+  - intrabar 청산: 15분봉 high/low 터치 여부로 근사 (실전은 매 틱 기준)
+  - stop/target 동시 터치 시 open 기준 선후 추정 (모호성 존재)
 """
 
 import argparse
@@ -25,25 +27,30 @@ KST = ZoneInfo("Asia/Seoul")
 # ─── 기본 파라미터 (C++ Params / Config.h 정렬) ──────────────────────────────
 
 DEFAULT_PARAMS = {
-    "rsi_length":          5,
-    "oversold":           50,
-    "overbought":         70,
+    # ── RSI (C++ RsiMeanReversionStrategy::Params) ──────────────────────────
+    "rsi_length":          14,     # C++ rsiLength
+    "oversold":            30,     # C++ oversold  — 진입 조건: RSI ≤ 30
+    "overbought":          70,     # C++ overbought — 청산 조건: RSI ≥ 70
 
-    "trend_look_window":   5,
-    "max_trend_strength":  1.0,    # 1.0 = 사실상 비활성 (모든 추세 허용)
+    # ── 추세 강도 ─────────────────────────────────────────────────────────────
+    "trend_look_window":   30,     # C++ trendLookWindow
+    "max_trend_strength":  0.04,   # C++ maxTrendStrength (4%): 추세가 강하면 진입 차단
 
-    "volatility_window":   5,
-    "min_volatility":      0.0,    # 0.0 = 비활성 (모든 변동성 허용)
+    # ── 변동성 ───────────────────────────────────────────────────────────────
+    "volatility_window":   20,     # C++ volatilityWindow
+    "min_volatility":      0.004,  # C++ minVolatility (0.4%): 변동성 부족 시 진입 차단
 
-    "stop_loss_pct":       2.0,
-    "profit_target_pct":   3.0,
+    # ── 손익 ─────────────────────────────────────────────────────────────────
+    "stop_loss_pct":       10.0,   # C++ stopLossPct
+    "profit_target_pct":   15.0,   # C++ profitTargetPct
 
-    "fee_rate":            0.0005, # 0.05% (Config.h EngineConfig::default_trade_fee_rate)
-    "slippage_rate":       0.0005, # 0.05% 슬리피지: 매수는 close보다 비싸게, 매도는 싸게 체결
+    # ── 수수료 / 자본 (Config.h) ─────────────────────────────────────────────
+    "fee_rate":            0.0005, # C++ default_trade_fee_rate (0.05%)
+    "slippage_rate":       0.0005, # 0.05%: 매수=close×1.0005, 매도=close×0.9995
 
-    "utilization":         1.0,    # 가용 KRW 중 사용 비율
-    "reserve_margin":      1.001,  # 수수료 여유 (Config.h EngineConfig::reserve_margin)
-    "min_notional_krw":    5000.0, # 최소 주문 금액 (Config.h StrategyConfig::min_notional_krw)
+    "utilization":         1.0,    # C++ utilization: 가용 KRW 전액 사용
+    "reserve_margin":      1.001,  # C++ reserve_margin
+    "min_notional_krw":    5000.0, # C++ min_notional_krw / init_dust_threshold_krw
 }
 
 
@@ -228,6 +235,48 @@ def _compute_trend_strength(close_series: pd.Series, look_window: int) -> tuple[
     return trend.fillna(0.0), close_n.notna()
 
 
+# ─── Intrabar 청산 헬퍼 ───────────────────────────────────────────────────────
+
+def _check_intrabar_exit_ohlc(
+    open_: float,
+    high: float,
+    low: float,
+    stop_price: float,
+    target_price: float,
+    slippage_rate: float,
+) -> tuple[str | None, float]:
+    """
+    15분봉 OHLC로 intrabar stop/target 터치 여부를 판단한다.
+
+    C++ onIntrabarCandle()과 동일하게 stop/target만 체크 (RSI 없음).
+    체결가는 레벨 자체에 슬리피지 적용 (close 대신 실제 청산 레벨 사용).
+
+    동일 캔들 내 stop·target 동시 터치 시 open 기준으로 선후 추정:
+    - open <= stop_price  → 시가부터 이미 손절 구간, stop 우선
+    - open >= target_price → 시가부터 이미 익절 구간, target 우선
+    - 그 외 (시가가 범위 안)  → 어느 쪽이 먼저인지 불명, 보수적으로 stop 우선
+
+    반환: (reason, sell_price) 또는 (None, 0.0)
+    """
+    hit_stop   = low  <= stop_price
+    hit_target = high >= target_price
+
+    if not hit_stop and not hit_target:
+        return None, 0.0
+
+    if hit_stop and hit_target:
+        # open 기준으로 선후 추정
+        stop_first = (open_ <= stop_price) or (open_ < target_price)
+        if stop_first:
+            return "stop_loss", stop_price * (1.0 - slippage_rate)
+        else:
+            return "take_profit", target_price * (1.0 - slippage_rate)
+
+    if hit_stop:
+        return "stop_loss", stop_price * (1.0 - slippage_rate)
+    return "take_profit", target_price * (1.0 - slippage_rate)
+
+
 # ─── 백테스트 핵심 ────────────────────────────────────────────────────────────
 
 def run_backtest(
@@ -246,7 +295,7 @@ def run_backtest(
         {
             'candles': DataFrame (index=ts, columns: open/high/low/close/volume/rsi/vol/trend/market_ok),
                        Plotly Candlestick + RSI 서브플롯에 직접 사용 가능.
-            'trades':  DataFrame (entry_ts, exit_ts, entry_price, exit_price, pnl, pnl_pct, reason),
+            'trades':  DataFrame (entry_ts, exit_ts, entry_price, exit_price, pnl, pnl_pct, reason, intrabar),
             'equity':  Series    (index=ts → 평가자산 KRW),
             'summary': dict      (total_trades, win_rate, total_pnl, avg_hold_minutes, open_position),
             'data_quality': dict (중간 캔들 누락 경고 정보),
@@ -326,36 +375,64 @@ def run_backtest(
         elif state == "InPosition":
             # 보유 수량 가치 체크 (C++ maybeExit min_notional 조건)
             if coin_qty * close >= p["min_notional_krw"]:
-                # 청산 조건 (우선순위: stop_loss > take_profit > rsi_exit)
-                reason = None
-                if close <= stop_price:
-                    reason = "stop_loss"
-                elif close >= target_price:
-                    reason = "take_profit"
-                elif row.rsi_ready and row.rsi >= p["overbought"]:
-                    reason = "rsi_exit"
+                intrabar_exit = False
 
-                if reason:
-                    sell_price = close * (1.0 - p["slippage_rate"])  # 매도: close보다 싸게 체결
-                    sell_gross = coin_qty * sell_price
+                # ── 1) intrabar 체크: OHLC high/low 기반 stop/target ────────────
+                ib_reason, ib_sell_price = _check_intrabar_exit_ohlc(
+                    open_=float(row.open),
+                    high=float(row.high),
+                    low=float(row.low),
+                    stop_price=stop_price,
+                    target_price=target_price,
+                    slippage_rate=p["slippage_rate"],
+                )
+                if ib_reason:
+                    sell_gross = coin_qty * ib_sell_price
                     sell_fee   = sell_gross * p["fee_rate"]
                     sell_net   = sell_gross - sell_fee
                     pnl        = sell_net - total_cost
-                    pnl_pct    = pnl / total_cost
-
-                    krw += sell_net
+                    krw       += sell_net
                     trades.append({
                         "entry_ts":    entry_ts,
                         "exit_ts":     ts,
                         "entry_price": entry_price,
-                        "exit_price":  sell_price,
+                        "exit_price":  ib_sell_price,
                         "pnl":         pnl,
-                        "pnl_pct":     pnl_pct,
-                        "reason":      reason,
+                        "pnl_pct":     pnl / total_cost,
+                        "reason":      ib_reason,
+                        "intrabar":    True,
                     })
-                    coin_qty   = 0.0
-                    total_cost = 0.0
-                    state      = "Flat"
+                    coin_qty = 0.0; total_cost = 0.0; state = "Flat"
+                    intrabar_exit = True
+
+                # ── 2) confirmed close 체크 (intrabar 미청산 시에만) ─────────────
+                if not intrabar_exit:
+                    reason = None
+                    if close <= stop_price:
+                        reason = "stop_loss"
+                    elif close >= target_price:
+                        reason = "take_profit"
+                    elif row.rsi_ready and row.rsi >= p["overbought"]:
+                        reason = "rsi_exit"
+
+                    if reason:
+                        sell_price = close * (1.0 - p["slippage_rate"])  # 매도: close보다 싸게 체결
+                        sell_gross = coin_qty * sell_price
+                        sell_fee   = sell_gross * p["fee_rate"]
+                        sell_net   = sell_gross - sell_fee
+                        pnl        = sell_net - total_cost
+                        krw       += sell_net
+                        trades.append({
+                            "entry_ts":    entry_ts,
+                            "exit_ts":     ts,
+                            "entry_price": entry_price,
+                            "exit_price":  sell_price,
+                            "pnl":         pnl,
+                            "pnl_pct":     pnl / total_cost,
+                            "reason":      reason,
+                            "intrabar":    False,
+                        })
+                        coin_qty = 0.0; total_cost = 0.0; state = "Flat"
 
         # equity curve: 현금 + 미실현 평가금액
         equity[ts] = krw + (coin_qty * close if state == "InPosition" else 0.0)

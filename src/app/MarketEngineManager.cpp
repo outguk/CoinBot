@@ -607,7 +607,8 @@ void MarketEngineManager::handleEngineEvents_(MarketContext& ctx,
                 e.position,
                 e.executed_volume,
                 e.remaining_volume,
-                e.executed_funds
+                e.executed_funds,
+                e.position_effect
             };
 
             ctx.strategy->onOrderUpdate(out);
