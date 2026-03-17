@@ -74,6 +74,7 @@ namespace trading {
         double executed_volume{ 0.0 };
         double remaining_volume{ 0.0 };
         double executed_funds{ 0.0 };   // 누적 체결 금액(KRW). WS 유실 복구 시 fill_price 폴백에 사용
+        core::PositionEffect position_effect{ core::PositionEffect::Unknown };
 
         OrderStatusEvent() = default;
 
@@ -82,13 +83,15 @@ namespace trading {
             core::OrderPosition pos,
             double execVol = 0.0,
             double remVol = 0.0,
-            double execFunds = 0.0) noexcept
+            double execFunds = 0.0,
+            core::PositionEffect effect = core::PositionEffect::Unknown) noexcept
             : identifier(std::move(cid)),
             status(st),
             position(pos),
             executed_volume(execVol),
             remaining_volume(remVol),
-            executed_funds(execFunds) {
+            executed_funds(execFunds),
+            position_effect(effect) {
         }
     };
 

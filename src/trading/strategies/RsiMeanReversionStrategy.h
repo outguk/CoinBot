@@ -107,6 +107,18 @@ namespace trading::strategies {
         // 테스트/리셋
         void reset();
 
+#ifdef COINBOT_TESTING
+        // 테스트 전용: 내부 pending 상태를 직접 주입한다.
+        // entry_p > 0 이면 stop/target도 params 기준으로 함께 설정한다.
+        void forceStateForTest(State s,
+                               std::string cid,
+                               std::string exit_reason  = {},
+                               double filled_vol        = 0.0,
+                               double cost_sum          = 0.0,
+                               double last_price        = 0.0,
+                               double entry_p           = 0.0);
+#endif
+
     private:
         // 1) 지표 업데이트 + 필터 계산을 한 번에 끝내는 단계
         [[nodiscard]] Snapshot buildSnapshot(const core::Candle& c);

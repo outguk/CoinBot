@@ -43,6 +43,7 @@ namespace engine
         double executed_volume{ 0.0 };  // 이 주문에서 지금까지 “실제로 체결된 누적 수량”
         double remaining_volume{ 0.0 }; // 이 주문에서 “아직 체결되지 않고 남아 있는 수량”
         double executed_funds{ 0.0 };   // 누적 체결 금액(KRW). WS 유실 복구 시 fill_price 폴백에 사용
+        core::PositionEffect position_effect{ core::PositionEffect::Unknown };
     };
 
     using EngineEvent = std::variant<EngineFillEvent, EngineOrderStatusEvent>;
