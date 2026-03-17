@@ -1,4 +1,4 @@
-<h1 align="center">$\bf{\large{\color{#6580DD} C++ \ CoinBot }}$</h1>
+<h1 align="center">$\bf{\large{\color{#6580DD} \ CoinBot }}$</h1>
 
 <p align="center">C++20 기반 Upbit 멀티마켓 자동매매 시스템</p>
 
