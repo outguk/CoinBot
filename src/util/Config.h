@@ -65,7 +65,7 @@ namespace util
         // 실시간 WS에서 구독할 분봉 단위 (분)
         // 현재 구조는 단일 live unit만 가정한다.
         // 기본값 15를 유지해 배치 수집/대시보드의 기존 기준과 맞춘다.
-        int live_candle_unit_minutes = 1;
+        int live_candle_unit_minutes = 15;
 
         // SQLite DB 파일 경로 (실행 파일과 동일 디렉토리 기준 상대 경로)
         // EC2: systemd WorkingDirectory=/home/ubuntu/coinbot 설정 시 해당 위치에 생성

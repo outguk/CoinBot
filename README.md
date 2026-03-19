@@ -1,97 +1,231 @@
-﻿src/app : 엔트리 포인트, 콘솔 UI, 메인 루프
+﻿<h1 align="center">CoinBot</h1>
 
-src/core : 공통 타입, 설정, 기본 인터페이스 (예: IOrderExecutor, IStrategy)
+<p align="center">C++20 기반 Upbit 멀티마켓 자동매매 시스템</p>
 
-src/api : 업비트 REST / WebSocket 클라이언트
+## 프로젝트 소개
 
-src/trading : 주문/포지션/리스크/계좌 관리
+CoinBot은 Upbit 거래소의 REST/WebSocket API와 직접 연결되어 여러 마켓을 동시에 자동 매매하는 트레이딩 봇입니다.
 
-src/strategy : 전략 인터페이스와 개별 전략 구현
+마켓별 워커 스레드, RAII 기반 자금 예약, 주문 상태 복구, SQLite 기록, Streamlit 분석 도구까지 하나의 저장소에서 다룹니다.
 
-src/util : 로깅, 시간 유틸, 문자열 변환 등
+**왜 C++인가?** 거래소 WebSocket에서 수신되는 실시간 시세와 주문 이벤트를 지연 없이 처리하려면, IO 스레드와 워커 스레드 간의 메모리 소유권과 생명주기를 명시적으로 제어할 수 있어야 합니다. C++20의 `jthread`, `stop_token`, move semantics, RAII를 활용해 자금 예약/해제와 스레드 종료를 언어 수준에서 안전하게 관리합니다.
 
-include/coinbot/... : 외부에서 재사용 가능한 퍼블릭 헤더들 정리
+## 개발 환경
 
-## 최근 변경 사항
+### Language
+![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C?style=for-the-badge&logo=c%2B%2B&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
 
-### 2026-03-17
+### Build & Runtime
+![CMake](https://img.shields.io/badge/CMake-064F8C?style=for-the-badge&logo=cmake&logoColor=white)
+![MSVC](https://img.shields.io/badge/MSVC-5C2D91?style=for-the-badge&logo=visualstudio&logoColor=white)
+![Ninja](https://img.shields.io/badge/Ninja-000000?style=for-the-badge&logo=ninja&logoColor=white)
+![Boost](https://img.shields.io/badge/Boost-000000?style=for-the-badge&logo=boost&logoColor=white)
+![OpenSSL](https://img.shields.io/badge/OpenSSL-721412?style=for-the-badge&logo=openssl&logoColor=white)
 
-- `PositionEffect` 기반 주문 상태 전이를 도입했다.
-  - 기존에는 `Filled`/`Canceled` + 내부 상태로 포지션 변화를 추론했다. 잘못된 상태 전이(Issue 1: Canceled+전량체결 → 항상 InPosition, Issue 2: WS 체결 유실 시 SELL volume=0)가 발생할 수 있었다.
-  - `core::PositionEffect` 열거형(`None`/`Opened`/`Reduced`/`Closed`)을 추가하고, `MarketEngine::resolvePositionEffect_()`에서 finalize 이후 계좌 잔고 기준으로 effect를 확정해 이벤트에 실어 전략에 전달한다.
-  - `RsiMeanReversionStrategy::onOrderUpdate()`는 effect만 보고 상태 전이를 결정한다. 상태와 체결 여부를 조합하던 이전 추론 로직은 제거됐다.
-  - `EngineOrderStatusEvent`와 `trading::OrderStatusEvent` 모두에 `position_effect` 필드가 추가됐다
-- `Config.h` 중복 임계값을 정리했다.
-  - `StrategyConfig::dust_exit_threshold_krw`를 제거하고 전략 코드 전체에서 `min_notional_krw`로 통합했다.
-  - 두 값이 항상 동일하다는 제약을 각 필드 주석에 명시했다.
+### Database & Data
+![SQLite](https://img.shields.io/badge/SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
+![JSON](https://img.shields.io/badge/nlohmann%2Fjson-000000?style=for-the-badge)
 
-### 2026-03-16
+### Analytics & Tooling
+![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)
+![Pandas](https://img.shields.io/badge/Pandas-150458?style=for-the-badge&logo=pandas&logoColor=white)
+![Plotly](https://img.shields.io/badge/Plotly-3F4F75?style=for-the-badge&logo=plotly&logoColor=white)
 
-- Private WS EOF 문제를 해결했다.
-  - Upbit private WebSocket은 주문 이벤트가 없으면 서버가 약 120s 후 앱 레벨 idle 판정으로 EOF를 보낸다.
-  - `HeartbeatMode::UpbitTextPing` 모드를 추가하고, `ws_private`에 30s 주기로 `"PING"` 텍스트 프레임을 전송하도록 설정했다.
-  - 서버 응답 `{"status":"UP"}`는 JSON 파싱으로 정확히 확인한 뒤 `on_msg_` 호출 전에 필터링해 엔진 계층에 노출되지 않도록 했다.
-  - 기존 컨트롤 ping(25s)은 NAT 무음 드롭 등 죽은 TCP 감지 목적으로 유지했다 — 두 keepalive는 역할이 다르다.
-  - `ws_public`은 초당 캔들 수신이 자연 keepalive 역할을 하므로 미적용.
-- `UpbitWebSocketClient` 코드를 정리했다.
-  - 컨트롤 ping과 텍스트 PING 블록을 단일 keepalive 블록으로 통합했다.
-  - `connectImpl` 탭/스페이스 혼용 및 주석 번호 스타일을 통일했다.
-  - ping `if(!ec)` / `if(ec)` → `if/else` 정리, 미사용 `#include <iostream>` 제거, 타이머 `now()` 중복 호출 통합, `exp` → `backoff_exp` 이름 변경.
+### Ops
+![systemd](https://img.shields.io/badge/systemd-000000?style=for-the-badge)
+![EC2](https://img.shields.io/badge/AWS_EC2-FF9900?style=for-the-badge&logo=amazon-ec2&logoColor=white)
 
-### 2026-03-12
+<hr>
 
-- 주문 복구 경로를 단순화했다.
-  - `MarketEngineManager`는 pending 주문 복구 시 `getOrder()` 재시도만 사용하고, `getOpenOrders()` fallback 경로는 제거했다.
-  - incomplete snapshot 판정은 `MarketEngine::reconcileFromSnapshot()` 쪽에 맡겨 복구 책임을 한 곳으로 모았다.
-- `ReservationToken` move assignment를 제거했다.
-  - `MarketEngine`의 활성 매수 토큰 보관은 대입 대신 `std::optional::emplace()`를 사용한다.
-  - 토큰 소멸자 경로만 남았으므로 `releaseWithoutToken()` 설명도 현재 구조에 맞게 정리했다.
-- DB/로컬 파일 관리 기준을 정리했다.
-  - `Database::open()`은 SQLite가 DB 파일이 없을 때 새 파일을 생성하고, 열기 직후 임베디드 스키마와 PRAGMA를 적용한다.
-  - `docs/*.md`와 vendored `src/database/sqlite3.c/.h`는 로컬 보관 대상으로 `.gitignore`에 추가했다.
+## Key Dependencies and Features
 
-### 2026-03-11
+### 1. Market-Per-Worker Concurrency
+- `MarketEngineManager`가 마켓당 하나의 `std::jthread`를 소유합니다.
+- WebSocket IO 스레드는 raw JSON을 `EventRouter`로 전달하고, `EventRouter`는 마켓별 `BlockingQueue`로 이벤트를 라우팅합니다.
+- 각 마켓 상태는 단일 워커만 수정하므로, 멀티마켓 병렬 처리와 마켓 내부 순차 처리를 동시에 만족합니다.
 
-- Intrabar 손절/익절 청산 로직을 추가했다.
-  - 기존에는 확정 분봉 종가 기준으로만 손절/익절을 판단했다.
-  - `RsiMeanReversionStrategy::onIntrabarCandle()`을 추가해, InPosition 상태에서 미확정 캔들의 close가 손절가 이하 또는 익절가 이상에 도달하면 즉시 시장가 매도를 제출한다.
-  - RSI 기반 청산은 확정 종가 전용으로 유지되며, intrabar 경로는 stop/target 체크만 수행한다.
-  - `MarketEngineManager::handleMarketData_()` 내부에 `doIntrabarCheck` 헬퍼를 추가하고, 실시간 캔들 수신의 세 경로(첫 수신·동일 ts 업데이트·새 분봉)에서 모두 호출한다.
-  - mark price는 submit 성공/실패 여부와 무관하게 intrabar close로 항상 최신화된다.
-  - DB signals 기록 시 rsi/volatility/trend_strength는 NULL로 저장되며, exit_reason은 `exit_stop` / `exit_target` / `exit_stop_target` 규칙을 그대로 따른다.
+### 2. ReservationToken Pattern
+- 매수 주문 전 KRW를 예약하고, 주문 실패/취소 시 예약 금액이 자동 반환되도록 `ReservationToken`을 사용합니다.
+- 토큰은 move-only RAII 객체이며, 비정상 경로에서도 잔액 누수를 줄이도록 설계했습니다.
+- `available_krw`, `reserved_krw`, `coin_balance`를 분리해 pending 상태와 부분 체결을 명시적으로 처리합니다.
 
-### 2026-03-10
+### 3. PositionEffect 기반 상태 전이
+- `Filled`, `Canceled`, `Rejected` 같은 주문 상태와 실제 포지션 변화는 같은 의미가 아니므로 분리해서 다룹니다.
+- `PositionEffect::Opened`, `Reduced`, `Closed`를 계산해 전략이 terminal 상태 이름이 아니라 실제 계좌 반영 결과로 상태를 확정합니다.
+- 이 구조로 부분 체결 후 취소, WS 체결 유실, snapshot 기반 복구에서 잘못된 상태 전이를 줄였습니다.
 
-- AWS 초보자 기준의 EC2 배포 문서를 정리했다.
-  - `docs/EC2_DEPLOY.md`에 `Elastic IP`, `IAM role`, `EBS`, `fstab`, `sentinel file` 설명과 실제 배포 순서를 반영했다.
-  - Ubuntu 24.04 / `t3.small` / 로컬 WSL 빌드 + EC2 배포 흐름으로 문서를 맞췄다.
-- 배포 안전 장치를 추가했다.
-  - `deploy/deploy.sh`와 `deploy/coinbot.service`가 `/home/ubuntu/coinbot` 마운트포인트와 sentinel 파일을 검사하도록 정리했다.
-  - EBS가 마운트되지 않은 상태에서 루트 디스크로 잘못 배포되는 상황을 방지한다.
-- 저장소 정리를 진행했다.
-  - 로컬 전용 파일과 생성 산출물이 Git에 다시 올라가지 않도록 `.gitignore`를 보강했다.
-  - `build/`, `.claude/settings.local.json`, `CLAUDE.md`, `.mcp.json`은 로컬 보관 기준으로 추적에서 제외했다.
+### 4. RSI Mean Reversion Strategy
+- RSI 과매도 진입, 과매수/손절/익절 청산의 평균회귀 전략입니다.
+- 확정봉에서 RSI 기반 진입/청산을 판단하고, 미확정 틱에서는 손절/익절만 즉시 체크합니다.
+- 전략 상태 머신(`Flat` → `PendingEntry` → `InPosition` → `PendingExit` → `Flat`)으로 중복 주문을 방지합니다.
 
-## 로컬 실행
+### 5. Recovery and Operational Resilience
+- 시작 복구에서는 봇이 이전에 낸 미체결 주문을 취소하고, 현재 계좌 포지션만 읽어 전략 상태를 복구합니다.
+- 런타임에서는 pending timeout 또는 private WS 재연결 뒤 `getOrder()` 재시도로 주문 상태를 다시 확인합니다.
+- 치명 상태는 `exit(1)`로 종료하고, Linux 운영 환경에서는 `systemd Restart=on-failure`로 재시작합니다.
 
-로컬 WSL에서 Upbit 키를 매번 직접 입력하지 않으려면 프로젝트 루트에 `.env.local`을 두고 실행 스크립트를 사용한다.
+### 6. SQLite + Streamlit + Backtest Pipeline
+- 봇은 `candles`, `orders`, `signals`를 SQLite WAL DB에 기록합니다.
+- `streamlit/app.py`는 실거래 데이터를 기반으로 P&L, 전략 분석, 백테스트 비교 기능을 제공합니다.
+- `tools/fetch_candles.py`, `tools/candle_rsi_backtest.py`로 과거 데이터 적재와 전략 근사 검증이 가능합니다.
 
-1. 예시 파일 복사
+<hr>
+
+## 아키텍처
+
+### 소프트웨어 아키텍처
+
+본 시스템은 Upbit 거래소와 실시간으로 연결되어 복수 마켓을 동시에 자동 매매하는 이벤트 기반 구조로 설계되어 있습니다.
+거래소로부터 수신되는 시세와 체결 이벤트는 라우터를 거쳐 마켓별 워커 스레드로 분배되며,
+각 워커는 독립된 처리 파이프라인에서 시세 분석, 매매 판단, 주문 실행까지를 순차적으로 수행합니다.
+자금 관리, 주문 추적, 거래 기록 등 공유 자원은 스레드 안전한 계층으로 분리되어
+마켓 간 병렬 처리와 마켓 내부 순차 처리를 동시에 보장합니다.
+
+<!-- TODO: 소프트웨어 아키텍처 다이어그램 -->
+
+아래 표는 다이어그램의 각 구성 요소와 이벤트가 처리되는 순서를 함께 나타냅니다.
+
+| 단계 | 구성 요소 | 설명 |
+| --- | --- | --- |
+| **① 수신** | `UpbitWebSocketClient` | 거래소와의 실시간 연결을 담당하며, 시세 스트림(Public)과 체결 알림(Private) 두 채널을 수신 |
+| **② 라우팅** | `EventRouter` | 수신된 raw JSON에서 마켓 코드를 식별하고 해당 마켓의 `BlockingQueue`로 이벤트를 전달 |
+| **③ 파싱** | `WsMessageParser` | 워커 스레드 내에서 JSON을 도메인 객체(`Candle`, `MyOrder`)로 변환 |
+| **④ 주문 관리** | `MarketEngine` | 체결 중복을 제거하고, 주문의 생성부터 체결/취소까지 생명주기를 추적하며 잔액 반영을 요청 |
+| **⑤ 매매 판단** | `RsiMeanReversionStrategy` | 확정봉에서 RSI 기반 진입/청산을 판단하고, 미확정 틱에서는 손절/익절만 즉시 체크 |
+| **⑥ 주문 실행** | `SharedOrderApi` | 전략의 `Decision`이 주문을 포함하면 JWT 서명 후 Upbit REST API로 주문 전송 |
+| **⑦ 자금 관리** | `AccountManager` | 마켓별 가용/예약 자금과 코인 잔량을 관리하며, RAII 패턴으로 자금 예약/해제를 보장 |
+| **⑧ 기록** | `Database` | 시세, 주문, 전략 신호를 SQLite에 기록하며, WAL 모드로 봇 실행 중에도 Streamlit의 동시 읽기를 허용 |
+
+### 시스템 아키텍처
+
+C++ 트레이딩 봇은 AWS EC2 인스턴스에서 systemd 서비스로 운영되며, Upbit 거래소와는 WSS/HTTPS로 통신합니다.
+거래 데이터는 EBS 볼륨의 SQLite DB에 기록되고, 같은 인스턴스에서 실행되는 Streamlit 대시보드가
+WAL 모드를 통해 봇 실행 중에도 DB를 동시 읽기하여 실시간 분석과 백테스트를 제공합니다.
+배포는 로컬에서 Linux 크로스 빌드 후 deploy 스크립트를 통해 바이너리 전송과 서비스 재시작까지 자동화되어 있습니다.
+
+<!-- TODO: 시스템 아키텍처 다이어그램 -->
+
+| 구성 요소 | 설명 |
+| --- | --- |
+| **CoinBot (C++ Binary)** | EC2에서 systemd로 관리되는 트레이딩 봇 프로세스. 장애 시 자동 재시작 |
+| **Upbit Exchange** | WSS로 실시간 시세/체결 수신, HTTPS REST로 주문 생성/조회/취소. JWT 인증 |
+| **SQLite (EBS Volume)** | 시세, 주문, 전략 신호를 WAL 모드로 저장. EBS 마운트 + sentinel 파일로 볼륨 안전성 검증 |
+| **Streamlit Dashboard** | 실거래 P&L 분석, 전략 지표 시각화, RSI 백테스트를 제공하는 Python 웹 대시보드 |
+| **Deploy Pipeline** | cmake 빌드 → scp 전송 → systemd 재시작을 자동화하는 배포 스크립트 |
+| **systemd** | `Restart=on-failure`로 프로세스 생존 보장. 마운트포인트/sentinel 사전 검증 |
+
+### 복구 구조
+
+복구는 시작 시점과 런타임 시점을 분리해서 설계했습니다.
+
+<!-- TODO: 복구 구조 다이어그램 -->
+
+| 구분 | 트리거 | 동작 |
+| --- | --- | --- |
+| **시작 복구** | 프로세스 시작 | 봇 미체결 주문 취소 → 계좌 조회 → 포지션 복원 |
+| **재연결 복구** | Private WS 재연결 | pending 주문 REST 재조회 → delta 정산 |
+| **타임아웃 복구** | 주문 pending > 120초 | 자동으로 `runRecovery_()` 실행 |
+| **운영 복구** | Worker 비정상 종료 | `exit(1)` → systemd 자동 재시작 |
+
+
+### SQLite + Streamlit + Backtest Pipeline
+
+봇이 SQLite에 기록한 실거래 데이터를 Python 도구들이 읽어 분석, 시각화, 전략 검증까지 수행합니다.
+
+<!-- TODO: Streamlit / Tools 다이어그램 -->
+
+#### Streamlit Dashboard (`streamlit/app.py`)
+
+실거래 DB를 실시간으로 읽어 두 개 탭으로 분석을 제공합니다.
+
+| 탭 | 데이터 소스 | 처리 흐름 |
+| --- | --- | --- |
+| **P&L 분석** | `orders`, `signals` 테이블 | Filled/부분체결 주문 조회 → BID↔ASK 페어링(단일 포지션 모델) → 수수료 반영 P&L 계산 → 승률, Profit Factor, RR Ratio 산출 → 일별/주별 수익 차트 |
+| **전략 분석** | `signals`, `candles` 테이블 | 매수/매도 신호를 캔들스틱 위에 오버레이 → RSI 분포 히스토그램 → 청산 사유(손절/익절/RSI 과매수) 비율 파이차트 → 평균 보유 시간 계산 |
+| **백테스트** | `candles` 테이블 | RSI/추세/변동성 파라미터 슬라이더 조정 → `candle_rsi_backtest.py` 호출 → 시뮬레이션 매매 결과를 캔들스틱+RSI 차트로 시각화 |
+
+P&L 계산에서 청산 사유(exit_reason)는 2단계로 매칭합니다.
+먼저 매도 주문의 `identifier`로 `signals` 테이블과 직접 조인하고, 매칭 실패 시 300초 시간 근접 기준으로 fallback 합니다.
+
+#### 캔들 수집기 (`tools/fetch_candles.py`)
+
+Upbit REST API에서 과거 캔들을 역순으로 배치 조회해 SQLite에 적재합니다.
+
+| 단계 | 동작 |
+| --- | --- |
+| **갭 탐지** | DB에 있는 캔들과 예상 시퀀스를 비교해 누락 구간만 식별 |
+| **역순 배치 조회** | 최신 → 과거 방향으로 200개씩 Upbit API 호출 (0.1초 간격, rate limit 준수) |
+| **충돌 해소** | `ON CONFLICT DO NOTHING` — 봇이 실시간으로 기록한 캔들이 우선 |
+| **미확정봉 제외** | 현재 진행 중인 캔들은 제외하고 마지막 확정봉까지만 저장 |
+
+#### RSI 백테스트 (`tools/candle_rsi_backtest.py`)
+
+SQLite에 적재된 캔들로 RSI 평균회귀 전략을 시뮬레이션합니다.
+
+| 단계 | 동작 |
+| --- | --- |
+| **지표 계산** | Wilder RSI, 변동성(rolling stdev), 추세강도(price window) — C++ 구현과 동일한 로직 |
+| **진입 게이트** | `rsi_ready AND trend ≤ max AND vol ≥ min` 을 모두 만족해야 진입 허용 |
+| **시뮬레이션** | `Flat ↔ InPosition` 2-state 모델. 미확정봉(OHLC)에서 손절/익절 먼저 체크, 확정봉에서 RSI 청산 |
+| **슬리피지/수수료** | 매수 `close × 1.0005`, 매도 `close × 0.9995`, 수수료 0.05% 양방향 반영 |
+| **출력** | 거래 내역, 자산 곡선, 요약(승률/수익/평균 보유 시간), 데이터 품질 리포트 |
+
+> C++ 봇은 4-state(`Flat→PendingEntry→InPosition→PendingExit`) 모델이지만, 백테스트는 즉시 체결을 가정한 2-state 근사 모델입니다.
+
+<hr>
+
+## 로컬 실행 및 도구
+
+### Windows Development
+- Visual Studio 2022 + MSVC + CMake preset 기준입니다.
+- `CMakePresets.json`의 Windows preset은 로컬 Boost/OpenSSL/nlohmann 경로를 전제로 합니다.
+- 개발용 preset: `x64-debug`, `x64-release`
+
+### Local Linux / WSL
 
 ```bash
+cmake --preset linux-release
+cmake --build out/build/linux-release -j$(nproc)
 cp .env.local.example .env.local
-```
-
-2. 실제 키 입력
-
-```bash
-nano .env.local
-```
-
-3. 로컬 실행
-
-```bash
 bash scripts/run_local.sh
 ```
 
-기본 실행 파일 경로는 `out/build/linux-release/CoinBot`이며, 다른 바이너리를 실행하려면 첫 번째 인자로 경로를 넘기면 된다.
+필수 환경 변수:
+- `UPBIT_ACCESS_KEY`
+- `UPBIT_SECRET_KEY`
+- `UPBIT_MARKETS`
+
+
+### Deployment
+- `deploy/coinbot.service`, `deploy/deploy.sh` 기준으로 Linux 운영 환경에 배포합니다.
+- `Restart=on-failure`, `WorkingDirectory`, mountpoint/sentinel 검증을 사용합니다.
+
+## 저장소 구조
+
+```text
+src/
+  core/        # 도메인 타입, BlockingQueue
+  util/        # Config, Logger
+  api/         # JWT, REST, WebSocket, Upbit DTO/Mapper
+  trading/     # 전략, 지표, 자금 관리
+  engine/      # MarketEngine, OrderStore, 엔진 이벤트
+  app/         # CoinBot, MarketEngineManager, EventRouter, StartupRecovery
+  database/    # SQLite 래퍼와 스키마
+
+streamlit/
+  app.py       # 실거래 분석 대시보드
+
+tools/
+  fetch_candles.py
+  candle_rsi_backtest.py
+
+deploy/
+  coinbot.service
+  deploy.sh
+```
+
+## Trade-offs / Known Limits
+
+- 백테스트는 실전 엔진의 근사 모델이며, 체결가와 슬리피지 처리에 단순화가 있습니다.
+- 봇 외부 수동 거래와 로컬 상태가 어긋날 수 있으므로 기본 전제는 봇 단독 계좌 사용입니다.
