@@ -399,5 +399,15 @@ MigrationBackup/
 FodyWeavers.xsd
 
 # Agent/tooling files kept only in local workspace, not in Git
-# CLAUDE.md
+CLAUDE.md
+AGENTS.md
 .mcp.json
+
+# Documentation (local reference only)
+docs/*.md
+
+# Build helper scripts
+build_and_check.cmd
+
+# Root header (generated / local-only)
+CoinBot.h
