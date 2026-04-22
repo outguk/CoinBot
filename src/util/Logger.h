@@ -53,7 +53,7 @@ namespace util
             min_level_ = level;
         }
 
-        // 파일 출력 활성화
+        // 파일 출력 활성화(현재는 x)
         void enableFileOutput(const std::string& filename)
         {
             std::lock_guard<std::mutex> lock(mutex_);

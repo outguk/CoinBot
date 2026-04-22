@@ -413,7 +413,7 @@ void UpbitWebSocketClient::runReadLoop_(std::stop_token stoken)
                     util::Logger::instance().warn("[WS] text heartbeat send failed, reconnecting");
                     doReconnect();
                 } else {
-                    util::Logger::instance().info("[WS] text heartbeat sent: PING");
+                    util::Logger::instance().debug("[WS] text heartbeat sent: PING");
                 }
             }
         }
